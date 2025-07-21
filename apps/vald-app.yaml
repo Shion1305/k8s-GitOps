@@ -1,0 +1,23 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: vald
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://vdaas.github.io/vald-charts
+    chart: vald
+    targetRevision: 1.7.0 # Use the latest stable version or specify as needed
+    helm:
+      valueFiles:
+        - ../../vald/values.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: vald
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true 
