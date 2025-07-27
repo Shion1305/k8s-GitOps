@@ -36,6 +36,7 @@ workspace:
   persistence:
     enabled: true
     size: 10Gi
+    storageClass: local-storage
 
 bootstrap:
   enabled: true
