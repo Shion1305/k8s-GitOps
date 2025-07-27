@@ -5,13 +5,16 @@ metadata:
   namespace: argocd
 spec:
   project: default
-  source:
-    repoURL: https://vald.vdaas.org/charts
+  sources:
+  - repoURL: https://vald.vdaas.org/charts
     chart: vald
-    targetRevision: 1.7.0 # Use the latest stable version or specify as needed
+    targetRevision: 1.7.0
     helm:
       valueFiles:
-        - ../vald/values.yaml
+      - $values/vald/values.yaml
+  - repoURL: https://github.com/Shion1305/k8s-GitOps.git
+    targetRevision: HEAD
+    ref: values
   destination:
     server: https://kubernetes.default.svc
     namespace: vald
