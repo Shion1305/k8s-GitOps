@@ -32,6 +32,11 @@ temporal:
     limits:
       cpu: 0.5
       memory: 256Mi
+  extraEnv:
+    - name: POSTGRES_TLS_ENABLED
+      value: "false"
+    - name: SQL_TLS_ENABLED
+      value: "false"
 
 workspace:
   persistence:
