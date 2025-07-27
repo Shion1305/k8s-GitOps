@@ -7,7 +7,7 @@ global:
     database: airbyte
     user: airbyte
     password: airbyte123
-    sslmode: disable
+    jdbcUrl: "jdbc:postgresql://postgres-postgresql.postgres.svc.cluster.local:5432/airbyte?sslmode=disable"
 
 postgresql:
   enabled: false
