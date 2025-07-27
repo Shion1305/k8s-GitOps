@@ -6,6 +6,10 @@
 
 agent:
   replicas: 2
+  ngt:
+    dimension: 784
+    distance_type: l2
+    object_type: float
 
 # Uncomment and customize below as needed
 # gateway:
