@@ -1,0 +1,41 @@
+global:
+  enabled: true
+  database:
+    type: external
+    host: postgres-postgresql.postgres.svc.cluster.local
+    port: 5432
+    database: airbyte
+    user: airbyte
+    password: airbyte123
+
+postgresql:
+  enabled: false
+
+webapp:
+  resources:
+    limits:
+      cpu: 1
+      memory: 512Mi
+  service:
+    type: ClusterIP
+    port: 80
+
+scheduler:
+  resources:
+    limits:
+      cpu: 1
+      memory: 512Mi
+
+temporal:
+  resources:
+    limits:
+      cpu: 0.5
+      memory: 256Mi
+
+workspace:
+  persistence:
+    enabled: true
+    size: 10Gi
+
+bootstrap:
+  enabled: true

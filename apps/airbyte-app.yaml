@@ -1,0 +1,26 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: airbyte
+  namespace: argocd
+spec:
+  project: default
+  sources:
+  - repoURL: https://airbytehq.github.io/helm-charts
+    chart: airbyte
+    targetRevision: 1.1.0
+    helm:
+      valueFiles:
+      - $values/airbyte/values.yaml
+  - repoURL: https://github.com/Shion1305/k8s-GitOps.git
+    targetRevision: HEAD
+    ref: values
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: airbyte
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
