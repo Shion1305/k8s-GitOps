@@ -5,10 +5,6 @@ metadata:
   namespace: argocd
 spec:
   project: default
-  source:
-    repoURL: https://github.com/Shion1305/k8s-GitOps
-    targetRevision: main
-    path: charts/postgres-operator
   destination:
     server: https://kubernetes.default.svc
     namespace: postgres-operator
@@ -16,3 +12,18 @@ spec:
     automated:
       prune: true
       selfHeal: true
+  sources:
+    - repoURL: https://opensource.zalando.com/postgres-operator/charts/postgres-operator
+      chart: postgres-operator
+      targetRevision: 1.14.0
+      helm:
+        values: |
+          operator:
+            namespace: postgres-operator
+    - repoURL: https://opensource.zalando.com/postgres-operator/charts/postgres-operator-ui
+      chart: postgres-operator-ui
+      targetRevision: 1.14.0
+      helm:
+        values: |
+          operatorApi:
+            url: http://postgres-operator:8080

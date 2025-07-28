@@ -1,6 +1,5 @@
-# charts/postgres‑suite/Chart.yaml
 apiVersion: v2
-name: postgres‑suite
+name: postgres‑operator
 type: application
 version: 0.1.0
 
