@@ -5,7 +5,7 @@
 # You can customize these values as needed
 
 agent:
-  replicas: 2
+  minReplicas: 10
   ngt:
     dimension: 784
     distance_type: l2
