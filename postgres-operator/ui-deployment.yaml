@@ -33,7 +33,9 @@ spec:
         - name: TARGET_NAMESPACE
           value: "*"
         - name: TEAMS
-          value: "[]"
+          value: '["admin", "dev-team", "default"]'
+        - name: SUPERUSER_TEAM
+          value: "admin"
         resources:
           limits:
             cpu: 200m

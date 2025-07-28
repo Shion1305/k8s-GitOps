@@ -30,6 +30,11 @@ configDebug:
   debug_logging: true
   enable_database_access: true
 
+configTeamsApi:
+  enable_teams_api: false
+  enable_team_superuser: false
+  enable_admin_role_for_users: true
+
 configKubernetes:
   cluster_domain: "cluster.local"
   cluster_labels:
