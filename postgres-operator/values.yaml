@@ -32,7 +32,8 @@ configDebug:
 
 configKubernetes:
   cluster_domain: "cluster.local"
-  cluster_labels: "application:spilo"
+  cluster_labels:
+    application: spilo
   cluster_name_label: "cluster-name"
   enable_cross_namespace_secret: false
   enable_init_containers: true
@@ -40,7 +41,7 @@ configKubernetes:
   enable_pod_disruption_budget: true
   enable_sidecars: true
   master_pod_move_timeout: "20m"
-  node_readiness_label: ""
+  node_readiness_label: {}
   node_readiness_label_merge: "OR"
   oauth_token_secret_name: "postgresql-operator"
   pdb_name_format: "postgres-{cluster}-pdb"
