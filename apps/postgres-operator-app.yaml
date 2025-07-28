@@ -9,8 +9,6 @@ spec:
     repoURL: https://github.com/Shion1305/k8s-GitOps
     targetRevision: main
     path: charts/postgres-operator
-    helm:
-      dependencyUpdate: true
   destination:
     server: https://kubernetes.default.svc
     namespace: postgres-operator
