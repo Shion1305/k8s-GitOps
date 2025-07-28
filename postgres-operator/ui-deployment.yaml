@@ -25,7 +25,7 @@ spec:
         - name: APP_URL
           value: "http://localhost:8081"
         - name: OPERATOR_API_URL
-          value: "http://postgres-operator:8080"
+          value: "http://postgres-operator:8080/"
         - name: OPERATOR_CLUSTER_NAME_LABEL
           value: "cluster-name"
         - name: RESOURCES_VISIBLE
