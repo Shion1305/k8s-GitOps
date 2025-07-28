@@ -1,0 +1,39 @@
+apiVersion: "acid.zalan.do/v1"
+kind: postgresql
+metadata:
+  name: dev-postgres
+  namespace: postgres-clusters
+spec:
+  teamId: "dev-team"
+  volume:
+    size: 10Gi
+    storageClass: local-storage
+  numberOfInstances: 1
+  users:
+    admin:  # database owner
+    - superuser
+    - createdb
+    developer:
+    - login
+  databases:
+    devdb: admin  # dbname: owner
+    testdb: admin
+  postgresql:
+    version: "16"
+    parameters:
+      max_connections: "200"
+      shared_buffers: "256MB"
+      effective_cache_size: "1GB"
+      log_statement: "all"
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: 500m
+      memory: 1Gi
+  tolerations:
+  - key: postgres
+    operator: Equal
+    value: "true"
+    effect: NoSchedule

@@ -1,0 +1,63 @@
+apiVersion: "acid.zalan.do/v1"
+kind: postgresql
+metadata:
+  name: prod-postgres
+  namespace: postgres-clusters
+spec:
+  teamId: "prod-team"
+  volume:
+    size: 50Gi
+    storageClass: local-storage
+  numberOfInstances: 3  # High availability with 1 master + 2 replicas
+  users:
+    app_user:
+    - login
+    - createdb
+    readonly_user:
+    - login
+    backup_user:
+    - login
+    - replication
+  databases:
+    appdb: app_user
+    analytics: app_user
+  postgresql:
+    version: "16"
+    parameters:
+      max_connections: "500"
+      shared_buffers: "1GB"
+      effective_cache_size: "3GB"
+      checkpoint_completion_target: "0.9"
+      wal_buffers: "16MB"
+      default_statistics_target: "100"
+      random_page_cost: "1.1"
+      effective_io_concurrency: "200"
+      work_mem: "4MB"
+      min_wal_size: "1GB"
+      max_wal_size: "4GB"
+      max_worker_processes: "8"
+      max_parallel_workers_per_gather: "4"
+      max_parallel_workers: "8"
+  resources:
+    requests:
+      cpu: 1
+      memory: 2Gi
+    limits:
+      cpu: 2
+      memory: 4Gi
+  enableShmVolume: true
+  enableConnectionPooler: true  # Enable PgBouncer
+  enableReplicaConnectionPooler: true
+  tolerations:
+  - key: postgres
+    operator: Equal
+    value: "true"
+    effect: NoSchedule
+  nodeAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: kubernetes.io/os
+          operator: In
+          values:
+          - linux
