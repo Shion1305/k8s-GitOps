@@ -10,7 +10,7 @@ metadata:
   name: postgres-operator-ui
 rules:
 - apiGroups: [""]
-  resources: ["configmaps", "secrets", "services", "pods"]
+  resources: ["configmaps", "secrets", "services", "pods", "namespaces"]
   verbs: ["get", "list", "watch"]
 - apiGroups: ["apps"]
   resources: ["deployments", "replicasets", "statefulsets"]
