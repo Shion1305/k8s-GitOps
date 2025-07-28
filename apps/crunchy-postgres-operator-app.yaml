@@ -1,0 +1,35 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: crunchy-postgres-operator
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  sources:
+  - repoURL: oci://registry.developers.crunchydata.com/crunchydata
+    chart: pgo
+    targetRevision: 5.8.2
+    helm:
+      valueFiles:
+      - $values/crunchy-postgres-operator/values.yaml
+  - repoURL: https://github.com/Shion1305/k8s-GitOps.git
+    targetRevision: HEAD
+    ref: values
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: postgres-operator-crunchy
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+    retry:
+      limit: 3
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
