@@ -1,0 +1,13 @@
+# charts/postgres‑suite/Chart.yaml
+apiVersion: v2
+name: postgres‑suite
+type: application
+version: 0.1.0
+
+dependencies:
+  - name: postgres‑operator
+    version: "1.14.0"
+    repository: https://opensource.zalando.com/postgres-operator/charts/postgres-operator   # official Operator chart :contentReference[oaicite:0]{index=0}
+  - name: postgres‑operator-ui
+    version: "1.14.0"
+    repository: https://opensource.zalando.com/postgres-operator/charts/postgres-operator-ui  # official UI chart :contentReference[oaicite:1]{index=1}

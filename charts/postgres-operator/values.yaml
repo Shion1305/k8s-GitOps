@@ -1,0 +1,7 @@
+postgres‑operator:
+  operator:
+    namespace: postgres-operator
+
+postgres‑operator-ui:
+  operatorApi:
+    url: http://postgres-operator:8080
