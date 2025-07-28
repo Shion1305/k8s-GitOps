@@ -1,0 +1,29 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: enforce-pvc-storage-limits
+spec:
+  validationFailureAction: Enforce
+  background: false
+  rules:
+  - name: limit-pvc-size-globally
+    match:
+      any:
+      - resources:
+          kinds:
+          - PersistentVolumeClaim
+    exclude:
+      any:
+      - resources:
+          namespaces:
+          - kube-system
+          - kube-public
+          - kube-node-lease
+          - kyverno
+    validate:
+      message: "PVC size exceeds maximum allowed (100Gi). Large storage requests can cause node capacity issues."
+      pattern:
+        spec:
+          resources:
+            requests:
+              storage: "<=100Gi"
