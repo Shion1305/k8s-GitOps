@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
       - name: postgres-operator-ui
-        image: registry.opensource.zalan.do/acid/postgres-operator-ui:v1.13.0
+        image: registry.opensource.zalan.do/acid/postgres-operator-ui:v1.14.0
         ports:
         - containerPort: 8081
           name: http
@@ -31,9 +31,9 @@ spec:
         - name: RESOURCES_VISIBLE
           value: "False"
         - name: TARGET_NAMESPACE
-          value: "*"
+          value: "postgres-operator-deployment"
         - name: TEAMS
-          value: '["admin", "dev-team", "default"]'
+          value: '["default", "admin"]'
         - name: SUPERUSER_TEAM
           value: "admin"
         resources:

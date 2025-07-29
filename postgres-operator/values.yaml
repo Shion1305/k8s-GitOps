@@ -1,7 +1,7 @@
 image:
   registry: registry.opensource.zalan.do
   repository: acid/postgres-operator
-  tag: v1.13.0
+  tag: v1.14.0
   pullPolicy: IfNotPresent
 
 # Operator configuration
@@ -63,7 +63,7 @@ configKubernetes:
   watched_namespace: "*"  # Watch all namespaces
 
 configLogicalBackup:
-  logical_backup_docker_image: "registry.opensource.zalan.do/acid/logical-backup:v1.13.0"
+  logical_backup_docker_image: "registry.opensource.zalan.do/acid/logical-backup:v1.14.0"
   logical_backup_job_prefix: "logical-backup-"
   logical_backup_provider: "s3"
   logical_backup_s3_bucket: ""
