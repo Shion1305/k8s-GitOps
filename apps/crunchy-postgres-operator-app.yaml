@@ -8,9 +8,9 @@ metadata:
 spec:
   project: default
   sources:
-  - repoURL: oci://registry.developers.crunchydata.com/crunchydata
-    chart: pgo
-    targetRevision: 5.8.2
+  - repoURL: https://github.com/Shion1305/crunchy-postgres-operator.git
+    targetRevision: HEAD
+    path: helm/install
     helm:
       valueFiles:
       - $values/crunchy-postgres-operator/values.yaml
@@ -19,7 +19,7 @@ spec:
     ref: values
   destination:
     server: https://kubernetes.default.svc
-    namespace: postgres-operator-crunchy
+    namespace: crunchydata-pg-operator
   syncPolicy:
     automated:
       prune: true
