@@ -15,8 +15,8 @@ Contains the Helm values for the Airbyte deployment, configured to use an extern
 
 ### secret-sync.yaml
 - **ServiceAccount**: `secret-replicator` with necessary RBAC permissions
-- **ClusterRole**: Allows reading secrets from any namespace and creating/updating specific secrets
-- **Job**: ArgoCD PreSync hook that replicates the PostgreSQL credentials from `postgres-operator-deployment` to `airbyte` namespace
+- **ClusterRole**: Allows reading secrets from any namespace and creating/updating the airbyte secrets
+- **Job**: ArgoCD PreSync hook that transforms PostgreSQL credentials from the postgres-operator format to Airbyte's expected format
 
 ## Database Connection Details
 
@@ -24,7 +24,7 @@ Contains the Helm values for the Airbyte deployment, configured to use an extern
 - **Port**: `5432`
 - **Database**: `airbyte`
 - **User**: `airbyte`
-- **Password**: Referenced from secret `airbyte.airbyte.credentials.postgresql.acid.zalan.do`
+- **Password**: Referenced from secret `airbyte-airbyte-secrets` with key `DATABASE_PASSWORD`
 
 ## Security Considerations
 
