@@ -2,11 +2,13 @@ global:
   enabled: true
   database:
     type: external
-    host: postgres-postgresql.postgres.svc.cluster.local
+    host: airbyte.postgres-operator-deployment.svc.cluster.local
     port: 5432
     database: airbyte
     user: airbyte
-    password: airbyte123
+    passwordSecret:
+      name: airbyte.airbyte.credentials.postgresql.acid.zalan.do
+      key: password
 
 postgresql:
   enabled: false
