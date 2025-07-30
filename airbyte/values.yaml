@@ -1,3 +1,7 @@
+workload-launcher:
+  serviceAccount:
+    name: airbyte-cluster-admin
+
 global:
   enabled: true
   database:
