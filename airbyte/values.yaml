@@ -12,6 +12,11 @@ global:
     database: "airbyte"
     userSecretKey: "database-user"
     passwordSecretKey: "database-password"
+  extraEnv:
+    - name: "ENV_POSTGRES_DB"
+      value: "POSTGRES_DB=airbyte"
+    - name: "ENV_DATABASE_DB"
+      value: "DATABASE_DB=airbyte"
 
 postgresql:
   enabled: false
