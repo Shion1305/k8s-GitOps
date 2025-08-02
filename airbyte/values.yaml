@@ -50,3 +50,6 @@ workspace:
 
 bootstrap:
   enabled: true
+
+dataPlane:
+  enabled: false
