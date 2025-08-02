@@ -69,18 +69,8 @@ grafana:
   defaultDashboardsEnabled: true
   defaultDashboardsTimezone: UTC
   
-  # Datasources configuration
-  datasources:
-    datasources.yaml:
-      apiVersion: 1
-      datasources:
-        - name: Prometheus
-          type: prometheus
-          url: http://kube-prometheus-stack-prometheus:9090
-          access: proxy
-          isDefault: true
-          jsonData:
-            timeInterval: 30s
+  # Datasources configuration - use default from chart
+  # (chart automatically configures Prometheus datasource)
   
   # Dashboard providers
   dashboardProviders:
