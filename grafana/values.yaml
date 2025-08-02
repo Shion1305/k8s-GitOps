@@ -1,0 +1,183 @@
+# Kube-Prometheus Stack Helm Values
+# Includes Grafana, Prometheus, and AlertManager
+
+# Global settings
+global:
+  scrapeInterval: 30s
+  evaluationInterval: 30s
+
+# Prometheus configuration
+prometheus:
+  enabled: true
+  prometheusSpec:
+    # Retention settings
+    retention: 30d
+    retentionSize: 15GB
+    
+    # Storage configuration
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: local-path
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 20Gi
+    
+    # Service discovery settings - discover all ServiceMonitors
+    serviceMonitorSelectorNilUsesHelmValues: false
+    serviceMonitorNamespaceSelector: {}
+    serviceMonitorSelector: {}
+    podMonitorSelectorNilUsesHelmValues: false
+    podMonitorNamespaceSelector: {}
+    podMonitorSelector: {}
+    ruleSelectorNilUsesHelmValues: false
+    ruleNamespaceSelector: {}
+    ruleSelector: {}
+    
+    # Resource configuration
+    resources:
+      limits:
+        cpu: 2000m
+        memory: 8Gi
+      requests:
+        cpu: 1000m
+        memory: 4Gi
+
+# Grafana configuration
+grafana:
+  enabled: true
+  
+  # Admin credentials (use secure values in production)
+  adminPassword: admin123
+  
+  # Service configuration
+  service:
+    type: NodePort
+    nodePort: 30080
+  
+  # Persistence
+  persistence:
+    enabled: true
+    type: pvc
+    storageClassName: local-path
+    size: 10Gi
+    accessModes:
+      - ReadWriteOnce
+  
+  # Default dashboards
+  defaultDashboardsEnabled: true
+  defaultDashboardsTimezone: UTC
+  
+  # Datasources configuration
+  datasources:
+    datasources.yaml:
+      apiVersion: 1
+      datasources:
+        - name: Prometheus
+          type: prometheus
+          url: http://kube-prometheus-stack-prometheus:9090
+          access: proxy
+          isDefault: true
+          jsonData:
+            timeInterval: 30s
+  
+  # Dashboard providers
+  dashboardProviders:
+    dashboardProviders.yaml:
+      apiVersion: 1
+      providers:
+        - name: 'default'
+          orgId: 1
+          folder: ''
+          type: file
+          disableDeletion: false
+          editable: true
+          options:
+            path: /var/lib/grafana/dashboards/default
+        - name: 'node-exporter'
+          orgId: 1
+          folder: 'Node Metrics'
+          type: file
+          disableDeletion: false
+          editable: true
+          options:
+            path: /var/lib/grafana/dashboards/node-exporter
+  
+  # Pre-configured dashboards
+  dashboards:
+    default:
+      kubernetes-cluster-monitoring:
+        gnetId: 7249
+        revision: 1
+        datasource: Prometheus
+      kubernetes-node-exporter:
+        gnetId: 1860
+        revision: 37
+        datasource: Prometheus
+    node-exporter:
+      node-exporter-full:
+        gnetId: 1860
+        revision: 37
+        datasource: Prometheus
+      node-exporter-server-metrics:
+        gnetId: 405
+        revision: 8
+        datasource: Prometheus
+  
+  # Grafana configuration
+  grafana.ini:
+    server:
+      root_url: "%(protocol)s://%(domain)s:%(http_port)s/grafana/"
+      serve_from_sub_path: true
+    auth.anonymous:
+      enabled: false
+    security:
+      admin_user: admin
+    dashboards:
+      default_home_dashboard_path: /var/lib/grafana/dashboards/default/kubernetes-cluster-monitoring.json
+  
+  # Resource configuration
+  resources:
+    limits:
+      cpu: 500m
+      memory: 1Gi
+    requests:
+      cpu: 250m
+      memory: 512Mi
+
+# AlertManager configuration
+alertmanager:
+  enabled: true
+  alertmanagerSpec:
+    storage:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: local-path
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 5Gi
+    resources:
+      limits:
+        cpu: 100m
+        memory: 256Mi
+      requests:
+        cpu: 50m
+        memory: 128Mi
+
+# Node Exporter (disabled since we're deploying it separately)
+nodeExporter:
+  enabled: false
+
+# Kube State Metrics
+kubeStateMetrics:
+  enabled: true
+
+# Prometheus Node Exporter Service Monitor
+prometheusNodeExporter:
+  enabled: false  # We'll use our separate deployment
+
+# Service Monitors
+prometheus-node-exporter:
+  enabled: true

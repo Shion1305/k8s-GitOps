@@ -1,0 +1,73 @@
+# Node Exporter Helm Values
+# Deploys node-exporter as DaemonSet to collect metrics from all nodes
+
+# Service configuration
+service:
+  type: ClusterIP
+  port: 9100
+  targetPort: 9100
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "9100"
+
+# Pod configuration
+podLabels:
+  app: node-exporter
+  component: metrics
+
+# Security context
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 65534
+  fsGroup: 65534
+
+# Node selector to avoid cordoned nodes (deploy only to available nodes)
+nodeSelector:
+  kubernetes.io/hostname: shion-ubuntu-2505
+
+# Tolerations - allow deployment on all nodes including master
+tolerations:
+  - operator: Exists
+
+# Resource limits
+resources:
+  limits:
+    cpu: 200m
+    memory: 50Mi
+  requests:
+    cpu: 100m
+    memory: 30Mi
+
+# Host network and PID for proper node metrics collection
+hostNetwork: true
+hostPID: true
+
+# Mount host filesystem for metrics collection
+hostRootFSMount:
+  enabled: true
+  mountPropagation: HostToContainer
+
+# Prometheus ServiceMonitor (will be picked up by Prometheus)
+prometheus:
+  monitor:
+    enabled: true
+    jobLabel: node-exporter
+    interval: 30s
+    scrapeTimeout: 10s
+    path: /metrics
+    labels:
+      app: node-exporter
+      component: metrics
+    relabelings:
+      - sourceLabels: [__meta_kubernetes_pod_node_name]
+        separator: ;
+        regex: ^(.*)$
+        targetLabel: instance
+        replacement: ${1}
+        action: replace
+      - sourceLabels: [__meta_kubernetes_pod_node_name]
+        separator: ;
+        regex: ^(.*)$
+        targetLabel: node
+        replacement: ${1}
+        action: replace
