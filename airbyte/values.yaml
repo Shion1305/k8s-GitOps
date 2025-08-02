@@ -9,7 +9,7 @@ global:
     secretName: "airbyte-config-secrets"
     host: airbyte.postgres-operator-deployment.svc.cluster.local
     port: 5432
-    database: airbyte
+    database: "airbyte"
     userSecretKey: "database-user"
     passwordSecretKey: "database-password"
 
