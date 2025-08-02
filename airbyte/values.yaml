@@ -24,7 +24,7 @@ postgresql:
 webapp:
   resources:
     limits:
-      cpu: 1
+      cpu: 2
       memory: 512Mi
   service:
     type: ClusterIP
@@ -33,13 +33,13 @@ webapp:
 scheduler:
   resources:
     limits:
-      cpu: 1
+      cpu: 2
       memory: 512Mi
 
 temporal:
   resources:
     limits:
-      cpu: 0.5
+      cpu: 1
       memory: 256Mi
 
 workspace:
@@ -48,8 +48,23 @@ workspace:
     size: 10Gi
     storageClass: local-storage
 
+worker:
+  resources:
+    limits:
+      cpu: 4
+      memory: 4Gi
+  hpa:
+    enabled: true
+
+server:
+  livenessProbe:
+    failureThreshold: 5
+
 bootstrap:
   enabled: true
 
 dataPlane:
   enabled: false
+
+metrics:
+  enabled: true
