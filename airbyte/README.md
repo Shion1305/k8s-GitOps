@@ -11,12 +11,15 @@ This directory contains the configuration for Airbyte that integrates with a Pos
 ## Components
 
 ### values.yaml
+
 Contains the Helm values for the Airbyte deployment, configured to use an external PostgreSQL database.
 
 ### secrets.yaml
+
 - **Secret**: Empty `airbyte-airbyte-secrets` managed by ArgoCD with placeholder values
 
 ### secret-sync.yaml
+
 - **ServiceAccount**: `secret-replicator` with necessary RBAC permissions
 - **ClusterRole**: Allows reading secrets from any namespace and updating the airbyte secrets
 - **Job**: ArgoCD PreSync hook that patches the ArgoCD-managed secret with PostgreSQL credentials from the postgres-operator
