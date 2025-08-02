@@ -6,12 +6,12 @@ global:
   enabled: true
   database:
     type: external
+    secretName: "airbyte-config-secrets"
     host: airbyte.postgres-operator-deployment.svc.cluster.local
     port: 5432
     database: airbyte
-    user: airbyte
-    # Note: Password will be provided by the airbyte-secrets secret created by our secret-sync job
-    password: "will-be-overridden-by-secret"
+    userSecretKey: "database-user"
+    passwordSecretKey: "database-password"
 
 postgresql:
   enabled: false
