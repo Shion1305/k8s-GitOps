@@ -1,0 +1,15 @@
+apiVersion: acid.zalan.do/v1
+kind: OperatorConfiguration
+metadata:
+  name: postgres-operator
+  namespace: postgres-operator
+configuration:
+  enable_team_superuser: false
+  spilo_runasuser: 101
+  spilo_runasgroup: 103
+  spilo_fsgroup: 103
+  kubernetes:
+    pod_deletion_wait_timeout: "10m"
+    pod_label_wait_timeout: "10m"
+  logical_backup:
+    logical_backup_s3_secret_name: ""
