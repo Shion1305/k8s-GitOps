@@ -1,0 +1,31 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: network-stress-test-ingress
+  namespace: network-stress-test
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    # Increase proxy timeouts for large file downloads
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "3600"
+    # Increase body size limit for uploads
+    nginx.ingress.kubernetes.io/proxy-body-size: "2g"
+spec:
+  ingressClassName: nginx-ssl
+  tls:
+  - hosts:
+    - network-stress-test.k.shion1305.com
+    # No secretName needed - controller uses default SSL certificate
+  rules:
+  - host: network-stress-test.k.shion1305.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: network-stress-test-service
+            port:
+              number: 8080

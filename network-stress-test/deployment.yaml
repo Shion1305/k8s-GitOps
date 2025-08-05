@@ -1,0 +1,139 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: network-stress-test
+  namespace: network-stress-test
+  labels:
+    app: network-stress-test
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: network-stress-test
+  template:
+    metadata:
+      labels:
+        app: network-stress-test
+    spec:
+      containers:
+      - name: stress-server
+        image: nginx:alpine
+        ports:
+        - containerPort: 8080
+        envFrom:
+        - configMapRef:
+            name: stress-test-config
+        command: ["/bin/sh"]
+        args:
+        - -c
+        - |
+          # Create a simple HTTP server that streams large data
+          cat > /tmp/server.sh << 'EOF'
+          #!/bin/sh
+          
+          # Create large data files of different sizes
+          mkdir -p /tmp/data
+          
+          # Generate test data files
+          echo "Generating test data files..."
+          dd if=/dev/zero of=/tmp/data/1mb.dat bs=1M count=1 2>/dev/null
+          dd if=/dev/zero of=/tmp/data/10mb.dat bs=1M count=10 2>/dev/null
+          dd if=/dev/zero of=/tmp/data/100mb.dat bs=1M count=100 2>/dev/null
+          dd if=/dev/zero of=/tmp/data/1gb.dat bs=1M count=1024 2>/dev/null
+          
+          # Create nginx config for streaming
+          cat > /etc/nginx/nginx.conf << 'NGINX_EOF'
+          events {
+              worker_connections 1024;
+          }
+          
+          http {
+              sendfile on;
+              tcp_nopush on;
+              tcp_nodelay on;
+              keepalive_timeout 65;
+              
+              server {
+                  listen 8080;
+                  server_name localhost;
+                  
+                  # Health check endpoint
+                  location /health {
+                      access_log off;
+                      return 200 "healthy\n";
+                      add_header Content-Type text/plain;
+                  }
+                  
+                  # Metrics endpoint
+                  location /metrics {
+                      access_log off;
+                      return 200 "# Network stress test metrics\nstress_test_active 1\n";
+                      add_header Content-Type text/plain;
+                  }
+                  
+                  # Stream endpoints for different sizes
+                  location /stream/1mb {
+                      add_header Content-Type application/octet-stream;
+                      add_header Content-Length 1048576;
+                      alias /tmp/data/1mb.dat;
+                  }
+                  
+                  location /stream/10mb {
+                      add_header Content-Type application/octet-stream;
+                      add_header Content-Length 10485760;
+                      alias /tmp/data/10mb.dat;
+                  }
+                  
+                  location /stream/100mb {
+                      add_header Content-Type application/octet-stream;
+                      add_header Content-Length 104857600;
+                      alias /tmp/data/100mb.dat;
+                  }
+                  
+                  location /stream/1gb {
+                      add_header Content-Type application/octet-stream;
+                      add_header Content-Length 1073741824;
+                      alias /tmp/data/1gb.dat;
+                  }
+                  
+                  # Dynamic streaming endpoint
+                  location ~ ^/stream/([0-9]+)mb$ {
+                      set $size $1;
+                      add_header Content-Type application/octet-stream;
+                      return 200;
+                  }
+                  
+                  # Root endpoint with usage instructions
+                  location / {
+                      return 200 "Network Stress Test Server\n\nAvailable endpoints:\n/health - Health check\n/metrics - Metrics\n/stream/1mb - Stream 1MB\n/stream/10mb - Stream 10MB\n/stream/100mb - Stream 100MB\n/stream/1gb - Stream 1GB\n\nUsage: curl -o /dev/null http://service-ip:8080/stream/100mb\n";
+                      add_header Content-Type text/plain;
+                  }
+              }
+          }
+          NGINX_EOF
+          
+          echo "Starting nginx..."
+          nginx -g "daemon off;"
+          EOF
+          
+          chmod +x /tmp/server.sh
+          /tmp/server.sh
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "2Gi"
+            cpu: "1000m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 5
