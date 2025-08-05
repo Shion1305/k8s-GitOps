@@ -56,7 +56,8 @@ spec:
               server {
                   listen 8080;
                   server_name localhost;
-                  
+                  root /tmp/data;
+
                   # Health check endpoint
                   location /health {
                       access_log off;
@@ -73,34 +74,19 @@ spec:
                   
                   # Stream endpoints for different sizes
                   location /stream/1mb {
-                      add_header Content-Type application/octet-stream;
-                      add_header Content-Length 1048576;
-                      alias /tmp/data/1mb.dat;
+                      try_files /1mb.dat =404;
                   }
                   
                   location /stream/10mb {
-                      add_header Content-Type application/octet-stream;
-                      add_header Content-Length 10485760;
-                      alias /tmp/data/10mb.dat;
+                      try_files /10mb.dat =404;
                   }
                   
                   location /stream/100mb {
-                      add_header Content-Type application/octet-stream;
-                      add_header Content-Length 104857600;
-                      alias /tmp/data/100mb.dat;
+                      try_files /100mb.dat =404;
                   }
                   
                   location /stream/1gb {
-                      add_header Content-Type application/octet-stream;
-                      add_header Content-Length 1073741824;
-                      alias /tmp/data/1gb.dat;
-                  }
-                  
-                  # Dynamic streaming endpoint
-                  location ~ ^/stream/([0-9]+)mb$ {
-                      set $size $1;
-                      add_header Content-Type application/octet-stream;
-                      return 200;
+                      try_files /1gb.dat =404;
                   }
                   
                   # Root endpoint with usage instructions
