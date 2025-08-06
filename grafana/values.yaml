@@ -48,9 +48,6 @@ prometheus:
 grafana:
   enabled: true
   
-  # Admin credentials (use secure values in production)
-  adminPassword: admin123
-  
   # Service configuration
   service:
     type: NodePort
@@ -115,15 +112,48 @@ grafana:
         revision: 8
         datasource: Prometheus
   
+  # Environment variables to load GitHub OAuth credentials from secret
+  envFromSecret: grafana-github-oauth-secret
+  
   # Grafana configuration
   grafana.ini:
     server:
       root_url: "%(protocol)s://%(domain)s:%(http_port)s/grafana/"
       serve_from_sub_path: true
+    
+    # Disable anonymous authentication
     auth.anonymous:
       enabled: false
+    
+    # Disable basic authentication (password login)
+    auth.basic:
+      enabled: false
+    
+    # Disable local login form and enable auto-login
+    auth:
+      disable_login_form: true
+      disable_signout_menu: false
+      oauth_auto_login: true
+    
+    # GitHub OAuth configuration
+    auth.github:
+      enabled: true
+      allow_sign_up: true
+      client_id: $dex.github.clientID
+      client_secret: $dex.github.clientSecret
+      scopes: user:email,read:org
+      auth_url: https://github.com/login/oauth/authorize
+      token_url: https://github.com/login/oauth/access_token
+      api_url: https://api.github.com/user
+      allowed_organizations: # Add your GitHub organizations here if needed
+      team_ids: # Add specific team IDs if needed
+      allow_assign_grafana_admin: false
+      role_attribute_path: # Optional: map GitHub teams to Grafana roles
+    
     security:
       admin_user: admin
+      # Note: admin password is disabled since we're using OAuth only
+    
     dashboards:
       default_home_dashboard_path: /var/lib/grafana/dashboards/default/kubernetes-cluster-monitoring.json
   
