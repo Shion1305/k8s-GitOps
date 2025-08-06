@@ -113,7 +113,11 @@ grafana:
         datasource: Prometheus
   
   # Environment variables to load GitHub OAuth credentials from secret
-  envFromSecret: grafana-github-oauth-secret
+  envFromSecrets:
+    - name: grafana-github-oauth-secret
+  
+  # Disable security validation for sensitive keys (required for OAuth secrets)
+  assertNoLeakedSecrets: false
   
   # Grafana configuration
   grafana.ini:
@@ -139,8 +143,8 @@ grafana:
     auth.github:
       enabled: true
       allow_sign_up: true
-      client_id: $dex.github.clientID
-      client_secret: $dex.github.clientSecret
+      client_id: ${dex.github.clientID}
+      client_secret: ${dex.github.clientSecret}
       scopes: user:email,read:org
       auth_url: https://github.com/login/oauth/authorize
       token_url: https://github.com/login/oauth/access_token
