@@ -77,7 +77,10 @@ configFiles:
     {
       "storage": { "rootDirectory": "/var/lib/registry" },
       "http": { "address": "0.0.0.0", "port": "5000" },
-      "log": { "level": "debug" }
+      "log": { "level": "debug" },
+      "extensions": {
+        "ui": { "enable": true }
+      }
     }
 # Alternatively, the configuration can include authentication and acessControl
 # data and we can use mountSecret option for the passwords.
