@@ -2,7 +2,7 @@ apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
   name: zot
-  namespace: argocd
+  namespace: zot
 spec:
   project: default
   sources:
