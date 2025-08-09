@@ -1,0 +1,27 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: zot
+  namespace: argocd
+spec:
+  project: default
+  sources:
+  - repoURL: https://zotregistry.dev/helm-charts
+    chart: zot
+    targetRevision: 0.1.78
+    helm:
+      valueFiles:
+      - $values/zot/values.yaml
+  - repoURL: https://github.com/Shion1305/k8s-GitOps.git
+    targetRevision: HEAD
+    ref: values
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: zot
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
