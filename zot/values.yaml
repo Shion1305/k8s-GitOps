@@ -68,7 +68,7 @@ startupProbe:
   failureThreshold: 3
 # If mountConfig is true the configMap named $CHART_RELEASE-config is mounted
 # on the pod's '/etc/zot' directory
-mountConfig: false
+mountConfig: true
 # If mountConfig is true the chart creates the '$CHART_RELEASE-config', if it
 # does not exist the user is in charge of managing it (as this file includes a
 # sample file you have to add it empty to handle it externally).
@@ -128,11 +128,7 @@ externalSecrets: []
 mountSecret: false
 # If secretFiles does not exist the user is in charge of managing it, again, if
 # you want to manage it the value has to be added empty to avoid using this one
-secretFiles:
-  # Example htpasswd with 'admin:admin' & 'user:user' user:pass pairs
-  htpasswd: |-
-    admin:$2y$05$vmiurPmJvHylk78HHFWuruFFVePlit9rZWGA/FbZfTEmNRneGJtha
-    user:$2y$05$L86zqQDfH5y445dcMlwu6uHv.oXFgT6AiJCwpv3ehr7idc0rI3S2G
+secretFiles: {}
 # Authentication string for Kubernetes probes, which is needed when `htpasswd`
 # authentication is enabled, but the anonymous access policy is not.
 # It contains a `user:password` string encoded in base64. The example value is
