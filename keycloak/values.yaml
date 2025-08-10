@@ -24,11 +24,10 @@ proxyHeaders: xforwarded
 # Configure ingress
 ingress:
   enabled: true
-  ingressClassName: nginx
+  ingressClassName: nginx-ssl
   hostname: keycloak.k.shion1305.com
   tls: true
   annotations:
-    cert-manager.io/cluster-issuer: letsencrypt-prod
     nginx.ingress.kubernetes.io/proxy-buffer-size: "16k"
     nginx.ingress.kubernetes.io/proxy-buffers-number: "8"
 
