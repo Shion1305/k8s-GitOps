@@ -9,9 +9,9 @@ postgresql:
   enabled: false
 
 externalDatabase:
-  host: keykloak.postgres-operator-deployment.svc.cluster.local
+  host: keycloak.postgres-operator-deployment.svc.cluster.local
   port: 5432
-  database: keykloak
+  database: keycloak
   user: postgres
   existingSecret: keycloak-postgres-credentials
   existingSecretPasswordKey: postgres-password
