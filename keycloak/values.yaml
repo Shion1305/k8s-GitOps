@@ -35,7 +35,7 @@ ingress:
 # Enable required Keycloak features
 extraEnvVars:
   - name: KC_FEATURES
-    value: "token-exchange,docker"
+    value: "token-exchange"
   - name: KC_HTTP_RELATIVE_PATH
     value: "/"
   - name: KC_PROXY_HEADERS
