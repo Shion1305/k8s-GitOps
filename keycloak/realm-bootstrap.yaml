@@ -40,14 +40,14 @@ spec:
           done
           
           echo "Configuring kcadm..."
-          /opt/keycloak/bin/kcadm.sh config credentials \
+          /opt/bitnami/keycloak/bin/kcadm.sh config credentials \
             --server $KEYCLOAK_URL \
             --realm master \
             --user $KEYCLOAK_ADMIN \
             --password $KEYCLOAK_ADMIN_PASSWORD
           
           echo "Creating registry realm..."
-          /opt/keycloak/bin/kcadm.sh create realms \
+          /opt/bitnami/keycloak/bin/kcadm.sh create realms \
             -s realm=registry \
             -s enabled=true \
             -s displayName="Docker Registry" \
@@ -60,7 +60,7 @@ spec:
             -s loginWithEmailAllowed=true || echo "Realm already exists"
           
           echo "Creating docker-registry client..."
-          CLIENT_ID=$(/opt/keycloak/bin/kcadm.sh create clients -r registry \
+          CLIENT_ID=$(/opt/bitnami/keycloak/bin/kcadm.sh create clients -r registry \
             -s clientId=docker-registry \
             -s enabled=true \
             -s protocol=docker-v2 \
@@ -68,10 +68,10 @@ spec:
             -s standardFlowEnabled=true \
             -s directAccessGrantsEnabled=false \
             -s serviceAccountsEnabled=false \
-            -i 2>/dev/null || /opt/keycloak/bin/kcadm.sh get clients -r registry -q clientId=docker-registry --fields id --format csv --noquotes | tail -n1)
+            -i 2>/dev/null || /opt/bitnami/keycloak/bin/kcadm.sh get clients -r registry -q clientId=docker-registry --fields id --format csv --noquotes | tail -n1)
           
           echo "Creating GitHub Actions identity provider..."
-          /opt/keycloak/bin/kcadm.sh create identity-provider/instances -r registry \
+          /opt/bitnami/keycloak/bin/kcadm.sh create identity-provider/instances -r registry \
             -s alias=github-actions \
             -s providerId=oidc \
             -s enabled=true \
@@ -85,38 +85,38 @@ spec:
             -s config.syncMode=IMPORT || echo "IdP already exists"
           
           echo "Creating mappers for GitHub Actions claims..."
-          IDP_ID=$(/opt/keycloak/bin/kcadm.sh get identity-provider/instances/github-actions -r registry --fields internalId --format csv --noquotes | tail -n1)
+          IDP_ID=$(/opt/bitnami/keycloak/bin/kcadm.sh get identity-provider/instances/github-actions -r registry --fields internalId --format csv --noquotes | tail -n1)
           
           # Repository mapper
-          /opt/keycloak/bin/kcadm.sh create identity-provider/instances/github-actions/mappers -r registry \
+          /opt/bitnami/keycloak/bin/kcadm.sh create identity-provider/instances/github-actions/mappers -r registry \
             -s name=repository-mapper \
             -s identityProviderMapper=oidc-user-attribute-idp-mapper \
             -s config.claim=repository \
             -s config.user.attribute=repository || echo "Repository mapper exists"
           
           # Ref mapper  
-          /opt/keycloak/bin/kcadm.sh create identity-provider/instances/github-actions/mappers -r registry \
+          /opt/bitnami/keycloak/bin/kcadm.sh create identity-provider/instances/github-actions/mappers -r registry \
             -s name=ref-mapper \
             -s identityProviderMapper=oidc-user-attribute-idp-mapper \
             -s config.claim=ref \
             -s config.user.attribute=ref || echo "Ref mapper exists"
           
           # Actor mapper
-          /opt/keycloak/bin/kcadm.sh create identity-provider/instances/github-actions/mappers -r registry \
+          /opt/bitnami/keycloak/bin/kcadm.sh create identity-provider/instances/github-actions/mappers -r registry \
             -s name=actor-mapper \
             -s identityProviderMapper=oidc-user-attribute-idp-mapper \
             -s config.claim=actor \
             -s config.user.attribute=actor || echo "Actor mapper exists"
           
           # SHA mapper
-          /opt/keycloak/bin/kcadm.sh create identity-provider/instances/github-actions/mappers -r registry \
+          /opt/bitnami/keycloak/bin/kcadm.sh create identity-provider/instances/github-actions/mappers -r registry \
             -s name=sha-mapper \
             -s identityProviderMapper=oidc-user-attribute-idp-mapper \
             -s config.claim=sha \
             -s config.user.attribute=sha || echo "SHA mapper exists"
           
           echo "Creating GHA token exchanger client..."
-          GHA_CLIENT_ID=$(/opt/keycloak/bin/kcadm.sh create clients -r registry \
+          GHA_CLIENT_ID=$(/opt/bitnami/keycloak/bin/kcadm.sh create clients -r registry \
             -s clientId=gha-exchanger \
             -s enabled=true \
             -s protocol=openid-connect \
@@ -126,13 +126,13 @@ spec:
             -s serviceAccountsEnabled=false \
             -s attributes.oauth2.device.authorization.grant.enabled=false \
             -s attributes.oidc.ciba.grant.enabled=false \
-            -i 2>/dev/null || /opt/keycloak/bin/kcadm.sh get clients -r registry -q clientId=gha-exchanger --fields id --format csv --noquotes | tail -n1)
+            -i 2>/dev/null || /opt/bitnami/keycloak/bin/kcadm.sh get clients -r registry -q clientId=gha-exchanger --fields id --format csv --noquotes | tail -n1)
           
           echo "Generating client secret for gha-exchanger..."
-          /opt/keycloak/bin/kcadm.sh create clients/$GHA_CLIENT_ID/client-secret -r registry
+          /opt/bitnami/keycloak/bin/kcadm.sh create clients/$GHA_CLIENT_ID/client-secret -r registry
           
           echo "Getting client secret..."
-          GHA_CLIENT_SECRET=$(/opt/keycloak/bin/kcadm.sh get clients/$GHA_CLIENT_ID/client-secret -r registry --fields value --format csv --noquotes | tail -n1)
+          GHA_CLIENT_SECRET=$(/opt/bitnami/keycloak/bin/kcadm.sh get clients/$GHA_CLIENT_ID/client-secret -r registry --fields value --format csv --noquotes | tail -n1)
           
           echo "Creating Kubernetes secret with GHA client credentials..."
           kubectl create secret generic gha-exchanger-credentials -n keycloak \
@@ -142,11 +142,11 @@ spec:
           
           echo "Configuring token exchange permissions..."
           # Get the token-exchange permission policy
-          POLICY_ID=$(/opt/keycloak/bin/kcadm.sh get clients/$GHA_CLIENT_ID/authz/resource-server/policy -r registry -q name="token-exchange" --fields id --format csv --noquotes 2>/dev/null | tail -n1 || echo "")
+          POLICY_ID=$(/opt/bitnami/keycloak/bin/kcadm.sh get clients/$GHA_CLIENT_ID/authz/resource-server/policy -r registry -q name="token-exchange" --fields id --format csv --noquotes 2>/dev/null | tail -n1 || echo "")
           
           if [ -z "$POLICY_ID" ]; then
             # Create token exchange policy if it doesn't exist
-            POLICY_ID=$(/opt/keycloak/bin/kcadm.sh create clients/$GHA_CLIENT_ID/authz/resource-server/policy/client -r registry \
+            POLICY_ID=$(/opt/bitnami/keycloak/bin/kcadm.sh create clients/$GHA_CLIENT_ID/authz/resource-server/policy/client -r registry \
               -s name=token-exchange \
               -s logic=POSITIVE \
               -s clients=[$GHA_CLIENT_ID] \
