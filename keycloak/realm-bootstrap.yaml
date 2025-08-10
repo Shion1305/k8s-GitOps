@@ -35,7 +35,7 @@ spec:
           KEYCLOAK_URL="http://keycloak.keycloak.svc.cluster.local:8080"
           
           echo "Waiting for Keycloak to be ready..."
-          until curl -f $KEYCLOAK_URL/health/ready; do
+          until curl -f $KEYCLOAK_URL/realms/master; do
             sleep 5
           done
           
