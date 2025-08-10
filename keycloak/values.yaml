@@ -45,7 +45,7 @@ extraEnvVars:
 resources:
   limits:
     memory: 2Gi
-    cpu: 1000m
+    cpu: 4000m
   requests:
     memory: 1Gi
     cpu: 500m
