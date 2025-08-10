@@ -19,6 +19,7 @@ externalDatabase:
 # Production settings
 production: true
 proxy: edge
+proxyHeaders: xforwarded
 
 # Configure ingress
 ingress:
@@ -37,6 +38,8 @@ extraEnvVars:
     value: "token-exchange,docker"
   - name: KC_HTTP_RELATIVE_PATH
     value: "/"
+  - name: KC_PROXY_HEADERS
+    value: "xforwarded"
 
 # Resource limits
 resources:
