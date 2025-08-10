@@ -44,10 +44,10 @@ extraEnvVars:
 # Resource limits
 resources:
   limits:
-    memory: 1Gi
+    memory: 2Gi
     cpu: 1000m
   requests:
-    memory: 512Mi
+    memory: 1Gi
     cpu: 500m
 
 # Replica count (can be increased for HA)
@@ -86,4 +86,4 @@ cache:
 
 # JVM settings
 extraEnvVarsSecret: ""
-javaOpts: "-Xms512m -Xmx1g -XX:MetaspaceSize=96M -XX:MaxMetaspaceSize=256m -Djava.net.preferIPv4Stack=true"
+javaOpts: "-Xms1g -Xmx1536m -XX:MetaspaceSize=128M -XX:MaxMetaspaceSize=256m -Djava.net.preferIPv4Stack=true"
