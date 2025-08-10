@@ -17,7 +17,7 @@ spec:
       restartPolicy: OnFailure
       containers:
       - name: realm-bootstrap
-        image: quay.io/keycloak/keycloak:23.0.3
+        image: bitnami/keycloak:24.0.5-debian-12-r6
         env:
         - name: KEYCLOAK_ADMIN
           value: admin
