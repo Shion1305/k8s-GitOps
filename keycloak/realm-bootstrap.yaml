@@ -22,10 +22,7 @@ spec:
         - name: KEYCLOAK_ADMIN
           value: admin
         - name: KEYCLOAK_ADMIN_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: keycloak
-              key: admin-password
+          value: admin123
         command:
         - /bin/bash
         - -c

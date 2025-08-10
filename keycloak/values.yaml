@@ -1,6 +1,7 @@
 # Keycloak Helm values for registry authentication with external PostgreSQL
 auth:
   adminUser: admin
+  adminPassword: admin123
   # Admin password will be auto-generated if not set
   # existingSecret: keycloak-admin-credentials
 
