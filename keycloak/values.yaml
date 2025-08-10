@@ -56,7 +56,7 @@ replicaCount: 1
 # Health checks
 livenessProbe:
   enabled: true
-  initialDelaySeconds: 300
+  initialDelaySeconds: 600
   periodSeconds: 30
   timeoutSeconds: 5
   failureThreshold: 3
@@ -64,10 +64,22 @@ livenessProbe:
 
 readinessProbe:
   enabled: true
-  initialDelaySeconds: 30
+  initialDelaySeconds: 120
   periodSeconds: 10
   timeoutSeconds: 1
-  failureThreshold: 3
+  failureThreshold: 10
+  successThreshold: 1
+
+# Startup probe to allow for longer initial startup
+startupProbe:
+  enabled: true
+  httpGet:
+    path: /realms/master
+    port: http
+  initialDelaySeconds: 60
+  periodSeconds: 10
+  timeoutSeconds: 1
+  failureThreshold: 10
   successThreshold: 1
 
 # Service configuration
