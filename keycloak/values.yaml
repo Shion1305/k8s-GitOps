@@ -1,0 +1,86 @@
+# Keycloak Helm values for registry authentication with external PostgreSQL
+auth:
+  adminUser: admin
+  # Admin password will be auto-generated if not set
+  # existingSecret: keycloak-admin-credentials
+
+# External PostgreSQL configuration
+postgresql:
+  enabled: false
+
+externalDatabase:
+  host: keykloak.postgres-operator-deployment.svc.cluster.local
+  port: 5432
+  database: keykloak
+  user: postgres
+  existingSecret: keycloak-postgres-credentials
+  existingSecretPasswordKey: postgres-password
+
+# Production settings
+production: true
+proxy: edge
+
+# Configure ingress
+ingress:
+  enabled: true
+  ingressClassName: nginx
+  hostname: keycloak.k.shion1305.com
+  tls: true
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/proxy-buffer-size: "16k"
+    nginx.ingress.kubernetes.io/proxy-buffers-number: "8"
+
+# Enable required Keycloak features
+extraEnvVars:
+  - name: KC_FEATURES
+    value: "token-exchange,docker"
+  - name: KC_HTTP_RELATIVE_PATH
+    value: "/"
+
+# Resource limits
+resources:
+  limits:
+    memory: 1Gi
+    cpu: 1000m
+  requests:
+    memory: 512Mi
+    cpu: 500m
+
+# Replica count (can be increased for HA)
+replicaCount: 1
+
+# Health checks
+livenessProbe:
+  enabled: true
+  initialDelaySeconds: 300
+  periodSeconds: 30
+  timeoutSeconds: 5
+  failureThreshold: 3
+  successThreshold: 1
+
+readinessProbe:
+  enabled: true
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  timeoutSeconds: 1
+  failureThreshold: 3
+  successThreshold: 1
+
+# Service configuration
+service:
+  type: ClusterIP
+  ports:
+    http: 8080
+
+# Logging
+logging:
+  level: INFO
+
+# Cache settings for better performance
+cache:
+  enabled: true
+
+# JVM settings
+extraEnvVarsSecret: ""
+javaOpts: "-Xms512m -Xmx1g -XX:MetaspaceSize=96M -XX:MaxMetaspaceSize=256m -Djava.net.preferIPv4Stack=true"

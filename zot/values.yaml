@@ -38,6 +38,7 @@ service:
 ingress:
   enabled: true
   annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
     nginx.ingress.kubernetes.io/ssl-redirect: "true"
     nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
     nginx.ingress.kubernetes.io/proxy-body-size: "0"
@@ -45,14 +46,15 @@ ingress:
     nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
     nginx.ingress.kubernetes.io/proxy-request-buffering: "off"
     nginx.ingress.kubernetes.io/proxy-buffering: "off"
-  className: "nginx-ssl"
+  className: "nginx"
   pathtype: ImplementationSpecific
   hosts:
     - host: registry.k.shion1305.com
       paths:
         - path: /
   tls:
-    - hosts:
+    - secretName: zot-registry-tls
+      hosts:
         - registry.k.shion1305.com
 # By default, Kubernetes HTTP probes use HTTP 'scheme'. So if TLS is enabled
 # in configuration, to prevent failures, the scheme must be set to 'HTTPS'.
@@ -77,21 +79,71 @@ mountConfig: true
 configFiles:
   config.json: |-
     {
-      "storage": { "rootDirectory": "/var/lib/registry" },
+      "distSpecVersion": "1.1.0-dev",
+      "storage": {
+        "rootDirectory": "/var/lib/registry",
+        "dedupe": false,
+        "gc": true,
+        "gcDelay": "1h",
+        "gcInterval": "24h"
+      },
       "http": {
         "address": "0.0.0.0",
         "port": "5000",
-        "compat": ["docker2s2"]
+        "realm": "registry.k.shion1305.com",
+        "auth": {
+          "bearer": {
+            "realm": "https://keycloak.k.shion1305.com/realms/registry/protocol/docker-v2/auth",
+            "service": "registry.k.shion1305.com",
+            "cert": "/etc/zot/keycloak-realm-public.crt"
+          }
+        },
+        "accessControl": {
+          "repositories": {
+            "maze-maze/toku-chan": {
+              "policies": [
+                {
+                  "users": ["**"],
+                  "actions": ["read", "create", "update", "delete"]
+                }
+              ]
+            },
+            "**": {
+              "anonymousPolicy": ["read"],
+              "policies": [
+                {
+                  "users": ["**"],
+                  "actions": ["read", "create", "update", "delete"]
+                }
+              ]
+            }
+          }
+        }
       },
-      "log": { "level": "debug" },
+      "log": { "level": "info" },
       "extensions": {
+        "metrics": {
+          "enable": true,
+          "prometheus": {
+            "path": "/metrics"
+          }
+        },
+        "scrub": {
+          "enable": true,
+          "interval": "24h"
+        },
         "search": {
           "enable": true,
           "cve": {
             "updateInterval": "2h"
           }
         },
-        "ui": { "enable": true }
+        "ui": { "enable": true },
+        "trust": {
+          "enable": true,
+          "cosign": true,
+          "notation": true
+        }
       }
     }
 # Alternatively, the configuration can include authentication and acessControl
@@ -153,20 +205,20 @@ secretFiles: {}
 # If persistence is 'true' the service uses a persistentVolumeClaim to mount a
 # volume for zot on '/var/lib/registry'; by default the pvc used is named
 # '$CHART_RELEASE-pvc', but the name can be changed below
-persistence: false
+persistence: true
 # PVC data, only used if persistence is 'true'
 pvc:
   # Make the chart create the PVC, this option is used with storageClasses that
   # can create volumes dynamically, if that is not the case is better to do it
   # manually and set create to false
-  create: false
+  create: true
   # Name of the PVC to use or create if persistence is enabled, if not set the
   # value '$CHART_RELEASE-pvc' is used
   name: null
   # Volume access mode, if using more than one replica we need
   accessModes: ["ReadWriteOnce"]
   # Size of the volume requested
-  storage: 8Gi
+  storage: 50Gi
   # Name of the storage class to use if it is different than the default one
   storageClassName: null
 # List of environment variables to set on the container
@@ -180,14 +232,17 @@ env:
 #      key: username
 
 # Extra Volume Mounts
-extraVolumeMounts: []
-# - name: data
-#   mountPath: /var/lib/registry
+extraVolumeMounts:
+- name: keycloak-realm-public-key
+  mountPath: /etc/zot
+  readOnly: true
 
 # Extra Volumes
-extraVolumes: []
-# - name: data
-#   emptyDir: {}
+extraVolumes:
+- name: keycloak-realm-public-key
+  configMap:
+    name: keycloak-realm-public-key
+    optional: true
 
 # Extra Containers running alongside the main container
 extraContainers: []
