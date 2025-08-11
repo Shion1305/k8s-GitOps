@@ -48,7 +48,7 @@ spec:
           echo "Obtaining admin token..."
           RESP=$(curl -s -X POST "$KEYCLOAK_URL/realms/master/protocol/openid-connect/token" \
             -H "Content-Type: application/x-www-form-urlencoded" \
-            -d "username=$KEYCLOAK_ADMIN\u0026password=$KEYCLOAK_ADMIN_PASSWORD\u0026grant_type=password\u0026client_id=admin-cli")
+            -d "username=$KEYCLOAK_ADMIN&password=$KEYCLOAK_ADMIN_PASSWORD&grant_type=password&client_id=admin-cli")
           TOKEN=$(echo "$RESP" | sed -n 's/.*"access_token":"\([^"]*\)".*/\1/p')
           if [ -z "$TOKEN" ]; then
             echo "Failed to obtain admin token: $RESP" 1\u003e\u00262
@@ -138,7 +138,7 @@ spec:
               "publicClient":false,
               "standardFlowEnabled":false,
               "directAccessGrantsEnabled":true,
-              "serviceAccountsEnabled":false,
+              "serviceAccountsEnabled":true,
               "attributes":{
                 "oauth2.device.authorization.grant.enabled":"false",
                 "oidc.ciba.grant.enabled":"false"
@@ -154,11 +154,9 @@ spec:
           curl -s -X POST "$KEYCLOAK_URL/admin/realms/registry/clients/$GHA_ID/client-secret" -H "$AUTHH" >/dev/null
           GHA_CLIENT_SECRET=$(curl -s "$KEYCLOAK_URL/admin/realms/registry/clients/$GHA_ID/client-secret" -H "$AUTHH" | sed -n 's/.*"value":"\([^"]*\)".*/\1/p')
 
-          echo "Creating Kubernetes secret with GHA client credentials..."
-          kubectl create secret generic gha-exchanger-credentials -n keycloak \
-            --from-literal=client-id=gha-exchanger \
-            --from-literal=client-secret=$GHA_CLIENT_SECRET \
-            --dry-run=client -o yaml | kubectl apply -f -
+          echo "K8s secret creation skipped (kubectl not available in container)."
+          echo "GHA_EXCHANGER_CLIENT_ID=gha-exchanger"
+          echo "GHA_EXCHANGER_CLIENT_SECRET=$GHA_CLIENT_SECRET"
 
           echo "Realm configuration completed successfully!"
           echo ""
@@ -169,7 +167,7 @@ spec:
           echo "GitHub IdP: github-actions"
           echo "Docker client: docker-registry"
           echo "Token exchanger: gha-exchanger"
-          echo "Client secret stored in: gha-exchanger-credentials secret"
-          echo "==============================="'}],
+          echo "Client secret printed above; will be created as Kubernetes secret externally"
+          echo "==============================="
       activeDeadlineSeconds: 600
   backoffLimit: 3

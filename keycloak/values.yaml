@@ -1,9 +1,7 @@
 # Keycloak Helm values for registry authentication with external PostgreSQL
 auth:
-  adminUser: admin
-  adminPassword: admin123
-  # Admin password will be auto-generated if not set
-  # existingSecret: keycloak-admin-credentials
+  # Admin credentials are now managed via Kubernetes Secret for security
+  existingSecret: keycloak-admin-credentials
 
 # External PostgreSQL configuration
 postgresql:
@@ -22,6 +20,21 @@ production: true
 proxy: edge
 proxyHeaders: xforwarded
 
+# Security hardening
+extraEnvVars:
+  - name: KC_FEATURES
+    value: "token-exchange"
+  - name: KC_HTTP_RELATIVE_PATH
+    value: "/"
+  - name: KC_PROXY_HEADERS
+    value: "xforwarded"
+  - name: KC_HOSTNAME_STRICT
+    value: "true"
+  - name: KC_HOSTNAME_STRICT_HTTPS
+    value: "true"
+  - name: KC_HTTP_ENABLED
+    value: "false"
+
 # Configure ingress
 ingress:
   enabled: true
@@ -33,14 +46,6 @@ ingress:
     nginx.ingress.kubernetes.io/proxy-buffers-number: "8"
     nginx.ingress.kubernetes.io/proxy-busy-buffers-size: "32k"
 
-# Enable required Keycloak features
-extraEnvVars:
-  - name: KC_FEATURES
-    value: "token-exchange"
-  - name: KC_HTTP_RELATIVE_PATH
-    value: "/"
-  - name: KC_PROXY_HEADERS
-    value: "xforwarded"
 
 # Resource limits
 resources:
