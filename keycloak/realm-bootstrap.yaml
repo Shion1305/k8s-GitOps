@@ -24,8 +24,18 @@ spec:
         - name: KEYCLOAK_ADMIN_PASSWORD
           valueFrom:
             secretKeyRef:
-              name: keycloak
+              name: keycloak-admin-credentials
               key: admin-password
+        - name: GITHUB_CLIENT_ID
+          valueFrom:
+            secretKeyRef:
+              name: github-oauth-credentials
+              key: client-id
+        - name: GITHUB_CLIENT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: github-oauth-credentials
+              key: client-secret
         command:
         - /bin/bash
         - -c
@@ -127,6 +137,36 @@ spec:
           add_mapper ref ref || true
           add_mapper actor actor || true
           add_mapper sha sha || true
+
+          echo "Ensuring GitHub OAuth IdP exists..."
+          if [ "$(http_status "$KEYCLOAK_URL/admin/realms/registry/identity-provider/instances/github" -H "$AUTHH")" != "200" ]; then
+            curl -s -X POST "$KEYCLOAK_URL/admin/realms/registry/identity-provider/instances" "${AHDRS[@]}" -d "{
+              \"alias\":\"github\",
+              \"providerId\":\"github\",
+              \"enabled\":true,
+              \"config\":{
+                \"clientId\":\"$GITHUB_CLIENT_ID\",
+                \"clientSecret\":\"$GITHUB_CLIENT_SECRET\",
+                \"syncMode\":\"IMPORT\",
+                \"useJwksUrl\":\"true\"
+              }
+            }" >/dev/null
+            echo "GitHub OAuth IdP created"
+          else
+            echo "GitHub OAuth IdP exists"
+          fi
+
+          echo "Ensuring GitHub OAuth IdP mappers exist..."
+          add_github_mapper(){
+            local name="$1"; local claim="$2"; local attr="$3"; set +e
+            curl -s -X POST "$KEYCLOAK_URL/admin/realms/registry/identity-provider/instances/github/mappers" \
+              "${AHDRS[@]}" -d "{\"name\":\"$name\",\"identityProviderMapper\":\"github-user-attribute-mapper\",\"config\":{\"jsonField\":\"$claim\",\"userAttribute\":\"$attr\"}}" >/dev/null
+            set -e
+          }
+          add_github_mapper "github-username" "login" "github_username" || true
+          add_github_mapper "github-email" "email" "email" || true
+          add_github_mapper "github-name" "name" "firstName" || true
+          add_github_mapper "github-avatar" "avatar_url" "github_avatar" || true
 
           echo "Ensuring client 'gha-exchanger' exists..."
           GHA_ID=$(curl -s "$KEYCLOAK_URL/admin/realms/registry/clients?clientId=gha-exchanger" -H "$AUTHH" | sed -n 's/.*"id":"\([^"]*\)".*/\1/p' | head -n1)
