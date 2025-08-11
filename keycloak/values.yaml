@@ -33,7 +33,7 @@ extraEnvVars:
   - name: KC_HOSTNAME_STRICT_HTTPS
     value: "true"
   - name: KC_HTTP_ENABLED
-    value: "false"
+    value: "true"
 
 # Configure ingress
 ingress:
