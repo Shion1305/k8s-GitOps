@@ -20,6 +20,12 @@ spec:
           - kube-public
           - kube-node-lease
           - kyverno
+    # Exclude Longhorn storage classes from PVC size limits
+    preconditions:
+      any:
+      - key: "{{ request.object.spec.storageClassName || '' }}"
+        operator: NotIn
+        value: ['longhorn', 'longhorn-hdd', 'longhorn-ssd', 'longhorn-static']
     validate:
       message: "PVC size exceeds maximum allowed (100Gi). Large storage requests can cause node capacity issues."
       pattern:
