@@ -1,2 +1,10 @@
+defaultSettings:
+  defaultReplicaCount: 1
+  # Do not create default disks
+  createDefaultDiskLabeledNodes: false
+  # (we're not using defaultDataPath so this is optional)
+  defaultDataPath: "/var/lib/longhorn"
+  # Reservation Rate, this can be minimum as they're block volumes
+  storageReservedPercentageForDefaultDisk: 1
 preUpgradeChecker:
   jobEnabled: false
