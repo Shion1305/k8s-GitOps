@@ -1,0 +1,125 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: timemachine-config
+  namespace: macos-timemachine
+data:
+  smb.conf: |
+    [global]
+        workgroup = WORKGROUP
+        server string = Time Machine Server
+        netbios name = TIMEMACHINE
+        security = user
+        guest account = nobody
+        map to guest = bad user
+        
+        # Performance optimizations
+        socket options = TCP_NODELAY IPTOS_LOWDELAY SO_RCVBUF=131072 SO_SNDBUF=131072
+        read raw = yes
+        write raw = yes
+        oplocks = no
+        max xmit = 131072
+        deadtime = 30
+        getwd cache = yes
+        
+        # Time Machine specific settings
+        fruit:advertise_fullsync = true
+        fruit:aapl = yes
+        fruit:time machine = yes
+        fruit:time machine max size = 4T
+        
+        # VFS modules for Time Machine support
+        vfs objects = catia fruit streams_xattr
+        
+        # Logging
+        log level = 2
+        log file = /var/log/samba/smbd.log
+        max log size = 50
+        
+        # Disable printing
+        load printers = no
+        printing = bsd
+        printcap name = /dev/null
+        disable spoolss = yes
+        
+    [TimeMachine]
+        comment = Time Machine Backup
+        path = /timemachine
+        browseable = yes
+        writeable = yes
+        create mask = 0600
+        directory mask = 0700
+        spotlight = no
+        
+        # Time Machine specific for this share
+        fruit:time machine = yes
+        fruit:time machine max size = 4T
+        
+        # Access control
+        valid users = admin
+        force user = admin
+        force group = admin
+        
+        # VFS for this share
+        vfs objects = catia fruit streams_xattr
+  
+  start.sh: |
+    #!/bin/bash
+    set -e
+    
+    # Wait for credentials to be available
+    while [ ! -f /etc/credentials/username ] || [ ! -f /etc/credentials/password ]; do
+      echo "Waiting for credentials to be mounted..."
+      sleep 5
+    done
+    
+    # Read credentials from mounted secret
+    USERNAME=$(cat /etc/credentials/username)
+    PASSWORD=$(cat /etc/credentials/password)
+    
+    echo "Setting up TimeMachine service with user: $USERNAME"
+    
+    # Create admin group and user (BusyBox compatible)
+    addgroup -g 1000 admin 2>/dev/null || echo "Group already exists"
+    adduser -u 1000 -G admin -h /timemachine -s /bin/bash -D admin 2>/dev/null || echo "User already exists"
+    
+    # Ensure the user home directory exists
+    mkdir -p /timemachine
+    chown admin:admin /timemachine
+    chmod 755 /timemachine
+    
+    # Initialize Samba directories and files
+    mkdir -p /var/lib/samba/private
+    mkdir -p /var/log/samba
+    mkdir -p /var/run/samba
+    
+    # Start services first
+    echo "Starting Samba services..."
+    nmbd -D
+    smbd -D
+    
+    # Wait a moment for services to initialize
+    sleep 3
+    
+    # Set up Samba password using the secure password from secret
+    echo "Setting up Samba user credentials..."
+    (echo "$PASSWORD"; echo "$PASSWORD") | smbpasswd -a -s "$USERNAME"
+    smbpasswd -e "$USERNAME"
+    
+    echo "TimeMachine service started successfully!"
+    echo "Connect using: smb://$USERNAME:<password>@<node-ip>:30445/TimeMachine"
+    echo "Password is stored in kubernetes secret 'timemachine-credentials'"
+    echo "Username: $USERNAME"
+    
+    # Keep container running by monitoring Samba processes
+    while true; do
+      if ! pgrep smbd > /dev/null; then
+        echo "smbd process died, restarting..."
+        smbd -D
+      fi
+      if ! pgrep nmbd > /dev/null; then
+        echo "nmbd process died, restarting..."
+        nmbd -D
+      fi
+      sleep 30
+    done

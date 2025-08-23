@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: timemachine-storage
+  namespace: macos-timemachine
+  annotations:
+    volume.beta.kubernetes.io/storage-class: "longhorn-hdd"
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: longhorn-hdd
+  resources:
+    requests:
+      storage: 4Ti
