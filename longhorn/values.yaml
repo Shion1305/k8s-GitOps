@@ -1,4 +1,5 @@
 defaultSettings:
+  v2DataEngine: true
   defaultReplicaCount: 1
   # Do not create default disks
   createDefaultDiskLabeledNodes: false
