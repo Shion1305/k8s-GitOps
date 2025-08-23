@@ -10,12 +10,10 @@ spec:
       allowScheduling: true
       diskType: block
       path: /dev/disk/by-id/nvme-Apacer_AS2280Q4U_4TB_AD20241204A0100019
-      storageReserved: 10Gi
       tags: ["ssd"]
     hdd-20t:
       allowScheduling: true
       diskType: block
       path: /dev/disk/by-id/ata-ST20000DM001-3Y3103_ZXA0PRG5
-      storageReserved: 10Gi
       tags: ["hdd"]
 
