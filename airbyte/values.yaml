@@ -46,7 +46,7 @@ workspace:
   persistence:
     enabled: true
     size: 10Gi
-    storageClass: local-storage
+    storageClass: longhorn-ssd
 
 worker:
   resources:
