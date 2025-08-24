@@ -6,7 +6,7 @@ provisioner: driver.longhorn.io
 allowVolumeExpansion: true
 parameters:
   numberOfReplicas: "1"
-  dataEngine: "v2"
+  dataEngine: "v1"
   fsType: "ext4"
   diskSelector: "ssd" # This must match with Node CR disk.tags
 volumeBindingMode: WaitForFirstConsumer
@@ -19,7 +19,7 @@ provisioner: driver.longhorn.io
 allowVolumeExpansion: true
 parameters:
   numberOfReplicas: "1"
-  dataEngine: "v2"
+  dataEngine: "v1"
   fsType: "ext4"
   diskSelector: "hdd"
 volumeBindingMode: WaitForFirstConsumer

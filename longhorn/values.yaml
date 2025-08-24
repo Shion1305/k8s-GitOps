@@ -1,17 +1,13 @@
 defaultSettings:
-  # Enable v2 data engine for SPDK support with block devices
-  v2DataEngine: true
+  # Use v1 data engine (traditional filesystem-based)
+  v2DataEngine: false
   defaultReplicaCount: 1
   # Do not create default disks
   createDefaultDiskLabeledNodes: false
-  # (we're not using defaultDataPath so this is optional)
+  # Default data path for v1 engine
   defaultDataPath: "/var/lib/longhorn"
-  # Reservation Rate, this can be minimum as they're block volumes
-  storageReservedPercentageForDefaultDisk: 1
-  # Enable v2 data engine CPU resources (note: uppercase CPU)
-  v2DataEngineGuaranteedInstanceManagerCPU: 1250
-  # Set hugepage limit for v2 engine
-  v2DataEngineHugepageLimit: 2048
+  # Reservation rate for filesystem-based volumes
+  storageReservedPercentageForDefaultDisk: 25
 preUpgradeChecker:
   jobEnabled: false
 
