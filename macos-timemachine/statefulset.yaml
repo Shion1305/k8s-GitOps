@@ -1,0 +1,96 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: timemachine
+  namespace: macos-timemachine
+  labels:
+    app: timemachine
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  serviceName: timemachine
+  replicas: 1
+  selector:
+    matchLabels:
+      app: timemachine
+  template:
+    metadata:
+      labels:
+        app: timemachine
+    spec:
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      nodeSelector:
+        kubernetes.io/hostname: shion-ubuntu-2505
+      containers:
+      - name: timemachine
+        image: mbentley/timemachine:smb
+        ports:
+        - containerPort: 137
+          protocol: UDP
+          name: udp137
+        - containerPort: 138
+          protocol: UDP
+          name: udp138
+        - containerPort: 139
+          name: tcp139
+        - containerPort: 445
+          name: tcp445
+        env:
+        - name: TM_USERNAME
+          value: "admin"
+        - name: TM_GROUPNAME
+          value: "admin"
+        - name: TM_UID
+          value: "1000"
+        - name: TM_GID
+          value: "1000"
+        - name: SET_PERMISSIONS
+          value: "false"
+        - name: SHARE_NAME
+          value: "TimeMachine"
+        - name: VOLUME_SIZE_LIMIT
+          value: "4T"
+        - name: SMB_VFS_OBJECTS
+          value: "fruit streams_xattr"
+        - name: MIMIC_MODEL
+          value: "TimeCapsule8,119"
+        - name: WORKGROUP
+          value: "WORKGROUP"
+        - name: PASSWORD_FILE
+          value: "/etc/timemachine/password"
+        - name: TZ
+          value: "Asia/Tokyo"
+        volumeMounts:
+        - name: tm-data
+          mountPath: /opt/timemachine
+        - name: run-samba
+          mountPath: /run/samba
+        - name: credentials
+          mountPath: /etc/timemachine
+          readOnly: true
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 2000m
+            memory: 1024Mi
+      volumes:
+      - name: run-samba
+        emptyDir: {}
+      - name: credentials
+        secret:
+          secretName: timemachine-credentials
+          items:
+          - key: password
+            path: password
+  volumeClaimTemplates:
+  - metadata:
+      name: tm-data
+    spec:
+      storageClassName: longhorn-hdd
+      accessModes: ["ReadWriteOnce"]
+      resources:
+        requests:
+          storage: 4Ti

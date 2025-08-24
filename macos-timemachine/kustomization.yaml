@@ -5,16 +5,14 @@ namespace: macos-timemachine
 
 resources:
 - namespace.yaml
-- static-credentials.yaml
-- configmap.yaml
-- pvc.yaml
-- deployment.yaml
+- password-generator.yaml
+- statefulset.yaml
 - service.yaml
 - networkpolicy.yaml
 
 images:
-- name: dperson/samba
-  newTag: latest
+- name: mbentley/timemachine
+  newTag: smb
 
 labels:
 - pairs:
