@@ -122,7 +122,7 @@ grafana:
   # Grafana configuration
   grafana.ini:
     server:
-      root_url: "%(protocol)s://%(domain)s:%(http_port)s/grafana/"
+      root_url: "https://o11y.k.shion1305.com/grafana/"
       serve_from_sub_path: true
     
     # Disable anonymous authentication
