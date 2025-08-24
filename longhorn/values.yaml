@@ -4,8 +4,8 @@ defaultSettings:
   defaultReplicaCount: 1
   # Do not create default disks
   createDefaultDiskLabeledNodes: false
-  # Default data path for v1 engine
-  defaultDataPath: "/var/lib/longhorn"
+  # Disable default data path since we use specific disk configurations
+  defaultDataPath: ""
   # Reservation rate for filesystem-based volumes
   storageReservedPercentageForDefaultDisk: 25
 preUpgradeChecker:
