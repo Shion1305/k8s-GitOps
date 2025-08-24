@@ -18,7 +18,7 @@ prometheus:
     storageSpec:
       volumeClaimTemplate:
         spec:
-          storageClassName: local-path
+          storageClassName: longhorn-hdd
           accessModes: ["ReadWriteOnce"]
           resources:
             requests:
@@ -57,7 +57,7 @@ grafana:
   persistence:
     enabled: true
     type: pvc
-    storageClassName: local-path
+    storageClassName: longhorn-hdd
     size: 10Gi
     accessModes:
       - ReadWriteOnce
@@ -177,7 +177,7 @@ alertmanager:
     storage:
       volumeClaimTemplate:
         spec:
-          storageClassName: local-path
+          storageClassName: longhorn-hdd
           accessModes: ["ReadWriteOnce"]
           resources:
             requests:
