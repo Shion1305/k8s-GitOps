@@ -28,4 +28,4 @@ spec:
           service:
             name: kube-prometheus-stack-grafana
             port:
-              number: 8080
+              number: 80
