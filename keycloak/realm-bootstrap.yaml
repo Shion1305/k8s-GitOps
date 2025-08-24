@@ -1,213 +1,213 @@
-# Keycloak realm bootstrap using kcadm CLI
-# This Job runs after Keycloak is ready and configures the registry realm
+# # Keycloak realm bootstrap using kcadm CLI
+# # This Job runs after Keycloak is ready and configures the registry realm
 
-apiVersion: batch/v1
-kind: Job
-metadata:
-  name: keycloak-realm-bootstrap
-  namespace: keycloak
-  annotations:
-    argocd.argoproj.io/hook: Sync
-    argocd.argoproj.io/hook-weight: "10"
-    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
-    argocd.argoproj.io/sync-wave: "1"
-spec:
-  template:
-    spec:
-      restartPolicy: OnFailure
-      containers:
-      - name: realm-bootstrap
-        image: bitnami/keycloak:24.0.5-debian-12-r6
-        env:
-        - name: KEYCLOAK_ADMIN
-          value: admin
-        - name: KEYCLOAK_ADMIN_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: keycloak-admin-credentials
-              key: admin-password
-        - name: GITHUB_CLIENT_ID
-          valueFrom:
-            secretKeyRef:
-              name: github-oauth-credentials
-              key: client-id
-        - name: GITHUB_CLIENT_SECRET
-          valueFrom:
-            secretKeyRef:
-              name: github-oauth-credentials
-              key: client-secret
-        command:
-        - /bin/bash
-        - -c
-        - |
-          set -e
+# apiVersion: batch/v1
+# kind: Job
+# metadata:
+#   name: keycloak-realm-bootstrap
+#   namespace: keycloak
+#   annotations:
+#     argocd.argoproj.io/hook: Sync
+#     argocd.argoproj.io/hook-weight: "10"
+#     argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+#     argocd.argoproj.io/sync-wave: "1"
+# spec:
+#   template:
+#     spec:
+#       restartPolicy: OnFailure
+#       containers:
+#       - name: realm-bootstrap
+#         image: bitnami/keycloak:24.0.5-debian-12-r6
+#         env:
+#         - name: KEYCLOAK_ADMIN
+#           value: admin
+#         - name: KEYCLOAK_ADMIN_PASSWORD
+#           valueFrom:
+#             secretKeyRef:
+#               name: keycloak-admin-credentials
+#               key: admin-password
+#         - name: GITHUB_CLIENT_ID
+#           valueFrom:
+#             secretKeyRef:
+#               name: github-oauth-credentials
+#               key: client-id
+#         - name: GITHUB_CLIENT_SECRET
+#           valueFrom:
+#             secretKeyRef:
+#               name: github-oauth-credentials
+#               key: client-secret
+#         command:
+#         - /bin/bash
+#         - -c
+#         - |
+#           set -e
           
-          # Use a writable location for kcadm config to avoid permission errors
-          export HOME=/tmp
-          export KCADM_CONFIG=/tmp/kcadm.config
-          export KEYCLOAK_CONFIG_FILE=/tmp/kcadm.config
-          mkdir -p "$HOME/.keycloak"
-          KEYCLOAK_URL="http://keycloak.keycloak.svc.cluster.local:8080"
-          KCADM="/opt/bitnami/keycloak/bin/kcadm.sh"
+#           # Use a writable location for kcadm config to avoid permission errors
+#           export HOME=/tmp
+#           export KCADM_CONFIG=/tmp/kcadm.config
+#           export KEYCLOAK_CONFIG_FILE=/tmp/kcadm.config
+#           mkdir -p "$HOME/.keycloak"
+#           KEYCLOAK_URL="http://keycloak.keycloak.svc.cluster.local:8080"
+#           KCADM="/opt/bitnami/keycloak/bin/kcadm.sh"
           
-          echo "Waiting for Keycloak to be ready..."
-          until curl -f $KEYCLOAK_URL/realms/master; do
-            sleep 5
-          done
+#           echo "Waiting for Keycloak to be ready..."
+#           until curl -f $KEYCLOAK_URL/realms/master; do
+#             sleep 5
+#           done
           
-          echo "Obtaining admin token..."
-          RESP=$(curl -s -X POST "$KEYCLOAK_URL/realms/master/protocol/openid-connect/token" \
-            -H "Content-Type: application/x-www-form-urlencoded" \
-            -d "username=$KEYCLOAK_ADMIN&password=$KEYCLOAK_ADMIN_PASSWORD&grant_type=password&client_id=admin-cli")
-          TOKEN=$(echo "$RESP" | sed -n 's/.*"access_token":"\([^"]*\)".*/\1/p')
-          if [ -z "$TOKEN" ]; then
-            echo "Failed to obtain admin token: $RESP" 1\u003e\u00262
-            exit 1
-          fi
-          AUTHH="Authorization: Bearer $TOKEN"
-          AHDRS=( -H "$AUTHH" -H "Content-Type: application/json" )
+#           echo "Obtaining admin token..."
+#           RESP=$(curl -s -X POST "$KEYCLOAK_URL/realms/master/protocol/openid-connect/token" \
+#             -H "Content-Type: application/x-www-form-urlencoded" \
+#             -d "username=$KEYCLOAK_ADMIN&password=$KEYCLOAK_ADMIN_PASSWORD&grant_type=password&client_id=admin-cli")
+#           TOKEN=$(echo "$RESP" | sed -n 's/.*"access_token":"\([^"]*\)".*/\1/p')
+#           if [ -z "$TOKEN" ]; then
+#             echo "Failed to obtain admin token: $RESP" 1\u003e\u00262
+#             exit 1
+#           fi
+#           AUTHH="Authorization: Bearer $TOKEN"
+#           AHDRS=( -H "$AUTHH" -H "Content-Type: application/json" )
 
-          # Helper to get HTTP status
-          http_status() { url="$1"; shift; curl -s -o /dev/null -w "%{http_code}" "$url" "$@"; }
+#           # Helper to get HTTP status
+#           http_status() { url="$1"; shift; curl -s -o /dev/null -w "%{http_code}" "$url" "$@"; }
 
-          echo "Ensuring realm 'registry' exists..."
-          if [ "$(http_status "$KEYCLOAK_URL/admin/realms/registry" -H "$AUTHH")" != "200" ]; then
-            curl -s -X POST "$KEYCLOAK_URL/admin/realms" "${AHDRS[@]}" -d '{
-              "realm":"registry","enabled":true,
-              "displayName":"Docker Registry",
-              "accessTokenLifespan":900,
-              "loginWithEmailAllowed":true,
-              "rememberMe":false,
-              "duplicateEmailsAllowed":false,
-              "editUsernameAllowed":false
-            }' >/dev/null
-            echo "Realm created"
-          else
-            echo "Realm already exists"
-          fi
+#           echo "Ensuring realm 'registry' exists..."
+#           if [ "$(http_status "$KEYCLOAK_URL/admin/realms/registry" -H "$AUTHH")" != "200" ]; then
+#             curl -s -X POST "$KEYCLOAK_URL/admin/realms" "${AHDRS[@]}" -d '{
+#               "realm":"registry","enabled":true,
+#               "displayName":"Docker Registry",
+#               "accessTokenLifespan":900,
+#               "loginWithEmailAllowed":true,
+#               "rememberMe":false,
+#               "duplicateEmailsAllowed":false,
+#               "editUsernameAllowed":false
+#             }' >/dev/null
+#             echo "Realm created"
+#           else
+#             echo "Realm already exists"
+#           fi
 
-          echo "Ensuring client 'docker-registry' exists..."
-          CLIENT_ID=$(curl -s "$KEYCLOAK_URL/admin/realms/registry/clients?clientId=docker-registry" -H "$AUTHH" | sed -n 's/.*"id":"\([^"]*\)".*/\1/p' | head -n1)
-          if [ -z "$CLIENT_ID" ]; then
-            curl -s -X POST "$KEYCLOAK_URL/admin/realms/registry/clients" "${AHDRS[@]}" -d '{
-              "clientId":"docker-registry",
-              "enabled":true,
-              "protocol":"docker-v2",
-              "publicClient":true,
-              "standardFlowEnabled":true,
-              "directAccessGrantsEnabled":false,
-              "serviceAccountsEnabled":false
-            }' >/dev/null
-            CLIENT_ID=$(curl -s "$KEYCLOAK_URL/admin/realms/registry/clients?clientId=docker-registry" -H "$AUTHH" | sed -n 's/.*"id":"\([^"]*\)".*/\1/p' | head -n1)
-            echo "Client docker-registry created"
-          else
-            echo "Client docker-registry exists"
-          fi
+#           echo "Ensuring client 'docker-registry' exists..."
+#           CLIENT_ID=$(curl -s "$KEYCLOAK_URL/admin/realms/registry/clients?clientId=docker-registry" -H "$AUTHH" | sed -n 's/.*"id":"\([^"]*\)".*/\1/p' | head -n1)
+#           if [ -z "$CLIENT_ID" ]; then
+#             curl -s -X POST "$KEYCLOAK_URL/admin/realms/registry/clients" "${AHDRS[@]}" -d '{
+#               "clientId":"docker-registry",
+#               "enabled":true,
+#               "protocol":"docker-v2",
+#               "publicClient":true,
+#               "standardFlowEnabled":true,
+#               "directAccessGrantsEnabled":false,
+#               "serviceAccountsEnabled":false
+#             }' >/dev/null
+#             CLIENT_ID=$(curl -s "$KEYCLOAK_URL/admin/realms/registry/clients?clientId=docker-registry" -H "$AUTHH" | sed -n 's/.*"id":"\([^"]*\)".*/\1/p' | head -n1)
+#             echo "Client docker-registry created"
+#           else
+#             echo "Client docker-registry exists"
+#           fi
 
-          echo "Ensuring IdP 'github-actions' exists..."
-          if [ "$(http_status "$KEYCLOAK_URL/admin/realms/registry/identity-provider/instances/github-actions" -H "$AUTHH")" != "200" ]; then
-            curl -s -X POST "$KEYCLOAK_URL/admin/realms/registry/identity-provider/instances" "${AHDRS[@]}" -d '{
-              "alias":"github-actions",
-              "providerId":"oidc",
-              "enabled":true,
-              "config":{
-                "issuer":"https://token.actions.githubusercontent.com",
-                "authorizationUrl":"https://token.actions.githubusercontent.com",
-                "tokenUrl":"https://token.actions.githubusercontent.com",
-                "clientId":"zot-actions",
-                "validateSignature":"true",
-                "useJwksUrl":"true",
-                "jwksUrl":"https://token.actions.githubusercontent.com/.well-known/jwks",
-                "syncMode":"IMPORT"
-              }
-            }' >/dev/null
-            echo "IdP created"
-          else
-            echo "IdP exists"
-          fi
+#           echo "Ensuring IdP 'github-actions' exists..."
+#           if [ "$(http_status "$KEYCLOAK_URL/admin/realms/registry/identity-provider/instances/github-actions" -H "$AUTHH")" != "200" ]; then
+#             curl -s -X POST "$KEYCLOAK_URL/admin/realms/registry/identity-provider/instances" "${AHDRS[@]}" -d '{
+#               "alias":"github-actions",
+#               "providerId":"oidc",
+#               "enabled":true,
+#               "config":{
+#                 "issuer":"https://token.actions.githubusercontent.com",
+#                 "authorizationUrl":"https://token.actions.githubusercontent.com",
+#                 "tokenUrl":"https://token.actions.githubusercontent.com",
+#                 "clientId":"zot-actions",
+#                 "validateSignature":"true",
+#                 "useJwksUrl":"true",
+#                 "jwksUrl":"https://token.actions.githubusercontent.com/.well-known/jwks",
+#                 "syncMode":"IMPORT"
+#               }
+#             }' >/dev/null
+#             echo "IdP created"
+#           else
+#             echo "IdP exists"
+#           fi
 
-          echo "Ensuring IdP mappers exist..."
-          add_mapper(){
-            local name="$1"; local claim="$2"; set +e
-            curl -s -X POST "$KEYCLOAK_URL/admin/realms/registry/identity-provider/instances/github-actions/mappers" \
-              "${AHDRS[@]}" -d "{\"name\":\"$name\",\"identityProviderMapper\":\"oidc-user-attribute-idp-mapper\",\"config\":{\"claim\":\"$claim\",\"user.attribute\":\"$claim\"}}" >/dev/null
-            set -e
-          }
-          add_mapper repository repository || true
-          add_mapper ref ref || true
-          add_mapper actor actor || true
-          add_mapper sha sha || true
+#           echo "Ensuring IdP mappers exist..."
+#           add_mapper(){
+#             local name="$1"; local claim="$2"; set +e
+#             curl -s -X POST "$KEYCLOAK_URL/admin/realms/registry/identity-provider/instances/github-actions/mappers" \
+#               "${AHDRS[@]}" -d "{\"name\":\"$name\",\"identityProviderMapper\":\"oidc-user-attribute-idp-mapper\",\"config\":{\"claim\":\"$claim\",\"user.attribute\":\"$claim\"}}" >/dev/null
+#             set -e
+#           }
+#           add_mapper repository repository || true
+#           add_mapper ref ref || true
+#           add_mapper actor actor || true
+#           add_mapper sha sha || true
 
-          echo "Ensuring GitHub OAuth IdP exists..."
-          if [ "$(http_status "$KEYCLOAK_URL/admin/realms/registry/identity-provider/instances/github" -H "$AUTHH")" != "200" ]; then
-            curl -s -X POST "$KEYCLOAK_URL/admin/realms/registry/identity-provider/instances" "${AHDRS[@]}" -d "{
-              \"alias\":\"github\",
-              \"providerId\":\"github\",
-              \"enabled\":true,
-              \"config\":{
-                \"clientId\":\"$GITHUB_CLIENT_ID\",
-                \"clientSecret\":\"$GITHUB_CLIENT_SECRET\",
-                \"syncMode\":\"IMPORT\",
-                \"useJwksUrl\":\"true\"
-              }
-            }" >/dev/null
-            echo "GitHub OAuth IdP created"
-          else
-            echo "GitHub OAuth IdP exists"
-          fi
+#           echo "Ensuring GitHub OAuth IdP exists..."
+#           if [ "$(http_status "$KEYCLOAK_URL/admin/realms/registry/identity-provider/instances/github" -H "$AUTHH")" != "200" ]; then
+#             curl -s -X POST "$KEYCLOAK_URL/admin/realms/registry/identity-provider/instances" "${AHDRS[@]}" -d "{
+#               \"alias\":\"github\",
+#               \"providerId\":\"github\",
+#               \"enabled\":true,
+#               \"config\":{
+#                 \"clientId\":\"$GITHUB_CLIENT_ID\",
+#                 \"clientSecret\":\"$GITHUB_CLIENT_SECRET\",
+#                 \"syncMode\":\"IMPORT\",
+#                 \"useJwksUrl\":\"true\"
+#               }
+#             }" >/dev/null
+#             echo "GitHub OAuth IdP created"
+#           else
+#             echo "GitHub OAuth IdP exists"
+#           fi
 
-          echo "Ensuring GitHub OAuth IdP mappers exist..."
-          add_github_mapper(){
-            local name="$1"; local claim="$2"; local attr="$3"; set +e
-            curl -s -X POST "$KEYCLOAK_URL/admin/realms/registry/identity-provider/instances/github/mappers" \
-              "${AHDRS[@]}" -d "{\"name\":\"$name\",\"identityProviderMapper\":\"github-user-attribute-mapper\",\"config\":{\"jsonField\":\"$claim\",\"userAttribute\":\"$attr\"}}" >/dev/null
-            set -e
-          }
-          add_github_mapper "github-username" "login" "github_username" || true
-          add_github_mapper "github-email" "email" "email" || true
-          add_github_mapper "github-name" "name" "firstName" || true
-          add_github_mapper "github-avatar" "avatar_url" "github_avatar" || true
+#           echo "Ensuring GitHub OAuth IdP mappers exist..."
+#           add_github_mapper(){
+#             local name="$1"; local claim="$2"; local attr="$3"; set +e
+#             curl -s -X POST "$KEYCLOAK_URL/admin/realms/registry/identity-provider/instances/github/mappers" \
+#               "${AHDRS[@]}" -d "{\"name\":\"$name\",\"identityProviderMapper\":\"github-user-attribute-mapper\",\"config\":{\"jsonField\":\"$claim\",\"userAttribute\":\"$attr\"}}" >/dev/null
+#             set -e
+#           }
+#           add_github_mapper "github-username" "login" "github_username" || true
+#           add_github_mapper "github-email" "email" "email" || true
+#           add_github_mapper "github-name" "name" "firstName" || true
+#           add_github_mapper "github-avatar" "avatar_url" "github_avatar" || true
 
-          echo "Ensuring client 'gha-exchanger' exists..."
-          GHA_ID=$(curl -s "$KEYCLOAK_URL/admin/realms/registry/clients?clientId=gha-exchanger" -H "$AUTHH" | sed -n 's/.*"id":"\([^"]*\)".*/\1/p' | head -n1)
-          if [ -z "$GHA_ID" ]; then
-            curl -s -X POST "$KEYCLOAK_URL/admin/realms/registry/clients" "${AHDRS[@]}" -d '{
-              "clientId":"gha-exchanger",
-              "enabled":true,
-              "protocol":"openid-connect",
-              "publicClient":false,
-              "standardFlowEnabled":false,
-              "directAccessGrantsEnabled":true,
-              "serviceAccountsEnabled":true,
-              "attributes":{
-                "oauth2.device.authorization.grant.enabled":"false",
-                "oidc.ciba.grant.enabled":"false"
-              }
-            }' >/dev/null
-            GHA_ID=$(curl -s "$KEYCLOAK_URL/admin/realms/registry/clients?clientId=gha-exchanger" -H "$AUTHH" | sed -n 's/.*"id":"\([^"]*\)".*/\1/p' | head -n1)
-            echo "Client gha-exchanger created"
-          else
-            echo "Client gha-exchanger exists"
-          fi
+#           echo "Ensuring client 'gha-exchanger' exists..."
+#           GHA_ID=$(curl -s "$KEYCLOAK_URL/admin/realms/registry/clients?clientId=gha-exchanger" -H "$AUTHH" | sed -n 's/.*"id":"\([^"]*\)".*/\1/p' | head -n1)
+#           if [ -z "$GHA_ID" ]; then
+#             curl -s -X POST "$KEYCLOAK_URL/admin/realms/registry/clients" "${AHDRS[@]}" -d '{
+#               "clientId":"gha-exchanger",
+#               "enabled":true,
+#               "protocol":"openid-connect",
+#               "publicClient":false,
+#               "standardFlowEnabled":false,
+#               "directAccessGrantsEnabled":true,
+#               "serviceAccountsEnabled":true,
+#               "attributes":{
+#                 "oauth2.device.authorization.grant.enabled":"false",
+#                 "oidc.ciba.grant.enabled":"false"
+#               }
+#             }' >/dev/null
+#             GHA_ID=$(curl -s "$KEYCLOAK_URL/admin/realms/registry/clients?clientId=gha-exchanger" -H "$AUTHH" | sed -n 's/.*"id":"\([^"]*\)".*/\1/p' | head -n1)
+#             echo "Client gha-exchanger created"
+#           else
+#             echo "Client gha-exchanger exists"
+#           fi
 
-          echo "Generating client secret for gha-exchanger..."
-          curl -s -X POST "$KEYCLOAK_URL/admin/realms/registry/clients/$GHA_ID/client-secret" -H "$AUTHH" >/dev/null
-          GHA_CLIENT_SECRET=$(curl -s "$KEYCLOAK_URL/admin/realms/registry/clients/$GHA_ID/client-secret" -H "$AUTHH" | sed -n 's/.*"value":"\([^"]*\)".*/\1/p')
+#           echo "Generating client secret for gha-exchanger..."
+#           curl -s -X POST "$KEYCLOAK_URL/admin/realms/registry/clients/$GHA_ID/client-secret" -H "$AUTHH" >/dev/null
+#           GHA_CLIENT_SECRET=$(curl -s "$KEYCLOAK_URL/admin/realms/registry/clients/$GHA_ID/client-secret" -H "$AUTHH" | sed -n 's/.*"value":"\([^"]*\)".*/\1/p')
 
-          echo "K8s secret creation skipped (kubectl not available in container)."
-          echo "GHA_EXCHANGER_CLIENT_ID=gha-exchanger"
-          echo "GHA_EXCHANGER_CLIENT_SECRET=$GHA_CLIENT_SECRET"
+#           echo "K8s secret creation skipped (kubectl not available in container)."
+#           echo "GHA_EXCHANGER_CLIENT_ID=gha-exchanger"
+#           echo "GHA_EXCHANGER_CLIENT_SECRET=$GHA_CLIENT_SECRET"
 
-          echo "Realm configuration completed successfully!"
-          echo ""
-          echo "=== CONFIGURATION SUMMARY ==="
-          echo "Realm: registry"  
-          echo "Docker v2 Auth URL: https://keycloak.k.shion1305.com/realms/registry/protocol/docker-v2/auth"
-          echo "Service: registry.k.shion1305.com"
-          echo "GitHub IdP: github-actions"
-          echo "Docker client: docker-registry"
-          echo "Token exchanger: gha-exchanger"
-          echo "Client secret printed above; will be created as Kubernetes secret externally"
-          echo "==============================="
-      activeDeadlineSeconds: 600
-  backoffLimit: 3
+#           echo "Realm configuration completed successfully!"
+#           echo ""
+#           echo "=== CONFIGURATION SUMMARY ==="
+#           echo "Realm: registry"  
+#           echo "Docker v2 Auth URL: https://keycloak.k.shion1305.com/realms/registry/protocol/docker-v2/auth"
+#           echo "Service: registry.k.shion1305.com"
+#           echo "GitHub IdP: github-actions"
+#           echo "Docker client: docker-registry"
+#           echo "Token exchanger: gha-exchanger"
+#           echo "Client secret printed above; will be created as Kubernetes secret externally"
+#           echo "==============================="
+#       activeDeadlineSeconds: 600
+#   backoffLimit: 3
