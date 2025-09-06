@@ -1,0 +1,92 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: timemachine-samba
+  namespace: macos-timemachine
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: timemachine-samba
+  template:
+    metadata:
+      labels:
+        app: timemachine-samba
+    spec:
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      nodeSelector:
+        kubernetes.io/hostname: shion-ubuntu-2505
+      containers:
+      - name: samba
+        image: dperson/samba:latest
+        ports:
+        - containerPort: 137
+          protocol: UDP
+          name: netbios-ns
+        - containerPort: 138
+          protocol: UDP
+          name: netbios-dgm
+        - containerPort: 139
+          name: netbios-ssn
+        - containerPort: 445
+          name: microsoft-ds
+        env:
+        - name: USERID
+          value: "1000"
+        - name: GROUPID
+          value: "1000"
+        - name: TZ
+          value: "Asia/Tokyo"
+        command:
+        - samba.sh
+        args:
+        - -s
+        - "TimeMachine;/timemachine;yes;no;no;admin;admin;Time Machine"
+        - -u
+        - "admin;$(cat /etc/samba-credentials/password)"
+        - -w
+        - "WORKGROUP"
+        - -g
+        - "vfs objects = fruit streams_xattr"
+        - -g 
+        - "fruit:metadata = stream"
+        - -g
+        - "fruit:model = TimeCapsule8,119" 
+        - -g
+        - "fruit:posix_rename = yes"
+        - -g
+        - "fruit:veto_appledouble = no"
+        - -g
+        - "fruit:wipe_intentionally_left_blank_rfork = yes"
+        - -g
+        - "fruit:delete_empty_adfiles = yes"
+        - -g
+        - "fruit:time machine = yes"
+        - -g
+        - "fruit:advertise_fullsync = true"
+        volumeMounts:
+        - name: timemachine-data
+          mountPath: /timemachine
+        - name: samba-credentials
+          mountPath: /etc/samba-credentials
+          readOnly: true
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 2000m
+            memory: 1024Mi
+      volumes:
+      - name: timemachine-data
+        persistentVolumeClaim:
+          claimName: timemachine-share-pvc
+      - name: samba-credentials
+        secret:
+          secretName: timemachine-credentials
+          items:
+          - key: password
+            path: password

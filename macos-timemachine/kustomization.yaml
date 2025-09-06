@@ -6,12 +6,16 @@ namespace: macos-timemachine
 resources:
 - namespace.yaml
 - password-generator.yaml
-- samba-operator-install.yaml
-- samba-common-config.yaml
-- samba-security-config.yaml
-- samba-share.yaml
-- samba-service.yaml
+- timemachine-deployment.yaml
+- timemachine-svc.yaml
 - networkpolicy.yaml
+
+# Removed samba-operator resources (not working properly)
+# - samba-operator-install.yaml
+# - samba-common-config.yaml
+# - samba-security-config.yaml
+# - samba-share.yaml
+# - samba-service.yaml
 
 # Remove old resources (comment out for migration)
 # - statefulset.yaml

@@ -6,34 +6,36 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-wave: "2"
 spec:
-  attributes:
-    # Time Machine specific configuration
-    'vfs objects': 'fruit streams_xattr'
-    'fruit:metadata': 'stream'
-    'fruit:model': 'TimeCapsule8,119'
-    'fruit:posix_rename': 'yes'
-    'fruit:veto_appledouble': 'no'
-    'fruit:nfs_aces': 'no'
-    'fruit:wipe_intentionally_left_blank_rfork': 'yes'
-    'fruit:delete_empty_adfiles': 'yes'
-    'fruit:copyfile': 'no'
-    'fruit:zero_file_id': 'yes'
-    
-    # Network and compatibility settings
-    'server min protocol': 'SMB2'
-    'ea support': 'yes'
-    'kernel oplocks': 'no'
-    'kernel share modes': 'no'
-    'posix locking': 'no'
-    'strict locking': 'no'
-    'case sensitive': 'yes'
-    'default case': 'lower'
-    'preserve case': 'no'
-    'short preserve case': 'no'
-    
-    # Performance and stability
-    'socket options': 'TCP_NODELAY IPTOS_LOWDELAY SO_RCVBUF=65536 SO_SNDBUF=65536'
-    'min receivefile size': '16384'
-    'use sendfile': 'yes'
-    'aio read size': '16384'
-    'aio write size': '16384'
+  customGlobalConfig:
+    configs:
+      # Time Machine specific configuration
+      'vfs objects': 'fruit streams_xattr'
+      'fruit:metadata': 'stream'
+      'fruit:model': 'TimeCapsule8,119'
+      'fruit:posix_rename': 'yes'
+      'fruit:veto_appledouble': 'no'
+      'fruit:nfs_aces': 'no'
+      'fruit:wipe_intentionally_left_blank_rfork': 'yes'
+      'fruit:delete_empty_adfiles': 'yes'
+      'fruit:copyfile': 'no'
+      'fruit:zero_file_id': 'yes'
+      
+      # Network and compatibility settings
+      'server min protocol': 'SMB2'
+      'ea support': 'yes'
+      'kernel oplocks': 'no'
+      'kernel share modes': 'no'
+      'posix locking': 'no'
+      'strict locking': 'no'
+      'case sensitive': 'yes'
+      'default case': 'lower'
+      'preserve case': 'no'
+      'short preserve case': 'no'
+      
+      # Performance and stability
+      'socket options': 'TCP_NODELAY IPTOS_LOWDELAY SO_RCVBUF=65536 SO_SNDBUF=65536'
+      'min receivefile size': '16384'
+      'use sendfile': 'yes'
+      'aio read size': '16384'
+      'aio write size': '16384'
+    useUnsafeCustomConfig: true
