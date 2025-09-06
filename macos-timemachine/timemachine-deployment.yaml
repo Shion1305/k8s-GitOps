@@ -40,39 +40,31 @@ spec:
           value: "1000"
         - name: TZ
           value: "Asia/Tokyo"
+        - name: SAMBA_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: timemachine-credentials
+              key: password
         command:
-        - samba.sh
-        args:
-        - -s
-        - "TimeMachine;/timemachine;yes;no;no;admin;admin;Time Machine"
-        - -u
-        - "admin;$(cat /etc/samba-credentials/password)"
-        - -w
-        - "WORKGROUP"
-        - -g
-        - "vfs objects = fruit streams_xattr"
-        - -g 
-        - "fruit:metadata = stream"
-        - -g
-        - "fruit:model = TimeCapsule8,119" 
-        - -g
-        - "fruit:posix_rename = yes"
-        - -g
-        - "fruit:veto_appledouble = no"
-        - -g
-        - "fruit:wipe_intentionally_left_blank_rfork = yes"
-        - -g
-        - "fruit:delete_empty_adfiles = yes"
-        - -g
-        - "fruit:time machine = yes"
-        - -g
-        - "fruit:advertise_fullsync = true"
+        - /bin/bash
+        - -c
+        - |
+          samba.sh \
+            -s "TimeMachine;/timemachine;yes;no;no;admin;admin;Time Machine" \
+            -u "admin;$SAMBA_PASSWORD" \
+            -w "WORKGROUP" \
+            -g "vfs objects = fruit streams_xattr" \
+            -g "fruit:metadata = stream" \
+            -g "fruit:model = TimeCapsule8,119" \
+            -g "fruit:posix_rename = yes" \
+            -g "fruit:veto_appledouble = no" \
+            -g "fruit:wipe_intentionally_left_blank_rfork = yes" \
+            -g "fruit:delete_empty_adfiles = yes" \
+            -g "fruit:time machine = yes" \
+            -g "fruit:advertise_fullsync = true"
         volumeMounts:
         - name: timemachine-data
           mountPath: /timemachine
-        - name: samba-credentials
-          mountPath: /etc/samba-credentials
-          readOnly: true
         resources:
           requests:
             cpu: 100m
@@ -83,10 +75,4 @@ spec:
       volumes:
       - name: timemachine-data
         persistentVolumeClaim:
-          claimName: timemachine-share-pvc
-      - name: samba-credentials
-        secret:
-          secretName: timemachine-credentials
-          items:
-          - key: password
-            path: password
+          claimName: timemachine-pvc

@@ -6,6 +6,7 @@ namespace: macos-timemachine
 resources:
 - namespace.yaml
 - password-generator.yaml
+- timemachine-pvc.yaml
 - timemachine-deployment.yaml
 - timemachine-svc.yaml
 - networkpolicy.yaml
