@@ -6,9 +6,7 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-wave: "2"
 spec:
+  mode: "user"
   users:
-  - name: admin
-    passwordFrom:
-      secret:
-        name: timemachine-credentials
-        key: password
+    secret: "timemachine-users-secret"
+    key: "users.json"

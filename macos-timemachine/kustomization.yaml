@@ -6,7 +6,6 @@ namespace: macos-timemachine
 resources:
 - namespace.yaml
 - password-generator.yaml
-- samba-crds.yaml
 - samba-operator-install.yaml
 - samba-common-config.yaml
 - samba-security-config.yaml
