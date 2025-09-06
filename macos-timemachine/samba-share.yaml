@@ -1,0 +1,48 @@
+apiVersion: samba-operator.samba.org/v1alpha1
+kind: SmbShare
+metadata:
+  name: timemachine-share
+  namespace: macos-timemachine
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
+spec:
+  shareName: "TimeMachine"
+  storage:
+    pvc:
+      spec:
+        storageClassName: longhorn-hdd
+        accessModes:
+        - ReadWriteOnce
+        resources:
+          requests:
+            storage: 4Ti
+  commonConfig: timemachine-config
+  securityConfig: timemachine-security
+  scaling:
+    replicas: 1
+  placement:
+    nodeSelector:
+      kubernetes.io/hostname: shion-ubuntu-2505
+  networking:
+    hostNetwork: true
+    dnsPolicy: ClusterFirstWithHostNet
+  customConfigValues:
+    # Time Machine specific settings
+    'fruit:time machine': 'yes'
+    'fruit:time machine max size': '4T'
+    
+    # Share permissions
+    'valid users': 'admin'
+    'read only': 'no'
+    'guest ok': 'no'
+    'create mask': '0600'
+    'directory mask': '0700'
+    'force user': 'admin'
+    'force group': 'admin'
+    
+    # Additional Time Machine optimizations
+    'spotlight': 'no'
+    'durable handles': 'yes'
+    'kernel oplocks': 'no'
+    'level2 oplocks': 'no'
+    'oplocks': 'no'

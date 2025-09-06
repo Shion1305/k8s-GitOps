@@ -1,0 +1,14 @@
+apiVersion: samba-operator.samba.org/v1alpha1
+kind: SmbSecurityConfig
+metadata:
+  name: timemachine-security
+  namespace: macos-timemachine
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  users:
+  - name: admin
+    passwordFrom:
+      secret:
+        name: timemachine-credentials
+        key: password
