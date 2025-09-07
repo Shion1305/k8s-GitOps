@@ -23,52 +23,51 @@ spec:
       nodeSelector:
         kubernetes.io/hostname: shion-ubuntu-2505
       containers:
-      - name: timemachine
-        image: mbentley/timemachine:smb
+      - name: samba
+        image: dperson/samba:latest
         ports:
         - containerPort: 137
           protocol: UDP
-          name: udp137
+          name: netbios-ns
         - containerPort: 138
           protocol: UDP
-          name: udp138
+          name: netbios-dgm
         - containerPort: 139
-          name: tcp139
+          name: netbios-ssn
         - containerPort: 445
-          name: tcp445
+          name: microsoft-ds
         env:
-        - name: TM_USERNAME
-          value: "admin"
-        - name: TM_GROUPNAME
-          value: "admin"
-        - name: TM_UID
+        - name: USERID
           value: "1000"
-        - name: TM_GID
+        - name: GROUPID
           value: "1000"
-        - name: SET_PERMISSIONS
-          value: "false"
-        - name: SHARE_NAME
-          value: "TimeMachine"
-        - name: VOLUME_SIZE_LIMIT
-          value: "4T"
-        - name: SMB_VFS_OBJECTS
-          value: "fruit streams_xattr"
-        - name: MIMIC_MODEL
-          value: "TimeCapsule8,119"
-        - name: WORKGROUP
-          value: "WORKGROUP"
-        - name: PASSWORD_FILE
-          value: "/etc/timemachine/password"
         - name: TZ
           value: "Asia/Tokyo"
+        - name: SAMBA_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: timemachine-credentials
+              key: password
+        command:
+        - /bin/bash
+        - -c
+        - |
+          samba.sh \
+            -s "TimeMachine;/timemachine;yes;no;no;admin;admin;Time Machine" \
+            -u "admin;$SAMBA_PASSWORD" \
+            -w "WORKGROUP" \
+            -g "vfs objects = fruit streams_xattr" \
+            -g "fruit:metadata = stream" \
+            -g "fruit:model = TimeCapsule8,119" \
+            -g "fruit:posix_rename = yes" \
+            -g "fruit:veto_appledouble = no" \
+            -g "fruit:wipe_intentionally_left_blank_rfork = yes" \
+            -g "fruit:delete_empty_adfiles = yes" \
+            -g "fruit:time machine = yes" \
+            -g "fruit:advertise_fullsync = true"
         volumeMounts:
         - name: tm-data
-          mountPath: /opt/timemachine
-        - name: run-samba
-          mountPath: /run/samba
-        - name: credentials
-          mountPath: /etc/timemachine
-          readOnly: true
+          mountPath: /timemachine
         resources:
           requests:
             cpu: 100m
@@ -76,15 +75,7 @@ spec:
           limits:
             cpu: 2000m
             memory: 1024Mi
-      volumes:
-      - name: run-samba
-        emptyDir: {}
-      - name: credentials
-        secret:
-          secretName: timemachine-credentials
-          items:
-          - key: password
-            path: password
+      volumes: []
   volumeClaimTemplates:
   - metadata:
       name: tm-data
