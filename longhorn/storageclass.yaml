@@ -11,7 +11,7 @@ parameters:
   dataEngine: "v1"
   fsType: "ext4"
   diskSelector: "ssd" # This must match with Node CR disk.tags
-volumeBindingMode: WaitForFirstConsumer
+volumeBindingMode: Immediate
 ---
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
@@ -24,5 +24,5 @@ parameters:
   dataEngine: "v1"
   fsType: "ext4"
   diskSelector: "hdd"
-volumeBindingMode: WaitForFirstConsumer
+volumeBindingMode: Immediate
 
