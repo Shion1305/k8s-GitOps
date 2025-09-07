@@ -8,6 +8,29 @@ defaultSettings:
   defaultDataPath: ""
   # Reservation rate for filesystem-based volumes
   storageReservedPercentageForDefaultDisk: 25
+
+# Node selector to exclude specific nodes from running Longhorn manager
+longhornManager:
+  nodeSelector:
+    kubernetes.io/hostname: shion-ubuntu-2505
+  tolerations: []
+
+# Node selector for Longhorn driver (CSI plugin)
+longhornDriver:
+  nodeSelector:
+    kubernetes.io/hostname: shion-ubuntu-2505
+  tolerations: []
+
+# Engine image deployment node selector
+engineImage:
+  nodeSelector:
+    kubernetes.io/hostname: shion-ubuntu-2505
+
+# UI deployment node selector
+longhornUI:
+  nodeSelector:
+    kubernetes.io/hostname: shion-ubuntu-2505
+
 preUpgradeChecker:
   jobEnabled: false
 
