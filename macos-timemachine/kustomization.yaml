@@ -6,9 +6,8 @@ namespace: macos-timemachine
 resources:
 - namespace.yaml
 - password-generator.yaml
-- timemachine-pvc.yaml
-- timemachine-deployment.yaml
-- timemachine-svc.yaml
+- statefulset.yaml
+- service.yaml
 - networkpolicy.yaml
 
 # Removed samba-operator resources (not working properly)
@@ -18,9 +17,10 @@ resources:
 # - samba-share.yaml
 # - samba-service.yaml
 
-# Remove old resources (comment out for migration)
-# - statefulset.yaml
-# - service.yaml
+# Removed conflicting standalone PVC and Deployment in favor of StatefulSet
+# - timemachine-pvc.yaml.backup
+# - timemachine-deployment.yaml.backup
+# - timemachine-svc.yaml
 
 labels:
 - pairs:
