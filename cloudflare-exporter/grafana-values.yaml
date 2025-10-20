@@ -1,0 +1,104 @@
+# Standalone Grafana for Cloudflare Monitoring
+# Bundled with cloudflare-exporter deployment
+
+# Deployment configuration
+replicas: 1
+
+# Service configuration - NodePort for external access
+service:
+  type: NodePort
+  port: 80
+  targetPort: 3000
+  nodePort: 30081  # Different from main Grafana (30080)
+
+# Persistence
+persistence:
+  enabled: true
+  type: pvc
+  storageClassName: longhorn-hdd
+  accessModes:
+    - ReadWriteOnce
+  size: 5Gi
+
+# Admin credentials
+adminUser: admin
+adminPassword: cloudflare123  # Change this in production!
+
+# Grafana configuration
+grafana.ini:
+  server:
+    root_url: "http://localhost:30081/"
+    serve_from_sub_path: false
+  
+  analytics:
+    check_for_updates: true
+  
+  auth.anonymous:
+    enabled: false
+
+# Datasources - connect to existing Prometheus
+datasources:
+  datasources.yaml:
+    apiVersion: 1
+    datasources:
+      - name: Prometheus
+        type: prometheus
+        access: proxy
+        url: http://kube-prometheus-stack-prometheus.grafana.svc.cluster.local:9090
+        isDefault: true
+        editable: true
+        jsonData:
+          timeInterval: 30s
+          queryTimeout: 60s
+
+# Dashboard providers
+dashboardProviders:
+  dashboardproviders.yaml:
+    apiVersion: 1
+    providers:
+      - name: 'cloudflare'
+        orgId: 1
+        folder: 'Cloudflare Monitoring'
+        type: file
+        disableDeletion: false
+        editable: true
+        options:
+          path: /var/lib/grafana/dashboards/cloudflare
+
+# Pre-configured dashboards
+dashboards:
+  cloudflare:
+    cloudflare-analytics:
+      gnetId: 12133
+      revision: 1
+      datasource: Prometheus
+    cloudflare-overview:
+      gnetId: 13133
+      revision: 1
+      datasource: Prometheus
+
+# Plugins to install
+plugins:
+  - grafana-piechart-panel
+  - grafana-worldmap-panel
+  - grafana-clock-panel
+
+# Resource limits
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 250m
+    memory: 256Mi
+
+# Security context
+securityContext:
+  runAsUser: 472
+  runAsGroup: 472
+  fsGroup: 472
+  runAsNonRoot: true
+
+# Pod annotations
+podAnnotations:
+  description: "Standalone Grafana for Cloudflare monitoring"

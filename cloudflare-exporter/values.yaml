@@ -1,0 +1,54 @@
+# Cloudflare Exporter Helm Values
+# Exposes Cloudflare metrics for Prometheus monitoring
+
+# Deployment configuration
+replicaCount: 1
+
+image:
+  repository: lablabs/cloudflare-exporter
+  tag: "" # Uses chart default
+  pullPolicy: IfNotPresent
+
+# Environment variables - credentials loaded from secret
+env:
+  - name: CF_API_TOKEN
+    valueFrom:
+      secretKeyRef:
+        name: cloudflare-credentials
+        key: CF_API_TOKEN
+
+# Service configuration
+service:
+  type: ClusterIP
+  port: 8080
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "8080"
+    prometheus.io/path: "/metrics"
+
+# Resource limits
+resources:
+  limits:
+    cpu: 200m
+    memory: 256Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+
+# Monitoring configuration
+serviceMonitor:
+  enabled: true
+  namespace: monitoring
+  interval: 60s
+  scrapeTimeout: 30s
+  labels:
+    release: kube-prometheus-stack
+
+# Security context
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 65534
+  capabilities:
+    drop:
+      - ALL
+  readOnlyRootFilesystem: true
