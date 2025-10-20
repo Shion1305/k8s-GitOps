@@ -5,8 +5,8 @@
 replicaCount: 1
 
 image:
-  repository: lablabs/cloudflare-exporter
-  tag: "" # Uses chart default
+  repository: lablabs/cloudflare_exporter
+  tag: "latest"  # Specify working version
   pullPolicy: IfNotPresent
 
 # Environment variables - credentials loaded from secret
