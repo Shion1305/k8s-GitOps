@@ -7,7 +7,7 @@ metadata:
     nginx.ingress.kubernetes.io/rewrite-target: /
     nginx.ingress.kubernetes.io/ssl-redirect: "false"
 spec:
-  ingressClassName: nginx
+  ingressClassName: nginx-ssl
   rules:
     - host: ynufes-cf.k.shion1305.com
       http:
@@ -19,3 +19,6 @@ spec:
                 name: cloudflare-grafana
                 port:
                   number: 80
+  tls:
+    - hosts:
+        - ynufes-cf.k.shion1305.com
