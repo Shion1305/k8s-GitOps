@@ -20,9 +20,11 @@ persistence:
     - ReadWriteOnce
   size: 5Gi
 
-# Admin credentials
-adminUser: admin
-adminPassword: cloudflare123  # Change this in production!
+# Admin credentials - use existing secret
+admin:
+  existingSecret: cloudflare-credentials
+  userKey: GRAFANA_ADMIN_USER
+  passwordKey: GRAFANA_ADMIN_PASSWORD
 
 # Grafana configuration
 grafana.ini:
