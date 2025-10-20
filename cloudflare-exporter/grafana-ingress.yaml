@@ -9,7 +9,7 @@ metadata:
 spec:
   ingressClassName: nginx
   rules:
-    - host: cloudflare.ynu-fes.k.shion1305.com
+    - host: ynufes-cf.k.shion1305.com
       http:
         paths:
           - path: /
