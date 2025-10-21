@@ -22,7 +22,7 @@ prometheus:
           accessModes: ["ReadWriteOnce"]
           resources:
             requests:
-              storage: 20Gi
+              storage: 200Gi
     
     # Service discovery settings - discover all ServiceMonitors
     serviceMonitorSelectorNilUsesHelmValues: false
