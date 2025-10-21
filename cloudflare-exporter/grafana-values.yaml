@@ -29,7 +29,7 @@ admin:
 # Grafana configuration
 grafana.ini:
   server:
-    root_url: "http://localhost:30081/"
+    root_url: "https://ynufes-cf.k.shion1305.com/"
     serve_from_sub_path: false
   
   analytics:
