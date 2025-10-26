@@ -12,6 +12,8 @@ spec:
       template:
         spec:
           restartPolicy: OnFailure
+          hostNetwork: true
+          dnsPolicy: ClusterFirstWithHostNet
           tolerations:
           - operator: Exists
           affinity:
