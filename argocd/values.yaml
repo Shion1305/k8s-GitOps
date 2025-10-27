@@ -1,15 +1,12 @@
 global:
   domain: argocd.k.shion1305.com
-
 configs:
   # Main configuration
   cm:
     # Admin account
     accounts.admin.enabled: "true"
-    
     # Application URL
     url: https://argocd.k.shion1305.com
-    
     # Dex (GitHub OAuth) configuration
     dex.config: |
       connectors:
@@ -20,7 +17,6 @@ configs:
           clientID: $github-oauth-secret:dex.github.clientID
           clientSecret: $github-oauth-secret:dex.github.clientSecret
           redirectURI: https://argocd.k.shion1305.com/api/dex/callback
-    
     # Resource exclusions
     resource.exclusions: |
       ### Network resources created by the Kubernetes control plane and excluded to reduce the number of watched events and UI clutter
@@ -77,7 +73,6 @@ configs:
         - BackgroundScanReport
         - ClusterBackgroundScanReport
         - UpdateRequest
-    
     # Resource update ignore rules
     resource.customizations.ignoreResourceUpdates.ConfigMap: |
       jqPathExpressions:
@@ -85,88 +80,70 @@ configs:
         - '.metadata.annotations."cluster-autoscaler.kubernetes.io/last-updated"'
         # Ignore the annotation of the legacy Leases election
         - '.metadata.annotations."control-plane.alpha.kubernetes.io/leader"'
-    
     resource.customizations.ignoreResourceUpdates.Endpoints: |
       jsonPointers:
         - /metadata
         - /subsets
-    
     resource.customizations.ignoreResourceUpdates.all: |
       jsonPointers:
         - /status
-    
     resource.customizations.ignoreResourceUpdates.apps_ReplicaSet: |
       jqPathExpressions:
         - '.metadata.annotations."deployment.kubernetes.io/desired-replicas"'
         - '.metadata.annotations."deployment.kubernetes.io/max-replicas"'
         - '.metadata.annotations."rollout.argoproj.io/desired-replicas"'
-    
     resource.customizations.ignoreResourceUpdates.argoproj.io_Application: |
       jqPathExpressions:
         - '.metadata.annotations."notified.notifications.argoproj.io"'
         - '.metadata.annotations."argocd.argoproj.io/refresh"'
         - '.metadata.annotations."argocd.argoproj.io/hydrate"'
         - '.operation'
-    
     resource.customizations.ignoreResourceUpdates.argoproj.io_Rollout: |
       jqPathExpressions:
         - '.metadata.annotations."notified.notifications.argoproj.io"'
-    
     resource.customizations.ignoreResourceUpdates.autoscaling_HorizontalPodAutoscaler: |
       jqPathExpressions:
         - '.metadata.annotations."autoscaling.alpha.kubernetes.io/behavior"'
         - '.metadata.annotations."autoscaling.alpha.kubernetes.io/conditions"'
         - '.metadata.annotations."autoscaling.alpha.kubernetes.io/metrics"'
         - '.metadata.annotations."autoscaling.alpha.kubernetes.io/current-metrics"'
-    
     resource.customizations.ignoreResourceUpdates.discovery.k8s.io_EndpointSlice: |
       jsonPointers:
         - /metadata
         - /endpoints
         - /ports
-  
   # RBAC configuration
   rbac:
     policy.default: role:admin
     policy.csv: ""
-  
   # Reference to existing secrets
   secret:
-    createSecret: false  # We'll keep existing argocd-secret
-  
+    createSecret: false # We'll keep existing argocd-secret
   # Parameters (empty as per current config)
   params: {}
-
 # Server configuration
 server:
   # Disable default ingress since we have a custom one
   ingress:
     enabled: false
-  
   # Keep existing service
   service:
     type: ClusterIP
-
 # Dex configuration
 dex:
   enabled: true
-
 # Redis
 redis:
   enabled: true
-
 # Application controller
 controller:
   replicas: 1
-
 # Repo server
 repoServer:
   replicas: 1
-
 # ApplicationSet controller
 applicationSet:
   replicas: 1
-
 # Notifications controller
 notifications:
   enabled: true

@@ -10,12 +10,11 @@ spec:
   source:
     repoURL: https://argoproj.github.io/argo-helm
     chart: argo-cd
-    targetRevision: 9.0.5  # ArgoCD v3.1.9
+    targetRevision: 9.0.5 # ArgoCD v3.1.9
     helm:
       valuesObject:
         global:
           domain: argocd.k.shion1305.com
-
         configs:
           cm:
             accounts.admin.enabled: "true"
@@ -126,35 +125,26 @@ spec:
           secret:
             createSecret: false
           params: {}
-
         server:
           ingress:
             enabled: false
           service:
             type: ClusterIP
-
         dex:
           enabled: true
-
         redis:
           enabled: true
-
         controller:
           replicas: 1
-
         repoServer:
           replicas: 1
-
         applicationSet:
           replicas: 1
-
         notifications:
           enabled: true
-
   destination:
     server: https://kubernetes.default.svc
     namespace: argocd
-  
   syncPolicy:
     automated:
       prune: true
