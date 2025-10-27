@@ -5,9 +5,9 @@ metadata:
   namespace: network-stress-test
 data:
   # Default chunk size for streaming (in bytes)
-  CHUNK_SIZE: "1048576"  # 1MB
+  CHUNK_SIZE: "1048576" # 1MB
   # Default response size (in MB)
-  DEFAULT_RESPONSE_SIZE: "100"  # 100MB
+  DEFAULT_RESPONSE_SIZE: "100" # 100MB
   # Server port
   PORT: "8080"
   # Enable metrics endpoint

@@ -3,7 +3,6 @@ image:
   repository: acid/postgres-operator
   tag: v1.14.0
   pullPolicy: IfNotPresent
-
 # Operator configuration
 configGeneral:
   enable_crd_registration: true
@@ -17,7 +16,6 @@ configGeneral:
   spilo_runasuser: 101
   spilo_runasgroup: 103
   spilo_fsgroup: 103
-
 configConnectionPooler:
   connection_pooler_image: "registry.opensource.zalan.do/acid/pgbouncer:master-32"
   connection_pooler_max_db_connections: 60
@@ -25,16 +23,13 @@ configConnectionPooler:
   connection_pooler_number_of_instances: 2
   connection_pooler_schema: "pooler"
   connection_pooler_user: "pooler"
-
 configDebug:
   debug_logging: true
   enable_database_access: true
-
 configTeamsApi:
   enable_teams_api: false
   enable_team_superuser: false
   enable_admin_role_for_users: true
-
 configKubernetes:
   cluster_domain: "cluster.local"
   cluster_labels:
@@ -60,8 +55,7 @@ configKubernetes:
   pod_terminate_grace_period: "5m"
   spilo_privileged: false
   storage_resize_mode: "pvc"
-  watched_namespace: "*"  # Watch all namespaces
-
+  watched_namespace: "*" # Watch all namespaces
 configLogicalBackup:
   logical_backup_docker_image: "registry.opensource.zalan.do/acid/logical-backup:v1.14.0"
   logical_backup_job_prefix: "logical-backup-"
@@ -71,7 +65,6 @@ configLogicalBackup:
   logical_backup_s3_region: ""
   logical_backup_s3_secret_name: ""
   logical_backup_schedule: "30 00 * * *"
-
 configPostgreSQL:
   docker_image: "ghcr.io/zalando/spilo-17:4.0-p2"
   enable_master_load_balancer: false
@@ -80,7 +73,6 @@ configPostgreSQL:
   enable_replica_pooler_load_balancer: false
   master_dns_name_format: "{cluster}.{namespace}.{hostedzone}"
   replica_dns_name_format: "{cluster}-repl.{namespace}.{hostedzone}"
-
 # Resource limits for the operator
 resources:
   limits:
@@ -89,14 +81,11 @@ resources:
   requests:
     cpu: 100m
     memory: 250Mi
-
 # RBAC
 rbac:
   create: true
   createAggregateClusterRoles: false
-
 serviceAccount:
   create: true
-
 # Enable CRD registration
 enableJsonLogging: false

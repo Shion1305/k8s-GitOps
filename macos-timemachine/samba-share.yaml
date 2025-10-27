@@ -12,7 +12,7 @@ spec:
       spec:
         storageClassName: longhorn-hdd
         accessModes:
-        - ReadWriteOnce
+          - ReadWriteOnce
         resources:
           requests:
             storage: 4Ti
@@ -30,7 +30,6 @@ spec:
     # Time Machine specific settings
     'fruit:time machine': 'yes'
     'fruit:time machine max size': '4T'
-    
     # Share permissions
     'valid users': 'admin'
     'read only': 'no'
@@ -39,7 +38,6 @@ spec:
     'directory mask': '0700'
     'force user': 'admin'
     'force group': 'admin'
-    
     # Additional Time Machine optimizations
     'spotlight': 'no'
     'durable handles': 'yes'

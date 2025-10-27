@@ -15,42 +15,42 @@ spec:
       serviceAccountName: cert-sync
       restartPolicy: OnFailure
       containers:
-      - name: cert-sync
-        image: curlimages/curl:8.4.0
-        command:
-        - /bin/sh
-        - -c
-        - |
-          set -e
-          
-          echo "Waiting for Keycloak to be ready..."
-          until curl -f -k https://keycloak.k.shion1305.com/health/ready; do
-            sleep 10
-          done
-          
-          echo "Fetching Keycloak realm public key..."
-          # Get the realm info which contains the public key
-          REALM_INFO=$(curl -s https://keycloak.k.shion1305.com/realms/registry)
-          
-          # Extract the public key from the JSON response
-          PUBLIC_KEY=$(echo "$REALM_INFO" | sed -n 's/.*"public_key":"\([^"]*\)".*/\1/p')
-          
-          if [ -z "$PUBLIC_KEY" ]; then
-            echo "Failed to extract public key from realm info"
-            exit 1
-          fi
-          
-          # Convert the key to PEM format
-          echo "-----BEGIN PUBLIC KEY-----" > /tmp/keycloak-realm-public.crt
-          echo "$PUBLIC_KEY" | fold -w 64 >> /tmp/keycloak-realm-public.crt
-          echo "-----END PUBLIC KEY-----" >> /tmp/keycloak-realm-public.crt
-          
-          # Create the ConfigMap using kubectl
-          kubectl create configmap keycloak-realm-public-key -n zot \
-            --from-file=keycloak-realm-public.crt=/tmp/keycloak-realm-public.crt \
-            --dry-run=client -o yaml | kubectl apply -f -
-          
-          echo "Keycloak realm public key ConfigMap created successfully"
+        - name: cert-sync
+          image: curlimages/curl:8.4.0
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+
+              echo "Waiting for Keycloak to be ready..."
+              until curl -f -k https://keycloak.k.shion1305.com/health/ready; do
+                sleep 10
+              done
+
+              echo "Fetching Keycloak realm public key..."
+              # Get the realm info which contains the public key
+              REALM_INFO=$(curl -s https://keycloak.k.shion1305.com/realms/registry)
+
+              # Extract the public key from the JSON response
+              PUBLIC_KEY=$(echo "$REALM_INFO" | sed -n 's/.*"public_key":"\([^"]*\)".*/\1/p')
+
+              if [ -z "$PUBLIC_KEY" ]; then
+                echo "Failed to extract public key from realm info"
+                exit 1
+              fi
+
+              # Convert the key to PEM format
+              echo "-----BEGIN PUBLIC KEY-----" > /tmp/keycloak-realm-public.crt
+              echo "$PUBLIC_KEY" | fold -w 64 >> /tmp/keycloak-realm-public.crt
+              echo "-----END PUBLIC KEY-----" >> /tmp/keycloak-realm-public.crt
+
+              # Create the ConfigMap using kubectl
+              kubectl create configmap keycloak-realm-public-key -n zot \
+                --from-file=keycloak-realm-public.crt=/tmp/keycloak-realm-public.crt \
+                --dry-run=client -o yaml | kubectl apply -f -
+
+              echo "Keycloak realm public key ConfigMap created successfully"
       activeDeadlineSeconds: 300
   backoffLimit: 5
 ---
@@ -75,9 +75,9 @@ metadata:
     argocd.argoproj.io/hook-weight: "15"
     argocd.argoproj.io/sync-wave: "2"
 rules:
-- apiGroups: [""]
-  resources: ["configmaps"]
-  verbs: ["create", "update", "patch", "get"]
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["create", "update", "patch", "get"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
@@ -93,6 +93,6 @@ roleRef:
   kind: Role
   name: cert-sync
 subjects:
-- kind: ServiceAccount
-  name: cert-sync
-  namespace: zot
+  - kind: ServiceAccount
+    name: cert-sync
+    namespace: zot

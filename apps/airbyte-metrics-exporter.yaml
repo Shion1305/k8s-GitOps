@@ -6,15 +6,15 @@ metadata:
 spec:
   project: default
   sources:
-  - repoURL: https://botify-labs.github.io/helm-charts
-    chart: prometheus-airbyte-exporter
-    targetRevision: 0.7.1
-    helm:
-      valueFiles:
-      - $values/airbyte-metrics-exporter/values.yaml
-  - repoURL: https://github.com/Shion1305/k8s-GitOps.git
-    targetRevision: HEAD
-    ref: values
+    - repoURL: https://botify-labs.github.io/helm-charts
+      chart: prometheus-airbyte-exporter
+      targetRevision: 0.7.1
+      helm:
+        valueFiles:
+          - $values/airbyte-metrics-exporter/values.yaml
+    - repoURL: https://github.com/Shion1305/k8s-GitOps.git
+      targetRevision: HEAD
+      ref: values
   destination:
     server: https://kubernetes.default.svc
     namespace: airbyte

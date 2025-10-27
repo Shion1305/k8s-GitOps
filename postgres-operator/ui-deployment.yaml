@@ -16,43 +16,43 @@ spec:
         app: postgres-operator-ui
     spec:
       containers:
-      - name: postgres-operator-ui
-        image: registry.opensource.zalan.do/acid/postgres-operator-ui:v1.14.0
-        ports:
-        - containerPort: 8081
-          name: http
-        env:
-        - name: APP_URL
-          value: "http://localhost:8081"
-        - name: OPERATOR_API_URL
-          value: "http://postgres-operator:8080/"
-        - name: OPERATOR_CLUSTER_NAME_LABEL
-          value: "cluster-name"
-        - name: RESOURCES_VISIBLE
-          value: "False"
-        - name: TARGET_NAMESPACE
-          value: "postgres-operator-deployment"
-        - name: TEAMS
-          value: '["default", "admin"]'
-        - name: SUPERUSER_TEAM
-          value: "admin"
-        resources:
-          limits:
-            cpu: 200m
-            memory: 200Mi
-          requests:
-            cpu: 100m
-            memory: 100Mi
-        readinessProbe:
-          httpGet:
-            path: /health
-            port: 8081
-          initialDelaySeconds: 5
-          periodSeconds: 10
-        livenessProbe:
-          httpGet:
-            path: /health
-            port: 8081
-          initialDelaySeconds: 30
-          periodSeconds: 30
+        - name: postgres-operator-ui
+          image: registry.opensource.zalan.do/acid/postgres-operator-ui:v1.14.0
+          ports:
+            - containerPort: 8081
+              name: http
+          env:
+            - name: APP_URL
+              value: "http://localhost:8081"
+            - name: OPERATOR_API_URL
+              value: "http://postgres-operator:8080/"
+            - name: OPERATOR_CLUSTER_NAME_LABEL
+              value: "cluster-name"
+            - name: RESOURCES_VISIBLE
+              value: "False"
+            - name: TARGET_NAMESPACE
+              value: "postgres-operator-deployment"
+            - name: TEAMS
+              value: '["default", "admin"]'
+            - name: SUPERUSER_TEAM
+              value: "admin"
+          resources:
+            limits:
+              cpu: 200m
+              memory: 200Mi
+            requests:
+              cpu: 100m
+              memory: 100Mi
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8081
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8081
+            initialDelaySeconds: 30
+            periodSeconds: 30
       serviceAccountName: postgres-operator-ui

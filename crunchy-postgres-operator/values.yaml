@@ -1,10 +1,8 @@
 # CrunchyData PostgreSQL Operator (PGO) Helm Values
 # https://github.com/CrunchyData/postgres-operator
-
 # Controller images used to run the operator's controllers
 controllerImages:
   cluster: registry.developers.crunchydata.com/crunchydata/postgres-operator:ubi9-5.8.2-0
-
 # Related images used when an image is omitted from PostgresCluster specs
 relatedImages:
   postgres_17:
@@ -27,23 +25,17 @@ relatedImages:
     image: registry.developers.crunchydata.com/crunchydata/crunchy-pgadmin4:ubi9-9.2-2520
   collector:
     image: registry.developers.crunchydata.com/crunchydata/postgres-operator:ubi9-5.8.2-0
-
 # Watch all namespaces (false) or only the namespace where PGO is installed (true)
 singleNamespace: false
-
 # Enable debug level logging
 debug: true
-
 # Leader election for high availability
 # Set this to enable HA mode (also increase replicas to > 1)
 pgoControllerLeaseName: cpk-leader-election-lease
-
 # Number of PGO instances (increase for HA when pgoControllerLeaseName is set)
 replicas: 1
-
 # Image pull secrets for controller images
 imagePullSecretNames: []
-
 # Resource configuration for controllers
 resources:
   controller:
@@ -53,20 +45,16 @@ resources:
     requests:
       cpu: 100m
       memory: 250Mi
-
 # Custom labels for PGO pods (avoid postgres-operator.crunchydata.com namespace)
 customPodLabels:
   app.kubernetes.io/managed-by: "argocd"
-  
 # Feature gates (uncomment to enable specific features)
 # features:
 #   AutoGrowVolumes: true
 
 # Extra environment variables
 extraEnv: []
-
 # Tolerations for operator pods
 tolerations: []
-
 # Affinity rules for operator pods
 affinity: {}

@@ -1,11 +1,9 @@
 # Kube-Prometheus Stack Helm Values
 # Includes Grafana, Prometheus, and AlertManager
-
 # Global settings
 global:
   scrapeInterval: 30s
   evaluationInterval: 30s
-
 # Prometheus configuration
 prometheus:
   enabled: true
@@ -13,7 +11,6 @@ prometheus:
     # Retention settings
     retention: 30d
     retentionSize: 15GB
-    
     # Storage configuration
     storageSpec:
       volumeClaimTemplate:
@@ -23,7 +20,6 @@ prometheus:
           resources:
             requests:
               storage: 200Gi
-    
     # Service discovery settings - discover all ServiceMonitors
     serviceMonitorSelectorNilUsesHelmValues: false
     serviceMonitorNamespaceSelector: {}
@@ -34,7 +30,6 @@ prometheus:
     ruleSelectorNilUsesHelmValues: false
     ruleNamespaceSelector: {}
     ruleSelector: {}
-    
     # Resource configuration
     resources:
       limits:
@@ -43,16 +38,13 @@ prometheus:
       requests:
         cpu: 1000m
         memory: 4Gi
-
 # Grafana configuration
 grafana:
   enabled: true
-  
   # Service configuration
   service:
     type: NodePort
     nodePort: 30080
-  
   # Persistence
   persistence:
     enabled: true
@@ -61,14 +53,12 @@ grafana:
     size: 10Gi
     accessModes:
       - ReadWriteOnce
-  
   # Default dashboards
   defaultDashboardsEnabled: true
   defaultDashboardsTimezone: UTC
-  
   # Datasources configuration - use default from chart
   # (chart automatically configures Prometheus datasource)
-  
+
   # Dashboard providers
   dashboardProviders:
     dashboardProviders.yaml:
@@ -90,7 +80,6 @@ grafana:
           editable: true
           options:
             path: /var/lib/grafana/dashboards/node-exporter
-  
   # Pre-configured dashboards
   dashboards:
     default:
@@ -111,34 +100,27 @@ grafana:
         gnetId: 405
         revision: 8
         datasource: Prometheus
-  
   # Environment variables to load GitHub OAuth credentials from secret
   envFromSecrets:
     - name: grafana-github-oauth-secret
-  
   # Disable security validation for sensitive keys (required for OAuth secrets)
   assertNoLeakedSecrets: false
-  
   # Grafana configuration
   grafana.ini:
     server:
       root_url: "https://o11y.k.shion1305.com/grafana/"
       serve_from_sub_path: true
-    
     # Disable anonymous authentication
     auth.anonymous:
       enabled: false
-    
     # Disable basic authentication (password login)
     auth.basic:
       enabled: false
-    
     # Disable local login form and enable auto-login
     auth:
       disable_login_form: true
       disable_signout_menu: false
       oauth_auto_login: true
-    
     # GitHub OAuth configuration
     auth.github:
       enabled: true
@@ -153,14 +135,11 @@ grafana:
       team_ids: # Add specific team IDs if needed
       allow_assign_grafana_admin: false
       role_attribute_path: # Optional: map GitHub teams to Grafana roles
-    
     security:
       admin_user: admin
       # Note: admin password is disabled since we're using OAuth only
-    
     dashboards:
       default_home_dashboard_path: /var/lib/grafana/dashboards/default/kubernetes-cluster-monitoring.json
-  
   # Resource configuration
   resources:
     limits:
@@ -169,7 +148,6 @@ grafana:
     requests:
       cpu: 250m
       memory: 512Mi
-
 # AlertManager configuration
 alertmanager:
   enabled: true
@@ -189,19 +167,15 @@ alertmanager:
       requests:
         cpu: 50m
         memory: 128Mi
-
 # Node Exporter (disabled since we're deploying it separately)
 nodeExporter:
   enabled: false
-
 # Kube State Metrics
 kubeStateMetrics:
   enabled: true
-
 # Prometheus Node Exporter Service Monitor
 prometheusNodeExporter:
-  enabled: false  # We'll use our separate deployment
-
+  enabled: false # We'll use our separate deployment
 # Service Monitors
 prometheus-node-exporter:
   enabled: true

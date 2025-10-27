@@ -6,18 +6,18 @@ metadata:
 spec:
   project: default
   sources:
-  - repoURL: https://opensource.zalando.com/postgres-operator/charts/postgres-operator
-    chart: postgres-operator
-    targetRevision: 1.14.0
-    helm:
-      valueFiles:
-      - $values/postgres-operator/values.yaml
-  - repoURL: https://github.com/Shion1305/k8s-GitOps.git
-    targetRevision: HEAD
-    ref: values
-  - repoURL: https://github.com/Shion1305/k8s-GitOps.git
-    targetRevision: HEAD
-    path: postgres-operator
+    - repoURL: https://opensource.zalando.com/postgres-operator/charts/postgres-operator
+      chart: postgres-operator
+      targetRevision: 1.14.0
+      helm:
+        valueFiles:
+          - $values/postgres-operator/values.yaml
+    - repoURL: https://github.com/Shion1305/k8s-GitOps.git
+      targetRevision: HEAD
+      ref: values
+    - repoURL: https://github.com/Shion1305/k8s-GitOps.git
+      targetRevision: HEAD
+      path: postgres-operator
   destination:
     server: https://kubernetes.default.svc
     namespace: postgres-operator

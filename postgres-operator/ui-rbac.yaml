@@ -9,15 +9,15 @@ kind: ClusterRole
 metadata:
   name: postgres-operator-ui
 rules:
-- apiGroups: [""]
-  resources: ["configmaps", "secrets", "services", "pods", "namespaces"]
-  verbs: ["get", "list", "watch"]
-- apiGroups: ["apps"]
-  resources: ["deployments", "replicasets", "statefulsets"]
-  verbs: ["get", "list", "watch"]
-- apiGroups: ["acid.zalan.do"]
-  resources: ["postgresqls", "operatorconfigurations"]
-  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: [""]
+    resources: ["configmaps", "secrets", "services", "pods", "namespaces"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["apps"]
+    resources: ["deployments", "replicasets", "statefulsets"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["acid.zalan.do"]
+    resources: ["postgresqls", "operatorconfigurations"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
@@ -28,6 +28,6 @@ roleRef:
   kind: ClusterRole
   name: postgres-operator-ui
 subjects:
-- kind: ServiceAccount
-  name: postgres-operator-ui
-  namespace: postgres-operator
+  - kind: ServiceAccount
+    name: postgres-operator-ui
+    namespace: postgres-operator

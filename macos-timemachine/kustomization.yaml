@@ -1,15 +1,12 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
-
 namespace: macos-timemachine
-
 resources:
-- namespace.yaml
-- password-generator.yaml
-- statefulset.yaml
-- service.yaml
-- networkpolicy.yaml
-
+  - namespace.yaml
+  - password-generator.yaml
+  - statefulset.yaml
+  - service.yaml
+  - networkpolicy.yaml
 # Removed samba-operator resources (not working properly)
 # - samba-operator-install.yaml
 # - samba-common-config.yaml
@@ -21,8 +18,7 @@ resources:
 # - timemachine-pvc.yaml.backup
 # - timemachine-deployment.yaml.backup
 # - timemachine-svc.yaml
-
 labels:
-- pairs:
-    app: samba-timemachine
-    component: timemachine
+  - pairs:
+      app: samba-timemachine
+      component: timemachine

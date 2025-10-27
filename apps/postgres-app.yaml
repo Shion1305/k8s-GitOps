@@ -6,15 +6,15 @@ metadata:
 spec:
   project: default
   sources:
-  - repoURL: https://charts.bitnami.com/bitnami
-    chart: postgresql
-    targetRevision: 15.5.32
-    helm:
-      valueFiles:
-      - $values/postgres/values.yaml
-  - repoURL: https://github.com/Shion1305/k8s-GitOps.git
-    targetRevision: HEAD
-    ref: values
+    - repoURL: https://charts.bitnami.com/bitnami
+      chart: postgresql
+      targetRevision: 15.5.32
+      helm:
+        valueFiles:
+          - $values/postgres/values.yaml
+    - repoURL: https://github.com/Shion1305/k8s-GitOps.git
+      targetRevision: HEAD
+      ref: values
   destination:
     server: https://kubernetes.default.svc
     namespace: postgres

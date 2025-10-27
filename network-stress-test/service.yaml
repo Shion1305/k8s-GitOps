@@ -9,10 +9,10 @@ spec:
   selector:
     app: network-stress-test
   ports:
-  - name: http
-    port: 8080
-    targetPort: 8080
-    protocol: TCP
+    - name: http
+      port: 8080
+      targetPort: 8080
+      protocol: TCP
   type: ClusterIP
 ---
 apiVersion: v1
@@ -26,9 +26,9 @@ spec:
   selector:
     app: network-stress-test
   ports:
-  - name: http
-    port: 8080
-    targetPort: 8080
-    nodePort: 30808
-    protocol: TCP
+    - name: http
+      port: 8080
+      targetPort: 8080
+      nodePort: 30808
+      protocol: TCP
   type: NodePort

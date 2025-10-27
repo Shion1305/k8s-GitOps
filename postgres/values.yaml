@@ -3,7 +3,6 @@ auth:
   username: "airbyte"
   password: "airbyte123"
   database: "airbyte"
-
 primary:
   persistence:
     enabled: true
@@ -16,15 +15,12 @@ primary:
     limits:
       memory: 512Mi
       cpu: 500m
-
 metrics:
   enabled: true
   serviceMonitor:
     enabled: false
-
 postgresql:
   maxConnections: 200
-
 tls:
   enabled: true
   certificatesSecret: ""

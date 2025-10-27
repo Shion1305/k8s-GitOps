@@ -14,18 +14,17 @@ spec:
         app: test-app
     spec:
       containers:
-      - name: nginx
-        image: nginx:alpine
-        ports:
-        - containerPort: 80
-        volumeMounts:
-        - name: html
-          mountPath: /usr/share/nginx/html
+        - name: nginx
+          image: nginx:alpine
+          ports:
+            - containerPort: 80
+          volumeMounts:
+            - name: html
+              mountPath: /usr/share/nginx/html
       volumes:
-      - name: html
-        configMap:
-          name: test-app-html
-
+        - name: html
+          configMap:
+            name: test-app-html
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -48,7 +47,6 @@ data:
         </script>
     </body>
     </html>
-
 ---
 apiVersion: v1
 kind: Service
@@ -59,9 +57,8 @@ spec:
   selector:
     app: test-app
   ports:
-  - port: 80
-    targetPort: 80
-
+    - port: 80
+      targetPort: 80
 ---
 apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -74,17 +71,17 @@ metadata:
 spec:
   ingressClassName: nginx-ssl
   tls:
-  - hosts:
-    - test.k.shion1305.com
-    # No secretName needed - controller uses default SSL certificate
+    - hosts:
+        - test.k.shion1305.com
+        # No secretName needed - controller uses default SSL certificate
   rules:
-  - host: test.k.shion1305.com
-    http:
-      paths:
-      - path: /
-        pathType: Prefix
-        backend:
-          service:
-            name: test-app-service
-            port:
-              number: 80
+    - host: test.k.shion1305.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: test-app-service
+                port:
+                  number: 80

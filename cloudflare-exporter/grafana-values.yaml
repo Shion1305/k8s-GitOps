@@ -1,16 +1,13 @@
 # Standalone Grafana for Cloudflare Monitoring
 # Bundled with cloudflare-exporter deployment
-
 # Deployment configuration
 replicas: 1
-
 # Service configuration - NodePort for external access
 service:
   type: NodePort
   port: 80
   targetPort: 3000
-  nodePort: 30081  # Different from main Grafana (30080)
-
+  nodePort: 30081 # Different from main Grafana (30080)
 # Persistence
 persistence:
   enabled: true
@@ -19,25 +16,20 @@ persistence:
   accessModes:
     - ReadWriteOnce
   size: 5Gi
-
 # Admin credentials - use existing secret
 admin:
   existingSecret: cloudflare-credentials
   userKey: GRAFANA_ADMIN_USER
   passwordKey: GRAFANA_ADMIN_PASSWORD
-
 # Grafana configuration
 grafana.ini:
   server:
     root_url: "https://ynufes-cf.k.shion1305.com/"
     serve_from_sub_path: false
-  
   analytics:
     check_for_updates: true
-  
   auth.anonymous:
     enabled: false
-
 # Datasources - connect to existing Prometheus
 datasources:
   datasources.yaml:
@@ -52,7 +44,6 @@ datasources:
         jsonData:
           timeInterval: 30s
           queryTimeout: 60s
-
 # Dashboard providers
 dashboardProviders:
   dashboardproviders.yaml:
@@ -66,7 +57,6 @@ dashboardProviders:
         editable: true
         options:
           path: /var/lib/grafana/dashboards/cloudflare
-
 # Pre-configured dashboards
 dashboards:
   cloudflare:
@@ -78,13 +68,11 @@ dashboards:
       gnetId: 13133
       revision: 1
       datasource: Prometheus
-
 # Plugins to install
 plugins:
   - grafana-piechart-panel
   - grafana-worldmap-panel
   - grafana-clock-panel
-
 # Resource limits
 resources:
   limits:
@@ -93,14 +81,12 @@ resources:
   requests:
     cpu: 250m
     memory: 256Mi
-
 # Security context
 securityContext:
   runAsUser: 472
   runAsGroup: 472
   fsGroup: 472
   runAsNonRoot: true
-
 # Pod annotations
 podAnnotations:
   description: "Standalone Grafana for Cloudflare monitoring"

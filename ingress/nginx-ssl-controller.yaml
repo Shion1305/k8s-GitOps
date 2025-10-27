@@ -24,100 +24,95 @@ spec:
       nodeSelector:
         kubernetes.io/hostname: instance-2024-1
       tolerations:
-      - key: node-role.kubernetes.io/control-plane
-        operator: Exists
-        effect: NoSchedule
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
       serviceAccountName: ingress-nginx
       hostNetwork: true
       dnsPolicy: ClusterFirstWithHostNet
       initContainers:
-      - name: create-tls-secret
-        image: bitnami/kubectl:latest
-        securityContext:
-          runAsUser: 0
-          runAsGroup: 0
-        volumeMounts:
-        - name: tls-certs
-          mountPath: /etc/letsencrypt
-          readOnly: true
-        command:
-        - sh
-        - -c
-        - |
-          kubectl delete secret nginx-tls-secret -n ingress-nginx --ignore-not-found=true
-          kubectl create secret tls nginx-tls-secret \
-            --cert=/etc/letsencrypt/live/k.shion1305.com/fullchain.pem \
-            --key=/etc/letsencrypt/live/k.shion1305.com/privkey.pem \
-            -n ingress-nginx
-
+        - name: create-tls-secret
+          image: bitnami/kubectl:latest
+          securityContext:
+            runAsUser: 0
+            runAsGroup: 0
+          volumeMounts:
+            - name: tls-certs
+              mountPath: /etc/letsencrypt
+              readOnly: true
+          command:
+            - sh
+            - -c
+            - |
+              kubectl delete secret nginx-tls-secret -n ingress-nginx --ignore-not-found=true
+              kubectl create secret tls nginx-tls-secret \
+                --cert=/etc/letsencrypt/live/k.shion1305.com/fullchain.pem \
+                --key=/etc/letsencrypt/live/k.shion1305.com/privkey.pem \
+                -n ingress-nginx
       containers:
-      - name: controller
-        # Use a current controller (v1.13.0 as of July 2025)
-        image: registry.k8s.io/ingress-nginx/controller:v1.13.0
-        args:
-          - /nginx-ingress-controller
-          - --election-id=ingress-nginx-ssl-leader
-          - --controller-class=k8s.io/ingress-nginx-ssl
-          - --ingress-class=nginx-ssl
-          - --configmap=$(POD_NAMESPACE)/ingress-nginx-ssl-controller
-          - --http-port=80
-          - --https-port=443
-          - --default-ssl-certificate=ingress-nginx/nginx-tls-secret
-          - --v=2
-          - --enable-ssl-passthrough=false
-          # uncomment if you rely on Prometheus metrics and lose them after 1.12+
-          # - --enable-metrics=true
-        env:
-        - name: POD_NAME
-          valueFrom: { fieldRef: { fieldPath: metadata.name } }
-        - name: POD_NAMESPACE
-          valueFrom: { fieldRef: { fieldPath: metadata.namespace } }
-        ports:
-        - name: http
-          containerPort: 80
-          hostPort: 80
-        - name: https
-          containerPort: 443
-          hostPort: 443
-
-        # run as the image’s normal unprivileged user (101) but allow binding 80/443
-        securityContext:
-          runAsNonRoot: true
-          runAsUser: 101
-          runAsGroup: 101
-          allowPrivilegeEscalation: false
-          capabilities:
-            drop: ["ALL"]
-            add: ["NET_BIND_SERVICE"]
-
-        # Optional: ONLY if you still hit the cfg.json permission quirk.
-        # Remove after you confirm 1.13.x fixes it for you.
-        # lifecycle:
-        #   postStart:
-        #     exec:
-        #       command:
-        #       - sh
-        #       - -c
-        #       - |
-        #         if [ -f /etc/nginx/lua/cfg.json ]; then chmod 0644 /etc/nginx/lua/cfg.json; fi
-        #         nginx -s reload || true
-
-        volumeMounts:
-        - name: tls-certs
-          mountPath: /etc/letsencrypt
-          readOnly: true
-        - name: webhook-cert
-          mountPath: /usr/local/certificates/
-          readOnly: true
-
+        - name: controller
+          # Use a current controller (v1.13.0 as of July 2025)
+          image: registry.k8s.io/ingress-nginx/controller:v1.13.0
+          args:
+            - /nginx-ingress-controller
+            - --election-id=ingress-nginx-ssl-leader
+            - --controller-class=k8s.io/ingress-nginx-ssl
+            - --ingress-class=nginx-ssl
+            - --configmap=$(POD_NAMESPACE)/ingress-nginx-ssl-controller
+            - --http-port=80
+            - --https-port=443
+            - --default-ssl-certificate=ingress-nginx/nginx-tls-secret
+            - --v=2
+            - --enable-ssl-passthrough=false
+            # uncomment if you rely on Prometheus metrics and lose them after 1.12+
+            # - --enable-metrics=true
+          env:
+            - name: POD_NAME
+              valueFrom: {fieldRef: {fieldPath: metadata.name}}
+            - name: POD_NAMESPACE
+              valueFrom: {fieldRef: {fieldPath: metadata.namespace}}
+          ports:
+            - name: http
+              containerPort: 80
+              hostPort: 80
+            - name: https
+              containerPort: 443
+              hostPort: 443
+          # run as the image’s normal unprivileged user (101) but allow binding 80/443
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 101
+            runAsGroup: 101
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+              add: ["NET_BIND_SERVICE"]
+          # Optional: ONLY if you still hit the cfg.json permission quirk.
+          # Remove after you confirm 1.13.x fixes it for you.
+          # lifecycle:
+          #   postStart:
+          #     exec:
+          #       command:
+          #       - sh
+          #       - -c
+          #       - |
+          #         if [ -f /etc/nginx/lua/cfg.json ]; then chmod 0644 /etc/nginx/lua/cfg.json; fi
+          #         nginx -s reload || true
+          volumeMounts:
+            - name: tls-certs
+              mountPath: /etc/letsencrypt
+              readOnly: true
+            - name: webhook-cert
+              mountPath: /usr/local/certificates/
+              readOnly: true
       volumes:
-      - name: tls-certs
-        hostPath:
-          path: /etc/letsencrypt
-          type: Directory
-      - name: webhook-cert
-        secret:
-          secretName: ingress-nginx-admission
+        - name: tls-certs
+          hostPath:
+            path: /etc/letsencrypt
+            type: Directory
+        - name: webhook-cert
+          secret:
+            secretName: ingress-nginx-admission
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -128,7 +123,6 @@ data:
   # only keep these two lines if you use any *_snippet annotations
   allow-snippet-annotations: "true"
   annotations-risk-level: "Critical"
-
   ssl-redirect: "true"
   force-ssl-redirect: "true"
 ---
@@ -137,39 +131,39 @@ kind: ClusterRole
 metadata:
   name: ingress-nginx-ssl-secrets
 rules:
-- apiGroups: [""]
-  resources: ["configmaps", "endpoints", "nodes", "pods", "secrets", "namespaces"]
-  verbs: ["list", "watch"]
-- apiGroups: ["coordination.k8s.io"]
-  resources: ["leases"]
-  verbs: ["list", "watch"]
-- apiGroups: [""]
-  resources: ["nodes"]
-  verbs: ["get"]
-- apiGroups: [""]
-  resources: ["services"]
-  verbs: ["get", "list", "watch"]
-- apiGroups: ["networking.k8s.io"]
-  resources: ["ingresses"]
-  verbs: ["get", "list", "watch"]
-- apiGroups: [""]
-  resources: ["events"]
-  verbs: ["create", "patch"]
-- apiGroups: ["networking.k8s.io"]
-  resources: ["ingresses/status"]
-  verbs: ["update"]
-- apiGroups: ["networking.k8s.io"]
-  resources: ["ingressclasses"]
-  verbs: ["get", "list", "watch"]
-- apiGroups: ["discovery.k8s.io"]
-  resources: ["endpointslices"]
-  verbs: ["list", "watch", "get"]
-- apiGroups: [""]
-  resources: ["secrets"]
-  verbs: ["get", "list", "create", "update", "patch", "delete"]
-- apiGroups: ["coordination.k8s.io"]
-  resources: ["leases"]
-  verbs: ["get", "list", "create", "update", "patch", "delete"]
+  - apiGroups: [""]
+    resources: ["configmaps", "endpoints", "nodes", "pods", "secrets", "namespaces"]
+    verbs: ["list", "watch"]
+  - apiGroups: ["coordination.k8s.io"]
+    resources: ["leases"]
+    verbs: ["list", "watch"]
+  - apiGroups: [""]
+    resources: ["nodes"]
+    verbs: ["get"]
+  - apiGroups: [""]
+    resources: ["services"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["ingresses"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["create", "patch"]
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["ingresses/status"]
+    verbs: ["update"]
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["ingressclasses"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["discovery.k8s.io"]
+    resources: ["endpointslices"]
+    verbs: ["list", "watch", "get"]
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "list", "create", "update", "patch", "delete"]
+  - apiGroups: ["coordination.k8s.io"]
+    resources: ["leases"]
+    verbs: ["get", "list", "create", "update", "patch", "delete"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
@@ -180,9 +174,9 @@ roleRef:
   kind: ClusterRole
   name: ingress-nginx-ssl-secrets
 subjects:
-- kind: ServiceAccount
-  name: ingress-nginx
-  namespace: ingress-nginx
+  - kind: ServiceAccount
+    name: ingress-nginx
+    namespace: ingress-nginx
 ---
 apiVersion: networking.k8s.io/v1
 kind: IngressClass

@@ -13,15 +13,15 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-wave: "0"
 rules:
-- apiGroups: [""]
-  resources: ["pods", "services", "endpoints", "persistentvolumeclaims", "events", "configmaps", "secrets"]
-  verbs: ["*"]
-- apiGroups: ["apps"]
-  resources: ["deployments", "daemonsets", "replicasets", "statefulsets"]
-  verbs: ["*"]
-- apiGroups: ["samba-operator.samba.org"]
-  resources: ["*"]
-  verbs: ["*"]
+  - apiGroups: [""]
+    resources: ["pods", "services", "endpoints", "persistentvolumeclaims", "events", "configmaps", "secrets"]
+    verbs: ["*"]
+  - apiGroups: ["apps"]
+    resources: ["deployments", "daemonsets", "replicasets", "statefulsets"]
+    verbs: ["*"]
+  - apiGroups: ["samba-operator.samba.org"]
+    resources: ["*"]
+    verbs: ["*"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
@@ -34,9 +34,9 @@ roleRef:
   kind: ClusterRole
   name: samba-operator
 subjects:
-- kind: ServiceAccount
-  name: samba-operator
-  namespace: macos-timemachine
+  - kind: ServiceAccount
+    name: samba-operator
+    namespace: macos-timemachine
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -57,27 +57,27 @@ spec:
     spec:
       serviceAccountName: samba-operator
       containers:
-      - name: manager
-        image: quay.io/samba.org/samba-operator:latest
-        command:
-        - /manager
-        env:
-        - name: WATCH_NAMESPACE
-          value: ""
-        - name: POD_NAME
-          valueFrom:
-            fieldRef:
-              fieldPath: metadata.name
-        - name: OPERATOR_NAME
-          value: "samba-operator"
-        - name: SAMBA_OP_WORKING_NAMESPACE
-          valueFrom:
-            fieldRef:
-              fieldPath: metadata.namespace
-        resources:
-          limits:
-            cpu: 200m
-            memory: 300Mi
-          requests:
-            cpu: 100m
-            memory: 20Mi
+        - name: manager
+          image: quay.io/samba.org/samba-operator:latest
+          command:
+            - /manager
+          env:
+            - name: WATCH_NAMESPACE
+              value: ""
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: OPERATOR_NAME
+              value: "samba-operator"
+            - name: SAMBA_OP_WORKING_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+          resources:
+            limits:
+              cpu: 200m
+              memory: 300Mi
+            requests:
+              cpu: 100m
+              memory: 20Mi

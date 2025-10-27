@@ -1,30 +1,23 @@
 installCRDs: true
-
 replicaCount: 1
-
 image:
   repository: ghcr.io/external-secrets/external-secrets
   pullPolicy: IfNotPresent
   tag: ""
-
 serviceAccount:
   create: true
   annotations: {}
   name: "external-secrets"
-
 podAnnotations: {}
-
 podSecurityContext: {}
-
 securityContext:
   allowPrivilegeEscalation: false
   capabilities:
     drop:
-    - ALL
+      - ALL
   readOnlyRootFilesystem: true
   runAsNonRoot: true
   runAsUser: 65534
-
 resources:
   limits:
     cpu: 100m
@@ -32,13 +25,9 @@ resources:
   requests:
     cpu: 10m
     memory: 64Mi
-
 nodeSelector: {}
-
 tolerations: []
-
 affinity: {}
-
 webhook:
   create: true
   certCheckInterval: "5m"
@@ -49,7 +38,6 @@ webhook:
     repository: ghcr.io/external-secrets/external-secrets
     pullPolicy: IfNotPresent
     tag: ""
-  
 certController:
   create: true
   requeueInterval: "5m"

@@ -15,17 +15,17 @@ metadata:
 spec:
   ingressClassName: nginx-ssl
   tls:
-  - hosts:
-    - o11y.k.shion1305.com
-    # No secretName needed - controller uses default SSL certificate
+    - hosts:
+        - o11y.k.shion1305.com
+        # No secretName needed - controller uses default SSL certificate
   rules:
-  - host: o11y.k.shion1305.com
-    http:
-      paths:
-      - path: /
-        pathType: Prefix
-        backend:
-          service:
-            name: kube-prometheus-stack-grafana
-            port:
-              number: 80
+    - host: o11y.k.shion1305.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: kube-prometheus-stack-grafana
+                port:
+                  number: 80

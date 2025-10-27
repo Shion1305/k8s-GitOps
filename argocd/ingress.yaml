@@ -4,15 +4,13 @@ metadata:
   name: argocd-ingress
   namespace: argocd
   annotations:
-    nginx.ingress.kubernetes.io/ssl-redirect:       "true"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
     nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
 spec:
   ingressClassName: nginx-ssl
-
   tls:
     - hosts:
         - argocd.k.shion1305.com
-
   rules:
     - host: argocd.k.shion1305.com
       http:
@@ -24,4 +22,3 @@ spec:
                 name: argocd-server
                 port:
                   number: 443
-

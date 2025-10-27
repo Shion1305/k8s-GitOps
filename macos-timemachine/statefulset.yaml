@@ -23,65 +23,65 @@ spec:
       nodeSelector:
         kubernetes.io/hostname: shion-ubuntu-2505
       containers:
-      - name: samba
-        image: dperson/samba:latest
-        ports:
-        - containerPort: 137
-          protocol: UDP
-          name: netbios-ns
-        - containerPort: 138
-          protocol: UDP
-          name: netbios-dgm
-        - containerPort: 139
-          name: netbios-ssn
-        - containerPort: 445
-          name: microsoft-ds
-        env:
-        - name: USERID
-          value: "1000"
-        - name: GROUPID
-          value: "1000"
-        - name: TZ
-          value: "Asia/Tokyo"
-        - name: SAMBA_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: timemachine-credentials
-              key: password
-        command:
-        - /bin/bash
-        - -c
-        - |
-          samba.sh \
-            -s "TimeMachine;/timemachine;yes;no;no;admin;admin;Time Machine" \
-            -u "admin;$SAMBA_PASSWORD" \
-            -w "WORKGROUP" \
-            -g "vfs objects = fruit streams_xattr" \
-            -g "fruit:metadata = stream" \
-            -g "fruit:model = TimeCapsule8,119" \
-            -g "fruit:posix_rename = yes" \
-            -g "fruit:veto_appledouble = no" \
-            -g "fruit:wipe_intentionally_left_blank_rfork = yes" \
-            -g "fruit:delete_empty_adfiles = yes" \
-            -g "fruit:time machine = yes" \
-            -g "fruit:advertise_fullsync = true"
-        volumeMounts:
-        - name: tm-data
-          mountPath: /timemachine
-        resources:
-          requests:
-            cpu: 100m
-            memory: 128Mi
-          limits:
-            cpu: 2000m
-            memory: 1024Mi
+        - name: samba
+          image: dperson/samba:latest
+          ports:
+            - containerPort: 137
+              protocol: UDP
+              name: netbios-ns
+            - containerPort: 138
+              protocol: UDP
+              name: netbios-dgm
+            - containerPort: 139
+              name: netbios-ssn
+            - containerPort: 445
+              name: microsoft-ds
+          env:
+            - name: USERID
+              value: "1000"
+            - name: GROUPID
+              value: "1000"
+            - name: TZ
+              value: "Asia/Tokyo"
+            - name: SAMBA_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: timemachine-credentials
+                  key: password
+          command:
+            - /bin/bash
+            - -c
+            - |
+              samba.sh \
+                -s "TimeMachine;/timemachine;yes;no;no;admin;admin;Time Machine" \
+                -u "admin;$SAMBA_PASSWORD" \
+                -w "WORKGROUP" \
+                -g "vfs objects = fruit streams_xattr" \
+                -g "fruit:metadata = stream" \
+                -g "fruit:model = TimeCapsule8,119" \
+                -g "fruit:posix_rename = yes" \
+                -g "fruit:veto_appledouble = no" \
+                -g "fruit:wipe_intentionally_left_blank_rfork = yes" \
+                -g "fruit:delete_empty_adfiles = yes" \
+                -g "fruit:time machine = yes" \
+                -g "fruit:advertise_fullsync = true"
+          volumeMounts:
+            - name: tm-data
+              mountPath: /timemachine
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 2000m
+              memory: 1024Mi
       volumes: []
   volumeClaimTemplates:
-  - metadata:
-      name: tm-data
-    spec:
-      storageClassName: longhorn-hdd
-      accessModes: ["ReadWriteOnce"]
-      resources:
-        requests:
-          storage: 4Ti
+    - metadata:
+        name: tm-data
+      spec:
+        storageClassName: longhorn-hdd
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 4Ti

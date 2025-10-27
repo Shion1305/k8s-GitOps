@@ -6,30 +6,30 @@ metadata:
 spec:
   project: default
   sources:
-  # Cloudflare Exporter
-  - repoURL: https://lablabs.github.io/cloudflare-exporter
-    chart: cloudflare-exporter
-    targetRevision: 0.0.3
-    helm:
-      releaseName: cloudflare-exporter
-      valueFiles:
-      - $values/cloudflare-exporter/values.yaml
-  # Grafana for Cloudflare
-  - repoURL: https://grafana.github.io/helm-charts
-    chart: grafana
-    targetRevision: 8.5.2
-    helm:
-      releaseName: cloudflare-grafana
-      valueFiles:
-      - $values/cloudflare-exporter/grafana-values.yaml
-  # Values reference
-  - repoURL: https://github.com/Shion1305/k8s-GitOps.git
-    targetRevision: HEAD
-    ref: values
-  # Additional resources (ServiceMonitor, Ingress)
-  - repoURL: https://github.com/Shion1305/k8s-GitOps.git
-    targetRevision: HEAD
-    path: cloudflare-exporter
+    # Cloudflare Exporter
+    - repoURL: https://lablabs.github.io/cloudflare-exporter
+      chart: cloudflare-exporter
+      targetRevision: 0.0.3
+      helm:
+        releaseName: cloudflare-exporter
+        valueFiles:
+          - $values/cloudflare-exporter/values.yaml
+    # Grafana for Cloudflare
+    - repoURL: https://grafana.github.io/helm-charts
+      chart: grafana
+      targetRevision: 8.5.2
+      helm:
+        releaseName: cloudflare-grafana
+        valueFiles:
+          - $values/cloudflare-exporter/grafana-values.yaml
+    # Values reference
+    - repoURL: https://github.com/Shion1305/k8s-GitOps.git
+      targetRevision: HEAD
+      ref: values
+    # Additional resources (ServiceMonitor, Ingress)
+    - repoURL: https://github.com/Shion1305/k8s-GitOps.git
+      targetRevision: HEAD
+      path: cloudflare-exporter
   destination:
     server: https://kubernetes.default.svc
     namespace: monitoring

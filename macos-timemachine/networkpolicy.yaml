@@ -8,38 +8,38 @@ spec:
     matchLabels:
       app: timemachine
   policyTypes:
-  - Ingress
-  - Egress
+    - Ingress
+    - Egress
   ingress:
-  # Allow access from local network
-  - from:
-    - ipBlock:
-        cidr: 192.168.0.0/16
-    # Allow from within the same namespace
-    - namespaceSelector:
-        matchLabels:
-          name: macos-timemachine
-    ports:
-    - protocol: TCP
-      port: 139
-    - protocol: TCP
-      port: 445
-    - protocol: UDP
-      port: 137
-    - protocol: UDP
-      port: 138
+    # Allow access from local network
+    - from:
+        - ipBlock:
+            cidr: 192.168.0.0/16
+        # Allow from within the same namespace
+        - namespaceSelector:
+            matchLabels:
+              name: macos-timemachine
+      ports:
+        - protocol: TCP
+          port: 139
+        - protocol: TCP
+          port: 445
+        - protocol: UDP
+          port: 137
+        - protocol: UDP
+          port: 138
   egress:
-  # Allow DNS
-  - to: []
-    ports:
-    - protocol: UDP
-      port: 53
-    - protocol: TCP
-      port: 53
-  # Allow access to Kubernetes API
-  - to:
-    - ipBlock:
-        cidr: 10.96.0.0/12
-    ports:
-    - protocol: TCP
-      port: 443
+    # Allow DNS
+    - to: []
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # Allow access to Kubernetes API
+    - to:
+        - ipBlock:
+            cidr: 10.96.0.0/12
+      ports:
+        - protocol: TCP
+          port: 443

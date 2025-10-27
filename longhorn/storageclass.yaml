@@ -25,4 +25,3 @@ parameters:
   fsType: "ext4"
   diskSelector: "hdd"
 volumeBindingMode: Immediate
-

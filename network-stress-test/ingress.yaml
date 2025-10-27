@@ -15,17 +15,17 @@ metadata:
 spec:
   ingressClassName: nginx-ssl
   tls:
-  - hosts:
-    - network-stress-test.k.shion1305.com
-    # No secretName needed - controller uses default SSL certificate
+    - hosts:
+        - network-stress-test.k.shion1305.com
+        # No secretName needed - controller uses default SSL certificate
   rules:
-  - host: network-stress-test.k.shion1305.com
-    http:
-      paths:
-      - path: /
-        pathType: Prefix
-        backend:
-          service:
-            name: network-stress-test-service
-            port:
-              number: 8080
+    - host: network-stress-test.k.shion1305.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: network-stress-test-service
+                port:
+                  number: 8080

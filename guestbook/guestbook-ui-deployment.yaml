@@ -14,10 +14,10 @@ spec:
         app: guestbook-ui
     spec:
       containers:
-      - image: paulbouwer/hello-kubernetes:1.10
-        name: guestbook-ui
-        env:
-        - name: MESSAGE
-          value: "Welcome to the Guestbook!"
-        ports:
-        - containerPort: 8080
+        - image: paulbouwer/hello-kubernetes:1.10
+          name: guestbook-ui
+          env:
+            - name: MESSAGE
+              value: "Welcome to the Guestbook!"
+          ports:
+            - containerPort: 8080

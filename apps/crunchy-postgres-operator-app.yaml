@@ -8,15 +8,15 @@ metadata:
 spec:
   project: default
   sources:
-  - repoURL: https://github.com/Shion1305/crunchy-postgres-operator.git
-    targetRevision: HEAD
-    path: helm/install
-    helm:
-      valueFiles:
-      - $values/crunchy-postgres-operator/values.yaml
-  - repoURL: https://github.com/Shion1305/k8s-GitOps.git
-    targetRevision: HEAD
-    ref: values
+    - repoURL: https://github.com/Shion1305/crunchy-postgres-operator.git
+      targetRevision: HEAD
+      path: helm/install
+      helm:
+        valueFiles:
+          - $values/crunchy-postgres-operator/values.yaml
+    - repoURL: https://github.com/Shion1305/k8s-GitOps.git
+      targetRevision: HEAD
+      ref: values
   destination:
     server: https://kubernetes.default.svc
     namespace: crunchydata-pg-operator

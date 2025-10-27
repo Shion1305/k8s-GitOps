@@ -11,14 +11,14 @@ spec:
     matchLabels:
       app.kubernetes.io/name: prometheus-node-exporter
   endpoints:
-  - port: http-metrics
-    interval: 30s
-    path: /metrics
-    relabelings:
-    - sourceLabels: [__meta_kubernetes_pod_node_name]
-      targetLabel: instance
-    - sourceLabels: [__meta_kubernetes_pod_node_name]
-      targetLabel: node
+    - port: http-metrics
+      interval: 30s
+      path: /metrics
+      relabelings:
+        - sourceLabels: [__meta_kubernetes_pod_node_name]
+          targetLabel: instance
+        - sourceLabels: [__meta_kubernetes_pod_node_name]
+          targetLabel: node
   namespaceSelector:
     matchNames:
-    - node-exporter
+      - node-exporter

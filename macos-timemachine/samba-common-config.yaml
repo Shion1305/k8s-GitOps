@@ -19,7 +19,6 @@ spec:
       'fruit:delete_empty_adfiles': 'yes'
       'fruit:copyfile': 'no'
       'fruit:zero_file_id': 'yes'
-      
       # Network and compatibility settings
       'server min protocol': 'SMB2'
       'ea support': 'yes'
@@ -31,7 +30,6 @@ spec:
       'default case': 'lower'
       'preserve case': 'no'
       'short preserve case': 'no'
-      
       # Performance and stability
       'socket options': 'TCP_NODELAY IPTOS_LOWDELAY SO_RCVBUF=65536 SO_SNDBUF=65536'
       'min receivefile size': '16384'

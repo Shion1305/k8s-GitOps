@@ -1,6 +1,5 @@
 # Node Exporter Helm Values
 # Deploys node-exporter as DaemonSet to collect metrics from all nodes
-
 # Service configuration
 service:
   type: ClusterIP
@@ -9,26 +8,21 @@ service:
   annotations:
     prometheus.io/scrape: "true"
     prometheus.io/port: "9100"
-
 # Pod configuration
 podLabels:
   app: node-exporter
   component: metrics
-
 # Security context
 securityContext:
   runAsNonRoot: true
   runAsUser: 65534
   fsGroup: 65534
-
 # Node selector to avoid cordoned nodes (deploy only to available nodes)
 nodeSelector:
   kubernetes.io/hostname: shion-ubuntu-2505
-
 # Tolerations - allow deployment on all nodes including master
 tolerations:
   - operator: Exists
-
 # Resource limits
 resources:
   limits:
@@ -37,16 +31,13 @@ resources:
   requests:
     cpu: 100m
     memory: 30Mi
-
 # Host network and PID for proper node metrics collection
 hostNetwork: true
 hostPID: true
-
 # Mount host filesystem for metrics collection
 hostRootFSMount:
   enabled: true
   mountPropagation: HostToContainer
-
 # Prometheus ServiceMonitor (will be picked up by Prometheus)
 prometheus:
   monitor:

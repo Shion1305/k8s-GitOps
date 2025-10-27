@@ -8,21 +8,21 @@ metadata:
 spec:
   type: LoadBalancer
   ports:
-  - name: netbios-ns
-    port: 137
-    protocol: UDP
-    targetPort: 137
-  - name: netbios-dgm
-    port: 138
-    protocol: UDP
-    targetPort: 138
-  - name: netbios-ssn
-    port: 139
-    protocol: TCP
-    targetPort: 139
-  - name: microsoft-ds
-    port: 445
-    protocol: TCP
-    targetPort: 445
+    - name: netbios-ns
+      port: 137
+      protocol: UDP
+      targetPort: 137
+    - name: netbios-dgm
+      port: 138
+      protocol: UDP
+      targetPort: 138
+    - name: netbios-ssn
+      port: 139
+      protocol: TCP
+      targetPort: 139
+    - name: microsoft-ds
+      port: 445
+      protocol: TCP
+      targetPort: 445
   selector:
     app: timemachine-samba

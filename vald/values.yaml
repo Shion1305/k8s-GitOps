@@ -3,7 +3,6 @@
 
 # Example: set the number of replicas for core components
 # You can customize these values as needed
-
 agent:
   minReplicas: 10
   ngt:

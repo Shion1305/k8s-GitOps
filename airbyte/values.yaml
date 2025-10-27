@@ -1,7 +1,6 @@
 workload-launcher:
   serviceAccount:
     name: airbyte-cluster-admin
-
 global:
   enabled: true
   database:
@@ -17,10 +16,8 @@ global:
       value: "POSTGRES_DB=airbyte"
     - name: "ENV_DATABASE_DB"
       value: "DATABASE_DB=airbyte"
-
 postgresql:
   enabled: false
-
 webapp:
   resources:
     limits:
@@ -29,25 +26,21 @@ webapp:
   service:
     type: ClusterIP
     port: 80
-
 scheduler:
   resources:
     limits:
       cpu: 2
       memory: 512Mi
-
 temporal:
   resources:
     limits:
       cpu: 1
       memory: 256Mi
-
 workspace:
   persistence:
     enabled: true
     size: 10Gi
     storageClass: longhorn-ssd
-
 worker:
   resources:
     limits:
@@ -55,16 +48,12 @@ worker:
       memory: 4Gi
   hpa:
     enabled: true
-
 server:
   livenessProbe:
     failureThreshold: 5
-
 bootstrap:
   enabled: true
-
 dataPlane:
   enabled: false
-
 metrics:
   enabled: true
