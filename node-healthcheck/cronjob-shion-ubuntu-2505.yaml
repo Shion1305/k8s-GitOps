@@ -9,29 +9,32 @@ spec:
   failedJobsHistoryLimit: 3
   jobTemplate:
     spec:
+      activeDeadlineSeconds: 30
+      backoffLimit: 0
       template:
         spec:
+          terminationGracePeriodSeconds: 5
           restartPolicy: OnFailure
           tolerations:
-          - operator: Exists
+            - operator: Exists
           affinity:
             nodeAffinity:
               requiredDuringSchedulingIgnoredDuringExecution:
                 nodeSelectorTerms:
-                - matchExpressions:
-                  - key: kubernetes.io/hostname
-                    operator: In
-                    values:
-                    - shion-ubuntu-2505
+                  - matchExpressions:
+                      - key: kubernetes.io/hostname
+                        operator: In
+                        values:
+                          - shion-ubuntu-2505
           containers:
-          - name: ping
-            image: curlimages/curl:8.10.1
-            args:
-            - "-fsS"
-            - "$(HEALTHCHECK_URL)"
-            env:
-            - name: HEALTHCHECK_URL
-              valueFrom:
-                secretKeyRef:
-                  name: node-healthcheck-urls
-                  key: shion-ubuntu-2505-url
+            - name: ping
+              image: curlimages/curl:8.10.1
+              args:
+                - "-fsS"
+                - "$(HEALTHCHECK_URL)"
+              env:
+                - name: HEALTHCHECK_URL
+                  valueFrom:
+                    secretKeyRef:
+                      name: node-healthcheck-urls
+                      key: shion-ubuntu-2505-url
