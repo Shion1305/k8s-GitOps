@@ -32,9 +32,15 @@ spec:
           hostPID: true
           containers:
             - name: certbot-renewal
-              image: certbot/certbot:latest
+              image: certbot/dns-cloudflare:latest
               securityContext:
                 privileged: true
+              env:
+                - name: CLOUDFLARE_API_TOKEN
+                  valueFrom:
+                    secretKeyRef:
+                      name: cloudflare-dns-edit-key
+                      key: CLOUDFLARE_DNS_EDIT_APIKEY
               volumeMounts:
                 - name: letsencrypt
                   mountPath: /etc/letsencrypt
@@ -47,14 +53,20 @@ spec:
                 - -c
                 - |
                   set -e
-                  echo "=== Let's Encrypt Certificate Renewal ==="
+                  echo "=== Let's Encrypt Certificate Renewal (Cloudflare DNS-01) ==="
                   echo "Starting at: $(date)"
 
-                  # Run certbot renewal
-                  # --quiet: Only output errors
-                  # --non-interactive: Run without user interaction
-                  # --deploy-hook: Command to run after successful renewal
+                  # Create Cloudflare credentials file
+                  mkdir -p /root/.secrets
+                  cat > /root/.secrets/cloudflare.ini <<EOF
+                  dns_cloudflare_api_token = ${CLOUDFLARE_API_TOKEN}
+                  EOF
+                  chmod 600 /root/.secrets/cloudflare.ini
+
+                  # Run certbot renewal with Cloudflare DNS plugin
                   certbot renew \
+                    --dns-cloudflare \
+                    --dns-cloudflare-credentials /root/.secrets/cloudflare.ini \
                     --non-interactive \
                     --quiet \
                     --deploy-hook "echo 'Certificate renewed successfully at $(date)'"
