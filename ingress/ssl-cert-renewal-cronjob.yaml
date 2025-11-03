@@ -1,0 +1,157 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: nginx-ssl-cert-renewal
+  namespace: ingress-nginx
+  labels:
+    app.kubernetes.io/name: nginx-ssl-cert-renewal
+    app.kubernetes.io/component: certificate-renewal
+spec:
+  # Run twice daily at 2 AM and 2 PM to check and renew certificates
+  schedule: "0 2,14 * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: nginx-ssl-cert-renewal
+        spec:
+          # Use the same node selector as the controller to access host certificates
+          nodeSelector:
+            kubernetes.io/hostname: instance-2024-1
+          tolerations:
+            - key: node-role.kubernetes.io/control-plane
+              operator: Exists
+              effect: NoSchedule
+          serviceAccountName: ingress-nginx
+          restartPolicy: OnFailure
+          hostNetwork: true
+          hostPID: true
+          containers:
+            - name: certbot-renewal
+              image: certbot/certbot:latest
+              securityContext:
+                privileged: true
+              volumeMounts:
+                - name: letsencrypt
+                  mountPath: /etc/letsencrypt
+                - name: lib-letsencrypt
+                  mountPath: /var/lib/letsencrypt
+                - name: log-letsencrypt
+                  mountPath: /var/log/letsencrypt
+              command:
+                - sh
+                - -c
+                - |
+                  set -e
+                  echo "=== Let's Encrypt Certificate Renewal ==="
+                  echo "Starting at: $(date)"
+
+                  # Run certbot renewal
+                  # --quiet: Only output errors
+                  # --non-interactive: Run without user interaction
+                  # --deploy-hook: Command to run after successful renewal
+                  certbot renew \
+                    --non-interactive \
+                    --quiet \
+                    --deploy-hook "echo 'Certificate renewed successfully at $(date)'"
+
+                  RENEWAL_EXIT_CODE=$?
+
+                  if [ $RENEWAL_EXIT_CODE -eq 0 ]; then
+                    echo "Certbot renewal check completed successfully"
+                  else
+                    echo "Certbot renewal failed with exit code: $RENEWAL_EXIT_CODE"
+                    exit $RENEWAL_EXIT_CODE
+                  fi
+
+                  # Check certificate validity
+                  CERT_FILE="/etc/letsencrypt/live/k.shion1305.com/fullchain.pem"
+                  if [ -f "$CERT_FILE" ]; then
+                    EXPIRY_DATE=$(openssl x509 -enddate -noout -in "$CERT_FILE" | cut -d= -f2)
+                    echo "Certificate expires: $EXPIRY_DATE"
+                  fi
+            - name: update-k8s-secret
+              image: bitnami/kubectl:latest
+              securityContext:
+                runAsUser: 0
+                runAsGroup: 0
+              volumeMounts:
+                - name: letsencrypt
+                  mountPath: /etc/letsencrypt
+                  readOnly: true
+              command:
+                - sh
+                - -c
+                - |
+                  set -e
+
+                  # Wait for certbot to complete
+                  echo "Waiting for certbot renewal to complete..."
+                  sleep 10
+
+                  echo "=== Updating Kubernetes TLS Secret ==="
+
+                  # Verify certificate files exist
+                  CERT_PATH="/etc/letsencrypt/live/k.shion1305.com/fullchain.pem"
+                  KEY_PATH="/etc/letsencrypt/live/k.shion1305.com/privkey.pem"
+
+                  if [ ! -f "$CERT_PATH" ] || [ ! -f "$KEY_PATH" ]; then
+                    echo "ERROR: Certificate files not found"
+                    echo "Expected: $CERT_PATH and $KEY_PATH"
+                    exit 1
+                  fi
+
+                  # Compare current secret with filesystem certificate
+                  NEEDS_UPDATE=false
+
+                  if kubectl get secret nginx-tls-secret -n ingress-nginx &>/dev/null; then
+                    CURRENT_CERT=$(kubectl get secret nginx-tls-secret -n ingress-nginx -o jsonpath='{.data.tls\.crt}' | base64 -d)
+                    NEW_CERT=$(cat "$CERT_PATH")
+
+                    if [ "$CURRENT_CERT" != "$NEW_CERT" ]; then
+                      echo "Certificate has been updated, recreating secret..."
+                      NEEDS_UPDATE=true
+                    else
+                      echo "Certificate unchanged, no secret update needed"
+                    fi
+                  else
+                    echo "Secret does not exist, creating..."
+                    NEEDS_UPDATE=true
+                  fi
+
+                  if [ "$NEEDS_UPDATE" = true ]; then
+                    # Delete and recreate the secret
+                    kubectl delete secret nginx-tls-secret -n ingress-nginx --ignore-not-found=true
+
+                    kubectl create secret tls nginx-tls-secret \
+                      --cert="$CERT_PATH" \
+                      --key="$KEY_PATH" \
+                      -n ingress-nginx
+
+                    echo "TLS secret updated successfully!"
+
+                    # Restart nginx controller to pick up new certificate
+                    echo "Restarting nginx-ssl-controller..."
+                    kubectl delete pod -n ingress-nginx -l app.kubernetes.io/name=ingress-nginx-ssl
+
+                    echo "Controller restart triggered"
+                  fi
+
+                  echo "Certificate renewal process completed at: $(date)"
+          volumes:
+            - name: letsencrypt
+              hostPath:
+                path: /etc/letsencrypt
+                type: Directory
+            - name: lib-letsencrypt
+              hostPath:
+                path: /var/lib/letsencrypt
+                type: DirectoryOrCreate
+            - name: log-letsencrypt
+              hostPath:
+                path: /var/log/letsencrypt
+                type: DirectoryOrCreate
