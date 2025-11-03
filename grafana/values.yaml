@@ -131,10 +131,10 @@ grafana:
       auth_url: https://github.com/login/oauth/authorize
       token_url: https://github.com/login/oauth/access_token
       api_url: https://api.github.com/user
-      allowed_organizations: # Add your GitHub organizations here if needed
+      allowed_organizations: Shion1305Dev
       team_ids: # Add specific team IDs if needed
-      allow_assign_grafana_admin: false
-      role_attribute_path: # Optional: map GitHub teams to Grafana roles
+      allow_assign_grafana_admin: true
+      role_attribute_path: contains(groups[*], '@Shion1305Dev/k-shion1305-com-admin') && 'Admin' || 'Viewer'
     security:
       admin_user: admin
       # Note: admin password is disabled since we're using OAuth only
