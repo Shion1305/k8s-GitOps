@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: instance-k8s-proxy
+  namespace: privacy-focused-gateway
+spec:
+  selector: {app: instance-k8s-proxy}
+  ports:
+    - name: http-proxy
+      port: 8080
+      targetPort: 8080

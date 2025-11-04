@@ -1,0 +1,27 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: instance-k8s-proxy-curl-httpbin-ip
+  namespace: privacy-focused-gateway
+spec:
+  schedule: "*/5 * * * *"
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: curl
+              image: curlimages/curl:8.5.0
+              args:
+                - /bin/sh
+                - -c
+                - 'echo "Via proxy: $HTTP_PROXY"; curl -s https://httpbin.org/ip'
+              env:
+                - name: HTTP_PROXY
+                  value: http://instance-k8s-proxy.privacy-focused-gateway.svc.cluster.local:8080
+                - name: HTTPS_PROXY
+                  value: http://instance-k8s-proxy.privacy-focused-gateway.svc.cluster.local:8080
+                - name: NO_PROXY
+                  value: .svc,.cluster.local,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16

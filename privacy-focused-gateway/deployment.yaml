@@ -1,0 +1,32 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: instance-k8s-proxy
+  namespace: privacy-focused-gateway
+spec:
+  replicas: 2
+  selector:
+    matchLabels: {app: instance-k8s-proxy}
+  template:
+    metadata:
+      labels: {app: instance-k8s-proxy}
+    spec:
+      nodeSelector: {egress-gw: "true"}
+      containers:
+        - name: envoy
+          image: envoyproxy/envoy:v1.31.5
+          args: ["-c", "/etc/envoy/envoy.yaml"]
+          ports:
+            - containerPort: 8080
+            - containerPort: 9901
+          readinessProbe:
+            httpGet: {path: /ready, port: 9901}
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          volumeMounts:
+            - name: cfg
+              mountPath: /etc/envoy
+      volumes:
+        - name: cfg
+          configMap:
+            name: instance-k8s-proxy-config
