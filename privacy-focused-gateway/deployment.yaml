@@ -12,6 +12,10 @@ spec:
       labels: {app: instance-k8s-proxy}
     spec:
       nodeSelector: {egress-gw: "true"}
+      tolerations:
+      - key: node.kubernetes.io/unschedulable
+        operator: Exists
+        effect: NoSchedule
       containers:
         - name: envoy
           image: envoyproxy/envoy:v1.31.5
