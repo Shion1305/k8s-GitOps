@@ -17,7 +17,25 @@ spec:
               args:
                 - /bin/sh
                 - -c
-                - 'echo "Via proxy: $HTTP_PROXY"; curl -s https://httpbin.org/ip'
+                - |
+                  set -x
+                  echo "=== Proxy Configuration ==="
+                  echo "HTTP_PROXY: $HTTP_PROXY"
+                  echo "HTTPS_PROXY: $HTTPS_PROXY"
+                  echo "NO_PROXY: $NO_PROXY"
+                  echo ""
+                  echo "=== DNS Resolution ==="
+                  nslookup instance-k8s-proxy.privacy-focused-gateway.svc.cluster.local || echo "DNS lookup failed"
+                  echo ""
+                  echo "=== Proxy Connectivity Test ==="
+                  curl -v -x $HTTP_PROXY --connect-timeout 10 -I http://httpbin.org 2>&1 || echo "Proxy connection test failed"
+                  echo ""
+                  echo "=== Fetching IP via Proxy ==="
+                  curl -v --proxy $HTTPS_PROXY --connect-timeout 10 https://httpbin.org/ip 2>&1
+                  EXIT_CODE=$?
+                  echo ""
+                  echo "=== Exit Code: $EXIT_CODE ==="
+                  exit $EXIT_CODE
               env:
                 - name: HTTP_PROXY
                   value: http://instance-k8s-proxy.privacy-focused-gateway.svc.cluster.local:8080

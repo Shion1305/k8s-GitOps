@@ -18,19 +18,31 @@ data:
               stat_prefix: fwd
               upgrade_configs:
               - upgrade_type: CONNECT
+              http_protocol_options:
+                accept_http_10: true
               route_config:
                 name: local
                 virtual_hosts:
                 - name: any
                   domains: ["*"]
                   routes:
+                  - match:
+                      connect_matcher: {}
+                    route:
+                      cluster: dfp_cluster
+                      upgrade_configs:
+                      - upgrade_type: CONNECT
+                        connect_config:
+                          allow_post: false
                   - match: { prefix: "/" }
                     route: { cluster: dfp_cluster }
               http_filters:
               - name: envoy.filters.http.dynamic_forward_proxy
                 typed_config:
                   "@type": type.googleapis.com/envoy.extensions.filters.http.dynamic_forward_proxy.v3.FilterConfig
-                  dns_cache_config: { name: local_dns_cache }
+                  dns_cache_config:
+                    name: local_dns_cache
+                    dns_lookup_family: V4_ONLY
               - name: envoy.filters.http.router
                 typed_config:
                   "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
@@ -41,7 +53,9 @@ data:
           name: envoy.clusters.dynamic_forward_proxy
           typed_config:
             "@type": type.googleapis.com/envoy.extensions.clusters.dynamic_forward_proxy.v3.ClusterConfig
-            dns_cache_config: { name: local_dns_cache }
+            dns_cache_config:
+              name: local_dns_cache
+              dns_lookup_family: V4_ONLY
     admin:
       address:
         socket_address: { address: 0.0.0.0, port_value: 9901 }
