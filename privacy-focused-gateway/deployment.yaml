@@ -4,7 +4,7 @@ metadata:
   name: instance-k8s-proxy
   namespace: privacy-focused-gateway
 spec:
-  replicas: 2
+  replicas: 3
   selector:
     matchLabels: {app: instance-k8s-proxy}
   template:
