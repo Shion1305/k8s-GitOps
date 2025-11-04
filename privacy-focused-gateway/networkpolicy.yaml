@@ -1,0 +1,29 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: instance-k8s-proxy-curl-deny-direct-egress
+  namespace: privacy-focused-gateway
+spec:
+  podSelector:
+    matchLabels:
+      job-name: instance-k8s-proxy-curl-httpbin-ip
+  policyTypes:
+  - Egress
+  egress:
+  # Allow DNS
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: kube-system
+    ports:
+    - protocol: UDP
+      port: 53
+  # Allow communication to proxy service only
+  - to:
+    - podSelector:
+        matchLabels:
+          app: instance-k8s-proxy
+    ports:
+    - protocol: TCP
+      port: 8080
+  # Deny all other egress (implicit by not specifying)
