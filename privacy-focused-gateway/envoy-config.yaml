@@ -32,7 +32,8 @@ data:
                   "@type": type.googleapis.com/envoy.extensions.filters.http.dynamic_forward_proxy.v3.FilterConfig
                   dns_cache_config: { name: local_dns_cache }
               - name: envoy.filters.http.router
-                typed_config: {}
+                typed_config:
+                  "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
       clusters:
       - name: dfp_cluster
         lb_policy: CLUSTER_PROVIDED
