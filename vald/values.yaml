@@ -1,6 +1,5 @@
 # values.yaml for Vald Helm chart
 # See https://github.com/vdaas/vald/blob/main/docs/deployment/helm.md for all options
-
 # Example: set the number of replicas for core components
 # You can customize these values as needed
 agent:
