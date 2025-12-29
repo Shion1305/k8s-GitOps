@@ -16,6 +16,9 @@ data:
         server min protocol = SMB2
         server max protocol = SMB3
         
+        # macOS support
+        fruit:aapl = yes
+        
         # Time Machine specific settings
         vfs objects = fruit streams_xattr
         fruit:metadata = stream
@@ -45,7 +48,8 @@ data:
         
         # Time Machine specific share settings
         fruit:time machine = yes
-        fruit:advertise_fullsync = true
+        fruit:time machine max size = 4T
         
-        # macOS compatibility
-        fruit:aapl = yes
+        # Durable handles for network stability
+        kernel oplocks = no
+        posix locking = no
