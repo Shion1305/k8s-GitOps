@@ -22,6 +22,19 @@ spec:
       dnsPolicy: ClusterFirstWithHostNet
       nodeSelector:
         kubernetes.io/hostname: shion-ubuntu-2505
+      initContainers:
+        - name: fix-permissions
+          image: dockurr/samba:latest
+          command:
+            - /bin/sh
+            - -c
+            - |
+              chown -R 1000:1000 /storage
+              chmod 775 /storage
+              echo "Storage permissions fixed"
+          volumeMounts:
+            - name: tm-data
+              mountPath: /storage
       containers:
         - name: samba
           image: dockurr/samba:latest
