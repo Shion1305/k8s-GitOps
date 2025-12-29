@@ -38,8 +38,10 @@ data:
         browseable = yes
         writable = yes
         read only = no
-        force user = samba
+        force user = admin
         force group = smb
+        create mask = 0664
+        directory mask = 0775
         
         # Time Machine specific share settings
         fruit:time machine = yes
