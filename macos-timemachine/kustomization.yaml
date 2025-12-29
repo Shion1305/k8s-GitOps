@@ -4,6 +4,7 @@ namespace: macos-timemachine
 resources:
   - namespace.yaml
   - password-generator.yaml
+  - configmap.yaml
   - statefulset.yaml
   - service.yaml
   - networkpolicy.yaml

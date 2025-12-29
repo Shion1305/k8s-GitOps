@@ -1,0 +1,49 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: timemachine-config
+  namespace: macos-timemachine
+  labels:
+    app: timemachine
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+data:
+  smb.conf: |
+    [global]
+        server string = Time Machine Server
+        idmap config * : range = 3000-7999
+        security = user
+        server min protocol = SMB2
+        server max protocol = SMB3
+        
+        # Time Machine specific settings
+        vfs objects = fruit streams_xattr
+        fruit:metadata = stream
+        fruit:model = TimeCapsule8,119
+        fruit:posix_rename = yes
+        fruit:veto_appledouble = no
+        fruit:wipe_intentionally_left_blank_rfork = yes
+        fruit:delete_empty_adfiles = yes
+        
+        # Disable printing services
+        load printers = no
+        printing = bsd
+        printcap name = /dev/null
+        disable spoolss = yes
+
+    [TimeMachine]
+        path = /storage
+        comment = Time Machine Backup
+        valid users = admin
+        browseable = yes
+        writable = yes
+        read only = no
+        force user = samba
+        force group = smb
+        
+        # Time Machine specific share settings
+        fruit:time machine = yes
+        fruit:advertise_fullsync = true
+        
+        # macOS compatibility
+        fruit:aapl = yes
