@@ -57,8 +57,8 @@ spec:
                   - |
                     # Wait for smbd to start
                     sleep 5
-                    # Set password for admin user using PASS env var
-                    echo -e "$PASS\n$PASS" | smbpasswd -a -s admin
+                    # Set password for admin user using PASS env var (update existing user)
+                    echo -e "$PASS\n$PASS" | smbpasswd -s admin
           volumeMounts:
             - name: tm-data
               mountPath: /storage
