@@ -48,6 +48,17 @@ spec:
                 secretKeyRef:
                   name: timemachine-credentials
                   key: password
+          lifecycle:
+            postStart:
+              exec:
+                command:
+                  - /bin/sh
+                  - -c
+                  - |
+                    # Wait for smbd to start
+                    sleep 5
+                    # Set password for admin user using PASS env var
+                    echo -e "$PASS\n$PASS" | smbpasswd -a -s admin
           volumeMounts:
             - name: tm-data
               mountPath: /storage
