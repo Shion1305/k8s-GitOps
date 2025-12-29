@@ -6,28 +6,25 @@ metadata:
   labels:
     app: timemachine
   annotations:
-    # Restrict access to local network only
-    metallb.universe.tf/allow-shared-ip: "timemachine"
-    metallb.universe.tf/address-pool: "local-only"
     argocd.argoproj.io/sync-wave: "0"
 spec:
   type: ClusterIP
   selector:
     app: timemachine
   ports:
-    - name: udp137
+    - name: netbios-ns
       port: 137
       targetPort: 137
       protocol: UDP
-    - name: udp138
+    - name: netbios-dgm
       port: 138
       targetPort: 138
       protocol: UDP
-    - name: tcp139
+    - name: netbios-ssn
       port: 139
       targetPort: 139
       protocol: TCP
-    - name: tcp445
+    - name: microsoft-ds
       port: 445
       targetPort: 445
       protocol: TCP

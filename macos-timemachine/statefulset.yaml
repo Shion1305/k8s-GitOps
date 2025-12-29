@@ -24,7 +24,7 @@ spec:
         kubernetes.io/hostname: shion-ubuntu-2505
       containers:
         - name: samba
-          image: dperson/samba:latest
+          image: dockurr/samba:latest
           ports:
             - containerPort: 137
               protocol: UDP
@@ -37,10 +37,6 @@ spec:
             - containerPort: 445
               name: microsoft-ds
           env:
-            - name: USERID
-              value: "1000"
-            - name: GROUPID
-              value: "1000"
             - name: TZ
               value: "Asia/Tokyo"
             - name: SAMBA_PASSWORD
@@ -75,7 +71,6 @@ spec:
             limits:
               cpu: 2000m
               memory: 1024Mi
-      volumes: []
   volumeClaimTemplates:
     - metadata:
         name: tm-data

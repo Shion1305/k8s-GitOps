@@ -7,17 +7,6 @@ resources:
   - statefulset.yaml
   - service.yaml
   - networkpolicy.yaml
-# Removed samba-operator resources (not working properly)
-# - samba-operator-install.yaml
-# - samba-common-config.yaml
-# - samba-security-config.yaml
-# - samba-share.yaml
-# - samba-service.yaml
-
-# Removed conflicting standalone PVC and Deployment in favor of StatefulSet
-# - timemachine-pvc.yaml.backup
-# - timemachine-deployment.yaml.backup
-# - timemachine-svc.yaml
 labels:
   - pairs:
       app: samba-timemachine
