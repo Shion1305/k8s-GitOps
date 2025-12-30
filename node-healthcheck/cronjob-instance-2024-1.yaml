@@ -31,7 +31,7 @@ spec:
             - name: ping
               image: curlimages/curl:8.17.0
               args:
-                - "-fsS"
+                - "-fsSv"
                 - "$(HEALTHCHECK_URL)"
                 - "--retry"
                 - "3"
