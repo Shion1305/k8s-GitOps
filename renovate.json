@@ -48,16 +48,11 @@
     "fileMatch": ["apps/.*\\.yaml$"]
   },
   "kubernetes": {
-    "fileMatch": [
-      "\\.yaml$",
-      "\\.yml$"
-    ]
+    "fileMatch": ["\\.yaml$"]
   },
-  "helm-values": {
-    "fileMatch": ["values\\.yaml$"]
-  },
-  "regexManagers": [
+  "customManagers": [
     {
+      "customType": "regex",
       "description": "Update Helm chart versions in ArgoCD Applications",
       "fileMatch": ["apps/.*\\.yaml$"],
       "matchStrings": [
@@ -66,6 +61,7 @@
       "datasourceTemplate": "helm"
     },
     {
+      "customType": "regex",
       "description": "Update Docker images with specific tags",
       "fileMatch": ["\\.yaml$"],
       "matchStrings": [
