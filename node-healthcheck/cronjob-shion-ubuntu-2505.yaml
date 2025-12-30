@@ -14,7 +14,8 @@ spec:
       template:
         spec:
           terminationGracePeriodSeconds: 5
-          restartPolicy: OnFailure
+          # Never restart failed pods so they remain for log inspection
+          restartPolicy: Never
           tolerations:
             - operator: Exists
           affinity:
