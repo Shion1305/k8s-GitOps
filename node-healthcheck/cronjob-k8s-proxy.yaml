@@ -1,0 +1,103 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: heartbeat-instance-k8s-proxy
+  namespace: node-healthcheck
+spec:
+  schedule: "*/1 * * * *"
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      activeDeadlineSeconds: 60
+      backoffLimit: 0
+      template:
+        spec:
+          terminationGracePeriodSeconds: 5
+          # Never restart failed pods so they remain for log inspection
+          restartPolicy: Never
+          tolerations:
+            - operator: Exists
+          affinity:
+            nodeAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                nodeSelectorTerms:
+                  - matchExpressions:
+                      - key: kubernetes.io/hostname
+                        operator: In
+                        values:
+                          - instance-k8s-proxy
+          containers:
+            - name: ping
+              image: nicolaka/netshoot:v0.14
+              command: ["/bin/sh", "-c"]
+              args:
+                - |
+                  set -eu
+
+                  diag() {
+                    url="$1"
+                    host="${url#*://}"
+                    host="${host%%/*}"
+                    host="${host%%:*}"
+
+                    echo "---" >&2
+                    echo "Time: $(date -Is 2>/dev/null || date)" >&2
+                    echo "Node/Pod diagnostics (best-effort)" >&2
+
+                    echo "[resolv.conf]" >&2
+                    cat /etc/resolv.conf >&2 || true
+
+                    echo "[/etc/hosts]" >&2
+                    cat /etc/hosts >&2 || true
+
+                    echo "[ip addr]" >&2
+                    (ip addr 2>&1 || true) >&2
+
+                    echo "[ip route]" >&2
+                    (ip route 2>&1 || true) >&2
+
+                    echo "[DNS check] host=$host" >&2
+                    if command -v getent >/dev/null 2>&1; then
+                      (getent hosts "$host" 2>&1 || true) >&2
+                    else
+                      echo "getent: not installed" >&2
+                    fi
+
+                    if command -v nslookup >/dev/null 2>&1; then
+                      (nslookup "$host" 2>&1 || true) >&2
+                    else
+                      echo "nslookup: not installed" >&2
+                    fi
+
+                    if command -v dig >/dev/null 2>&1; then
+                      (dig +time=2 +tries=1 "$host" A 2>&1 || true) >&2
+                      (dig +time=2 +tries=1 "$host" AAAA 2>&1 || true) >&2
+                    else
+                      echo "dig: not installed" >&2
+                    fi
+                  }
+
+                  for i in 1 2 3 4; do
+                    echo "Attempt $i: curling $HEALTHCHECK_URL" >&2
+
+                    if curl -fsSv \
+                        --max-time 15 \
+                        "$HEALTHCHECK_URL"
+                    then
+                      exit 0
+                    fi
+
+                    echo "Attempt $i failed; running diagnostics" >&2
+                    diag "$HEALTHCHECK_URL"
+
+                    sleep 2
+                  done
+
+                  exit 1
+              env:
+                - name: HEALTHCHECK_URL
+                  valueFrom:
+                    secretKeyRef:
+                      name: node-healthcheck-urls
+                      key: instance-k8s-proxy-url

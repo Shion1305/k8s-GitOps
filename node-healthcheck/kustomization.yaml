@@ -1,6 +1,7 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
+  - cronjob-k8s-proxy.yaml
   - cronjob-instance-2024-1.yaml
   - cronjob-raspi-cm4.yaml
   - cronjob-shion-ubuntu-2505.yaml
