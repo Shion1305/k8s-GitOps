@@ -1,0 +1,30 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: github-spam-lab-deny-direct-egress
+  namespace: gh-analysis
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    # Allow DNS lookups (kube-system/coreDNS)
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53
+    # Allow egress only to instance-k8s-proxy service in privacy-focused-gateway namespace
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: privacy-focused-gateway
+          podSelector:
+            matchLabels:
+              app: instance-k8s-proxy
+      ports:
+        - protocol: TCP
+          port: 8080
+  # All other egress is implicitly denied by not being listed

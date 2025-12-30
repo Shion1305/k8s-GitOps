@@ -1,0 +1,33 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: gh-analysis
+  namespace: argocd
+spec:
+  project: default
+  sources:
+    # Helm chart for the app
+    - repoURL: https://github.com/Shion1305/gh-spam-analysis-proj.git
+      targetRevision: HEAD
+      path: charts/github-spam-lab
+      helm:
+        valueFiles:
+          # Values file living in the GitOps repo (copied from deploy/values.yaml)
+          - $values/gh-analysis/values.yaml
+    # Values repo reference (k8s-GitOps)
+    - repoURL: https://github.com/Shion1305/k8s-GitOps.git
+      targetRevision: HEAD
+      ref: values
+    # App-specific manifests (e.g., NetworkPolicies) in the GitOps repo
+    - repoURL: https://github.com/Shion1305/k8s-GitOps.git
+      targetRevision: HEAD
+      path: gh-analysis
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: gh-analysis
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

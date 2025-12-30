@@ -1,0 +1,56 @@
+image:
+  # Use the same image repo you publish in CI
+  repository: ghcr.io/shion1305/gh-spam-analysis-proj
+  tag: "latest"
+  pullPolicy: IfNotPresent
+
+api:
+  replicaCount: 1
+  service:
+    type: ClusterIP
+    port: 8080
+  # Bind API to all interfaces on the configured port (set via API__BIND)
+  env:
+    # Route all outbound HTTP/HTTPS through instance-k8s-proxy
+    - name: HTTP_PROXY
+      value: http://instance-k8s-proxy.privacy-focused-gateway.svc.cluster.local:8080
+    - name: HTTPS_PROXY
+      value: http://instance-k8s-proxy.privacy-focused-gateway.svc.cluster.local:8080
+    # In case the app uses lower-level libs, also set NO_PROXY for in-cluster addresses.
+    - name: NO_PROXY
+      value: ".svc,.cluster.local,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"
+  resources: {}
+  ingress:
+    enabled: false
+
+collector:
+  enabled: true
+  replicaCount: 1
+  env:
+    # Force collector’s outbound traffic through instance-k8s-proxy as well.
+    - name: HTTP_PROXY
+      value: http://instance-k8s-proxy.privacy-focused-gateway.svc.cluster.local:8080
+    - name: HTTPS_PROXY
+      value: http://instance-k8s-proxy.privacy-focused-gateway.svc.cluster.local:8080
+    - name: NO_PROXY
+      value: ".svc,.cluster.local,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"
+  resources: {}
+
+postgres:
+  # Secret in your GitOps repo/cluster holding the DB URL:
+  # key: DATABASE__URL
+  existingSecret: github-spam-lab-postgres
+  existingSecretKey: "DATABASE__URL"
+
+github:
+  # Secret in your GitOps repo/cluster holding GitHub PATs:
+  # - GITHUB__TOKEN_IDS
+  # - GITHUB__TOKEN_SECRETS
+  # - GITHUB__USER_AGENT
+  existingSecret: github-spam-lab-github-tokens
+  tokenIdsKey: "GITHUB__TOKEN_IDS"
+  tokenSecretsKey: "GITHUB__TOKEN_SECRETS"
+  userAgentKey: "GITHUB__USER_AGENT"
+
+serviceAccount:
+  create: true
