@@ -1,0 +1,77 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    ":dependencyDashboard",
+    ":semanticCommits",
+    ":gitSignOff"
+  ],
+  "prConcurrentLimit": 5,
+  "prHourlyLimit": 2,
+  "timezone": "Asia/Tokyo",
+  "labels": ["dependencies", "renovate"],
+  "commitMessagePrefix": "chore(deps):",
+  "commitMessageAction": "update",
+  "commitMessageTopic": "{{depName}}",
+  "gitAuthor": "shion-bot <bot@github.shion.pro>",
+  "packageRules": [
+    {
+      "description": "Group all ArgoCD Application Helm chart updates",
+      "matchManagers": ["argocd"],
+      "matchFileNames": ["apps/**/*.yaml"],
+      "groupName": "ArgoCD Helm Charts",
+      "automerge": false,
+      "schedule": ["before 6am on Monday"]
+    },
+    {
+      "description": "Group all Docker image updates",
+      "matchDatasources": ["docker"],
+      "groupName": "Docker Images",
+      "automerge": false,
+      "schedule": ["before 6am on Monday"]
+    },
+    {
+      "description": "Separate major updates",
+      "matchUpdateTypes": ["major"],
+      "groupName": "Major Dependencies",
+      "automerge": false,
+      "labels": ["dependencies", "renovate", "major"]
+    },
+    {
+      "description": "Group minor and patch updates",
+      "matchUpdateTypes": ["minor", "patch"],
+      "groupName": "Minor and Patch Dependencies",
+      "automerge": false
+    }
+  ],
+  "argocd": {
+    "fileMatch": ["apps/.*\\.yaml$"]
+  },
+  "kubernetes": {
+    "fileMatch": [
+      "\\.yaml$",
+      "\\.yml$"
+    ]
+  },
+  "helm-values": {
+    "fileMatch": ["values\\.yaml$"]
+  },
+  "regexManagers": [
+    {
+      "description": "Update Helm chart versions in ArgoCD Applications",
+      "fileMatch": ["apps/.*\\.yaml$"],
+      "matchStrings": [
+        "repoURL:\\s+(?<registryUrl>https?://[^\\n]+)\\n\\s+chart:\\s+(?<depName>[^\\n]+)\\n\\s+targetRevision:\\s+(?<currentValue>[^\\s#]+)"
+      ],
+      "datasourceTemplate": "helm"
+    },
+    {
+      "description": "Update Docker images with specific tags",
+      "fileMatch": ["\\.yaml$"],
+      "matchStrings": [
+        "image:\\s+(?<depName>[^:\\s]+):(?<currentValue>[^\\s]+)"
+      ],
+      "datasourceTemplate": "docker"
+    }
+  ]
+}
