@@ -30,11 +30,27 @@ spec:
           containers:
             - name: ping
               image: curlimages/curl:8.17.0
+              command: ["/bin/sh", "-c"]
               args:
-                - "-fsSv"
-                - "$(HEALTHCHECK_URL)"
-                - "--retry"
-                - "3"
+                - |
+                  set -eu
+
+                  # 4 total attempts, 2s delay between attempts
+                  for i in 1 2 3 4; do
+                    echo "Attempt $i: curling $HEALTHCHECK_URL" >&2
+
+                    # Keep or remove -v depending on how noisy you want logs to be.
+                    if curl -fsSv \
+                        --max-time 15 \
+                        "$HEALTHCHECK_URL"
+                    then
+                      exit 0
+                    fi
+
+                    sleep 2
+                  done
+
+                  exit 1
               env:
                 - name: HEALTHCHECK_URL
                   valueFrom:
