@@ -9,6 +9,7 @@ data:
     set -eu
 
     # Diagnostic function - runs on failure to help troubleshoot
+    # Always returns success to prevent script exit with set -e
     diag() {
       url="$1"
       host="${url#*://}"
@@ -22,26 +23,51 @@ data:
 
       # Network configuration
       echo "[Network Interface]" >&2
-      ip -br addr 2>&1 >&2 || true
+      ip -br addr >&2 || true
       echo "" >&2
 
       echo "[Default Route]" >&2
-      ip route show default 2>&1 >&2 || true
+      ip route show default >&2 || true
       echo "" >&2
 
       # DNS configuration
-      echo "[DNS Config]" >&2
-      grep -E '^(nameserver|search)' /etc/resolv.conf 2>&1 >&2 || true
+      echo "[DNS Config - /etc/resolv.conf]" >&2
+      cat /etc/resolv.conf >&2 || true
       echo "" >&2
 
-      # DNS resolution check
-      echo "[DNS Resolution: $host]" >&2
-      dig +short +time=2 +tries=1 "$host" 2>&1 >&2 || echo "DNS lookup failed" >&2
+      # NSSwitch configuration - critical for curl DNS resolution
+      echo "[NSSwitch Config - /etc/nsswitch.conf]" >&2
+      if [ -f /etc/nsswitch.conf ]; then
+        cat /etc/nsswitch.conf >&2
+      else
+        echo "MISSING: /etc/nsswitch.conf not found - this may cause curl DNS failures!" >&2
+      fi
+      echo "" >&2
+
+      # DNS resolution using different methods
+      echo "[DNS Resolution Test: $host]" >&2
+      echo "dig:" >&2
+      dig +short +time=2 +tries=1 "$host" >&2 || echo "  dig failed" >&2
+
+      echo "getent:" >&2
+      getent hosts "$host" >&2 || echo "  getent failed (uses nsswitch.conf)" >&2
+
+      echo "nslookup:" >&2
+      nslookup "$host" >&2 || echo "  nslookup failed" >&2
+      echo "" >&2
+
+      # Curl verbose test
+      echo "[Curl Verbose Test: $host]" >&2
+      curl -v --max-time 5 "https://$host" >&2 || true
       echo "" >&2
 
       # Connectivity test
       echo "[Ping Test: $host]" >&2
-      ping -c 2 -W 2 "$host" 2>&1 >&2 || echo "Ping failed" >&2
+      ping -c 2 -W 2 "$host" >&2 || echo "Ping failed" >&2
+      echo "" >&2
+
+      # Ensure function always returns success
+      return 0
     }
 
     # Retry loop with diagnostics on failure
@@ -55,11 +81,12 @@ data:
 
       echo "✗ Attempt $i/4 failed" >&2
 
-      # Run diagnostics on failure (except after last attempt)
-      if [ "$i" -lt 4 ]; then
+      # Run diagnostics on first failure only to avoid spam
+      if [ "$i" -eq 1 ]; then
         diag "$HEALTHCHECK_URL"
-        sleep 2
       fi
+
+      sleep 2
     done
 
     # Final diagnostics after all retries exhausted
