@@ -14,8 +14,8 @@ spec:
       template:
         spec:
           terminationGracePeriodSeconds: 5
-          # Never restart failed pods so they remain for log inspection
           restartPolicy: Never
+          # Use host network for raspberry pi
           hostNetwork: true
           dnsPolicy: ClusterFirstWithHostNet
           tolerations:
@@ -31,15 +31,20 @@ spec:
                           - raspi-cm4
           containers:
             - name: ping
-              image: curlimages/curl:8.17.0
-              args:
-                - "-fsS"
-                - "$(HEALTHCHECK_URL)"
-                - "--retry"
-                - "3"
+              image: nicolaka/netshoot:v0.14
+              command: ["/bin/sh", "/scripts/healthcheck.sh"]
               env:
                 - name: HEALTHCHECK_URL
                   valueFrom:
                     secretKeyRef:
                       name: node-healthcheck-urls
                       key: raspi-cm4-url
+              volumeMounts:
+                - name: script
+                  mountPath: /scripts
+                  readOnly: true
+          volumes:
+            - name: script
+              configMap:
+                name: healthcheck-script
+                defaultMode: 0555

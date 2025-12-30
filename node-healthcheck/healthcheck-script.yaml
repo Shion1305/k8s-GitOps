@@ -1,0 +1,69 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: healthcheck-script
+  namespace: node-healthcheck
+data:
+  healthcheck.sh: |
+    #!/bin/sh
+    set -eu
+
+    # Diagnostic function - runs on failure to help troubleshoot
+    diag() {
+      url="$1"
+      host="${url#*://}"
+      host="${host%%/*}"
+      host="${host%%:*}"
+
+      echo "---" >&2
+      echo "Time: $(date -Is)" >&2
+      echo "Diagnostics for failed healthcheck to: $url" >&2
+      echo "" >&2
+
+      # Network configuration
+      echo "[Network Interface]" >&2
+      ip -br addr 2>&1 >&2 || true
+      echo "" >&2
+
+      echo "[Default Route]" >&2
+      ip route show default 2>&1 >&2 || true
+      echo "" >&2
+
+      # DNS configuration
+      echo "[DNS Config]" >&2
+      grep -E '^(nameserver|search)' /etc/resolv.conf 2>&1 >&2 || true
+      echo "" >&2
+
+      # DNS resolution check
+      echo "[DNS Resolution: $host]" >&2
+      dig +short +time=2 +tries=1 "$host" 2>&1 >&2 || echo "DNS lookup failed" >&2
+      echo "" >&2
+
+      # Connectivity test
+      echo "[Ping Test: $host]" >&2
+      ping -c 2 -W 2 "$host" 2>&1 >&2 || echo "Ping failed" >&2
+    }
+
+    # Retry loop with diagnostics on failure
+    for i in 1 2 3 4; do
+      echo "Attempt $i/4: checking $HEALTHCHECK_URL" >&2
+
+      if curl -fsSv --max-time 15 "$HEALTHCHECK_URL"; then
+        echo "✓ Healthcheck successful" >&2
+        exit 0
+      fi
+
+      echo "✗ Attempt $i/4 failed" >&2
+
+      # Run diagnostics on failure (except after last attempt)
+      if [ "$i" -lt 4 ]; then
+        diag "$HEALTHCHECK_URL"
+        sleep 2
+      fi
+    done
+
+    # Final diagnostics after all retries exhausted
+    echo "" >&2
+    echo "All retries exhausted. Final diagnostics:" >&2
+    diag "$HEALTHCHECK_URL"
+    exit 1
