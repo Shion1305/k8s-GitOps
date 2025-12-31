@@ -47,5 +47,8 @@ github:
   tokenIdsKey: "GITHUB__TOKEN_IDS"
   tokenSecretsKey: "GITHUB__TOKEN_SECRETS"
   userAgentKey: "GITHUB__USER_AGENT"
+config:
+  # ConfigMap in GitOps repo providing config/default.toml for the app
+  existingConfigMap: gh-analysis-config
 serviceAccount:
   create: true

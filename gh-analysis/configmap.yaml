@@ -1,0 +1,38 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: gh-analysis-config
+  namespace: gh-analysis
+data:
+  default.toml: |-
+    [database]
+    # This URL is unused; DATABASE__URL from Secret overrides it.
+
+    [github]
+    # User agent can be overridden via GITHUB__USER_AGENT env.
+
+    [collector]
+    interval_secs = 300
+    page_size = 100
+    run_once = false
+    fetch_mode = "graphql"
+    max_concurrent_repos = 4
+
+    [broker]
+    max_inflight = 32
+    per_repo_inflight = 2
+    distributed = false
+    cache_capacity = 5000
+    cache_ttl_secs = 600
+    backoff_base_ms = 500
+    backoff_max_ms = 60000
+    jitter_frac = 0.2
+
+    [api]
+    # Overridden via API__BIND env set by Helm.
+    bind = "0.0.0.0:3000"
+
+    [observability]
+    metrics_path = "/metrics"
+    metrics_bind = "0.0.0.0:9091"
+
