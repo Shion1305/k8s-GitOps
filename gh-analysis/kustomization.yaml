@@ -3,4 +3,3 @@ kind: Kustomization
 namespace: gh-analysis
 resources:
   - networkpolicy.yaml
-
