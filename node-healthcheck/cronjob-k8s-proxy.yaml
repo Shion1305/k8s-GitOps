@@ -13,6 +13,10 @@ spec:
       backoffLimit: 0
       template:
         spec:
+          dnsConfig:
+            options:
+              - name: ndots
+                value: "1"
           terminationGracePeriodSeconds: 5
           restartPolicy: Never
           tolerations:
