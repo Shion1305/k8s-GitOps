@@ -1,7 +1,7 @@
 image:
   # Use the same image repo you publish in CI
   repository: ghcr.io/shion1305/gh-spam-analysis-proj
-  tag: "v0.1.6"
+  tag: "v0.1.7"
   pullPolicy: IfNotPresent
 api:
   replicaCount: 1
