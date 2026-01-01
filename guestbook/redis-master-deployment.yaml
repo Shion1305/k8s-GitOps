@@ -22,7 +22,7 @@ spec:
     spec:
       containers:
         - name: master
-          image: redis:6.2-alpine
+          image: redis:8.4-alpine
           resources:
             requests:
               cpu: 100m
