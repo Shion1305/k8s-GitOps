@@ -16,32 +16,30 @@
   "gitAuthor": "shion-bot <bot@github.shion.pro>",
   "packageRules": [
     {
-      "description": "Group all ArgoCD Application Helm chart updates",
+      "description": "Schedule ArgoCD Application Helm chart updates",
       "matchManagers": ["argocd"],
       "matchFileNames": ["apps/**/*.yaml"],
-      "groupName": "ArgoCD Helm Charts",
       "automerge": false,
       "schedule": ["before 6am on Monday"]
     },
     {
-      "description": "Group all Docker image updates",
+      "description": "Schedule Helm chart updates in ArgoCD Applications",
+      "matchDatasources": ["helm"],
+      "matchFileNames": ["apps/**/*.yaml"],
+      "automerge": false,
+      "schedule": ["before 6am on Monday"]
+    },
+    {
+      "description": "Docker image updates",
       "matchDatasources": ["docker"],
-      "groupName": "Docker Images",
       "automerge": false,
       "schedule": ["before 6am on Monday"]
     },
     {
-      "description": "Separate major updates",
+      "description": "Major updates",
       "matchUpdateTypes": ["major"],
-      "groupName": "Major Dependencies",
       "automerge": false,
       "labels": ["dependencies", "renovate", "major"]
-    },
-    {
-      "description": "Group minor and patch updates",
-      "matchUpdateTypes": ["minor", "patch"],
-      "groupName": "Minor and Patch Dependencies",
-      "automerge": false
     }
   ],
   "argocd": {
