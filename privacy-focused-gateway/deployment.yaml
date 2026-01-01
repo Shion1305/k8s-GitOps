@@ -18,7 +18,7 @@ spec:
         effect: NoSchedule
       containers:
         - name: envoy
-          image: envoyproxy/envoy:v1.31.5
+          image: envoyproxy/envoy:v1.36.4
           args: ["-c", "/etc/envoy/envoy.yaml"]
           ports:
             - containerPort: 8080
