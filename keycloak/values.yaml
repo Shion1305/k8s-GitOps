@@ -46,7 +46,7 @@ resources:
     memory: 4Gi
     cpu: 4000m
   requests:
-    memory: 1500m
+    memory: 1500Mi
     cpu: 500m
 # Replica count (can be increased for HA)
 replicaCount: 1
