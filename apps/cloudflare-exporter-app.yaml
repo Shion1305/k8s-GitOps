@@ -9,7 +9,7 @@ spec:
     # Cloudflare Exporter
     - repoURL: https://lablabs.github.io/cloudflare-exporter
       chart: cloudflare-exporter
-      targetRevision: 0.0.3
+      targetRevision: 0.2.3
       helm:
         releaseName: cloudflare-exporter
         valueFiles:
