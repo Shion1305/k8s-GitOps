@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
         - name: postgres-operator-ui
-          image: registry.opensource.zalan.do/acid/postgres-operator-ui:v1.14.0
+          image: registry.opensource.zalan.do/acid/postgres-operator-ui:v1.15.0
           ports:
             - containerPort: 8081
               name: http
