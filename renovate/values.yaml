@@ -8,14 +8,13 @@ cronjob:
   successfulJobsHistoryLimit: 1
   failedJobsHistoryLimit: 1
   concurrencyPolicy: Forbid
+  # Override command to use wrapper script
+  commandOverride:
+    - /bin/bash
+    - /scripts/run-renovate.sh
 
 # Use existing secret created manually
 existingSecret: "renovate-secret"
-
-# Override command to use wrapper script
-command:
-  - /bin/bash
-  - /scripts/run-renovate.sh
 
 # Extra volumes for wrapper script
 extraVolumes:
