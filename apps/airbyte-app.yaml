@@ -15,9 +15,6 @@ spec:
     - repoURL: https://github.com/Shion1305/k8s-GitOps.git
       targetRevision: HEAD
       ref: values
-    - repoURL: https://github.com/Shion1305/k8s-GitOps.git
-      targetRevision: HEAD
-      path: airbyte
   destination:
     server: https://kubernetes.default.svc
     namespace: airbyte
