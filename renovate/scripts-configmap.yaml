@@ -1,0 +1,103 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: renovate-scripts
+  namespace: renovate
+data:
+  run-renovate.sh: |
+    #!/bin/bash
+    set -e
+
+    echo "Starting Renovate for all GitHub App installations..."
+
+    # Check required environment variables
+    if [ -z "$RENOVATE_APP_ID" ] || [ -z "$RENOVATE_APP_PRIVATE_KEY" ]; then
+      echo "ERROR: RENOVATE_APP_ID and RENOVATE_APP_PRIVATE_KEY must be set"
+      exit 1
+    fi
+
+    # Function to generate JWT
+    generate_jwt() {
+      local app_id="$1"
+      local private_key="$2"
+
+      # Current time
+      local now=$(date +%s)
+      local exp=$((now + 600))  # 10 minutes from now
+
+      # JWT header
+      local header='{"alg":"RS256","typ":"JWT"}'
+      local header_b64=$(echo -n "$header" | base64 | tr -d '=' | tr '/+' '_-' | tr -d '\n')
+
+      # JWT payload
+      local payload="{\"iat\":$now,\"exp\":$exp,\"iss\":\"$app_id\"}"
+      local payload_b64=$(echo -n "$payload" | base64 | tr -d '=' | tr '/+' '_-' | tr -d '\n')
+
+      # Create signature
+      local signature=$(echo -n "${header_b64}.${payload_b64}" | \
+        openssl dgst -sha256 -sign <(echo "$private_key") | \
+        base64 | tr -d '=' | tr '/+' '_-' | tr -d '\n')
+
+      echo "${header_b64}.${payload_b64}.${signature}"
+    }
+
+    echo "Generating JWT for GitHub App authentication..."
+    JWT=$(generate_jwt "$RENOVATE_APP_ID" "$RENOVATE_APP_PRIVATE_KEY")
+
+    echo "Fetching list of installations..."
+    INSTALLATIONS=$(curl -s -H "Authorization: Bearer $JWT" \
+      -H "Accept: application/vnd.github+json" \
+      https://api.github.com/app/installations | jq -r '.[].id')
+
+    if [ -z "$INSTALLATIONS" ]; then
+      echo "ERROR: No installations found for this GitHub App"
+      exit 1
+    fi
+
+    INSTALLATION_COUNT=$(echo "$INSTALLATIONS" | wc -l | tr -d ' ')
+    echo "Found $INSTALLATION_COUNT installation(s)"
+
+    # Process each installation
+    CURRENT=0
+    for INSTALLATION_ID in $INSTALLATIONS; do
+      CURRENT=$((CURRENT + 1))
+      echo ""
+      echo "========================================="
+      echo "Processing installation $CURRENT/$INSTALLATION_COUNT (ID: $INSTALLATION_ID)"
+      echo "========================================="
+
+      # Generate installation access token
+      echo "Generating access token for installation $INSTALLATION_ID..."
+      TOKEN_RESPONSE=$(curl -s -X POST \
+        -H "Authorization: Bearer $JWT" \
+        -H "Accept: application/vnd.github+json" \
+        "https://api.github.com/app/installations/$INSTALLATION_ID/access_tokens")
+
+      TOKEN=$(echo "$TOKEN_RESPONSE" | jq -r '.token')
+
+      if [ "$TOKEN" == "null" ] || [ -z "$TOKEN" ]; then
+        echo "ERROR: Failed to generate token for installation $INSTALLATION_ID"
+        echo "Response: $TOKEN_RESPONSE"
+        continue
+      fi
+
+      echo "Token generated successfully (expires in 1 hour)"
+
+      # Run Renovate with this installation token
+      echo "Running Renovate..."
+      export RENOVATE_TOKEN="$TOKEN"
+
+      if renovate; then
+        echo "✓ Renovate completed successfully for installation $INSTALLATION_ID"
+      else
+        echo "✗ Renovate failed for installation $INSTALLATION_ID"
+      fi
+
+      # Unset token for security
+      unset RENOVATE_TOKEN
+    done
+
+    echo ""
+    echo "========================================="
+    echo "All installations processed!"
+    echo "========================================="

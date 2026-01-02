@@ -17,6 +17,12 @@ spec:
     - repoURL: https://github.com/Shion1305/k8s-GitOps.git
       targetRevision: HEAD
       ref: values
+    # ConfigMap with wrapper script
+    - repoURL: https://github.com/Shion1305/k8s-GitOps.git
+      targetRevision: HEAD
+      path: renovate
+      directory:
+        include: scripts-configmap.yaml
   destination:
     server: https://kubernetes.default.svc
     namespace: renovate

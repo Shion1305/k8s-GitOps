@@ -1,14 +1,32 @@
 # Renovate Helm Chart Values
 # Official chart: https://github.com/renovatebot/helm-charts
 
-# CronJob schedule - Run every 6 hours
+# CronJob configuration
 cronjob:
+  enabled: true
   schedule: "0 */6 * * *"
-  successfulJobsHistoryLimit: 3
-  failedJobsHistoryLimit: 3
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 1
+  concurrencyPolicy: Forbid
 
 # Use existing secret created manually
 existingSecret: "renovate-secret"
+
+# Override command to use wrapper script
+command:
+  - /bin/bash
+  - /scripts/run-renovate.sh
+
+# Extra volumes for wrapper script
+extraVolumes:
+  - name: scripts
+    configMap:
+      name: renovate-scripts
+      defaultMode: 0755
+
+extraVolumeMounts:
+  - name: scripts
+    mountPath: /scripts
 
 # Environment variables
 env:
@@ -21,7 +39,6 @@ renovate:
   config: |
     {
       "platform": "github",
-      "token": "",
       "autodiscover": true,
       "autodiscoverFilter": ["Shion1305/*", "*/*"],
       "onboarding": true,
