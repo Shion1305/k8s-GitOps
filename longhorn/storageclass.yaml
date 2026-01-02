@@ -6,6 +6,7 @@ metadata:
     storageclass.kubernetes.io/is-default-class: "true"
 provisioner: driver.longhorn.io
 allowVolumeExpansion: true
+reclaimPolicy: Retain
 parameters:
   numberOfReplicas: "1"
   dataEngine: "v1"
@@ -19,6 +20,7 @@ metadata:
   name: longhorn-hdd
 provisioner: driver.longhorn.io
 allowVolumeExpansion: true
+reclaimPolicy: Retain
 parameters:
   numberOfReplicas: "1"
   dataEngine: "v1"
