@@ -6,18 +6,28 @@ This directory contains the Keycloak deployment using the official Keycloak Oper
 
 **Background:** Bitnami deprecated their free Keycloak Docker images on August 28, 2025. We migrated to the official Keycloak Operator which uses images from `quay.io/keycloak/keycloak`.
 
-## Manual Operator Installation
+## GitOps Management
 
-The Keycloak Operator and CRDs must be installed manually (ArgoCD cannot manage CRDs reliably):
+The Keycloak Operator is **fully managed by ArgoCD** via three applications:
 
-```bash
-# Install CRDs
-kubectl apply -f https://raw.githubusercontent.com/keycloak/keycloak-k8s-resources/26.4.7/kubernetes/keycloaks.k8s.keycloak.org-v1.yml
-kubectl apply -f https://raw.githubusercontent.com/keycloak/keycloak-k8s-resources/26.4.7/kubernetes/keycloakrealmimports.k8s.keycloak.org-v1.yml
+### 1. `keycloak-crds` (sync-wave: -2)
+- **Purpose**: Manages Keycloak CRDs
+- **Source**: `https://github.com/keycloak/keycloak-k8s-resources.git`
+- **Path**: `kubernetes/*-v1.yml` (CRD files only)
+- **Version**: Tracked in `apps/keycloak-crds-app.yaml` targetRevision
+- **Auto-prune**: Disabled (CRDs are never auto-deleted)
 
-# Deploy Operator
-kubectl -n keycloak apply -f https://raw.githubusercontent.com/keycloak/keycloak-k8s-resources/26.4.7/kubernetes/kubernetes.yml
-```
+### 2. `keycloak-operator-install` (sync-wave: -1)
+- **Purpose**: Deploys the Keycloak Operator
+- **Source**: `https://github.com/keycloak/keycloak-k8s-resources.git`
+- **Path**: `kubernetes/` (operator manifests)
+- **Version**: Tracked in `apps/keycloak-operator-install-app.yaml` targetRevision
+- **Auto-sync**: Enabled with self-heal
+
+### 3. `keycloak-operator` (sync-wave: 0)
+- **Purpose**: Manages Keycloak instance (CR)
+- **Source**: This repository (`keycloak-operator/keycloak.yaml`)
+- **Auto-sync**: Enabled with self-heal
 
 ## Keycloak Configuration
 
@@ -41,9 +51,26 @@ kubectl create secret generic keycloak-db-secret -n keycloak \
 
 ## Upgrading Keycloak
 
-To upgrade Keycloak, update the operator version in the installation commands above, then update the CRDs and operator deployment.
+**Automatic Updates via Renovate:**
 
-The operator will handle rolling updates of Keycloak pods automatically.
+Renovate automatically detects and creates PRs for new Keycloak operator versions by monitoring:
+- `apps/keycloak-crds-app.yaml` - targetRevision field
+- `apps/keycloak-operator-install-app.yaml` - targetRevision field
+
+Both point to `github.com/keycloak/keycloak-k8s-resources` and use Git tags.
+
+**Manual Update:**
+
+To manually upgrade, edit the `targetRevision` in both files:
+
+```bash
+# Update both to the same version
+vim apps/keycloak-crds-app.yaml        # Change targetRevision
+vim apps/keycloak-operator-install-app.yaml  # Change targetRevision
+git commit -m "chore: update Keycloak operator to vX.Y.Z"
+```
+
+ArgoCD will sync the changes automatically. The operator will then handle rolling updates of Keycloak pods.
 
 ## Admin Access
 

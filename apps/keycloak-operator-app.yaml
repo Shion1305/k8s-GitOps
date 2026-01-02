@@ -3,6 +3,8 @@ kind: Application
 metadata:
   name: keycloak-operator
   namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"  # Deploy after operator installation
 spec:
   project: default
   destination:
@@ -12,6 +14,8 @@ spec:
     repoURL: https://github.com/Shion1305/k8s-GitOps.git
     targetRevision: HEAD
     path: keycloak-operator
+    directory:
+      exclude: "crds/*"  # CRDs managed by separate app
   syncPolicy:
     automated:
       selfHeal: true

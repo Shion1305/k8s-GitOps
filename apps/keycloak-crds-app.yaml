@@ -1,0 +1,31 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: keycloak-crds
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-2"  # Install CRDs before operator
+spec:
+  project: default
+  destination:
+    server: https://kubernetes.default.svc
+  source:
+    repoURL: https://github.com/keycloak/keycloak-k8s-resources.git
+    targetRevision: "26.4.7"  # Renovate will update this
+    path: kubernetes
+    directory:
+      include: "*-v1.yml"  # Only include CRD files
+  syncPolicy:
+    automated:
+      selfHeal: true
+      prune: false  # Never auto-delete CRDs to avoid data loss
+    syncOptions:
+      - CreateNamespace=false  # CRDs are cluster-scoped
+      - Replace=true  # Allow CRD updates
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m

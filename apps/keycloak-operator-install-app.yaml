@@ -1,0 +1,29 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: keycloak-operator-install
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"  # Install operator before Keycloak CR
+spec:
+  project: default
+  destination:
+    namespace: keycloak
+    server: https://kubernetes.default.svc
+  source:
+    repoURL: https://github.com/keycloak/keycloak-k8s-resources.git
+    targetRevision: "26.4.7"  # Update this version to upgrade operator
+    path: kubernetes
+  syncPolicy:
+    automated:
+      selfHeal: true
+      prune: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
