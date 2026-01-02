@@ -1,0 +1,45 @@
+apiVersion: k8s.keycloak.org/v2alpha1
+kind: Keycloak
+metadata:
+  name: keycloak
+  namespace: keycloak
+spec:
+  instances: 1
+  db:
+    vendor: postgres
+    host: keycloak.postgres-operator-deployment.svc.cluster.local
+    port: 5432
+    database: keycloak
+    usernameSecret:
+      name: keycloak-db-secret
+      key: username
+    passwordSecret:
+      name: keycloak-db-secret
+      key: password
+  http:
+    httpEnabled: true
+  hostname:
+    hostname: keycloak.k.shion1305.com
+  proxy:
+    headers: xforwarded
+  ingress:
+    enabled: true
+    className: nginx-ssl
+  # Resource limits
+  unsupported:
+    podTemplate:
+      spec:
+        containers:
+          - name: keycloak
+            resources:
+              limits:
+                memory: 4Gi
+                cpu: 4000m
+              requests:
+                memory: 1500Mi
+                cpu: 500m
+            env:
+              - name: KC_FEATURES
+                value: "token-exchange"
+              - name: JAVA_OPTS_APPEND
+                value: "-Xms1g -Xmx1536m -XX:MetaspaceSize=128M -XX:MaxMetaspaceSize=256m -Djava.net.preferIPv4Stack=true"
