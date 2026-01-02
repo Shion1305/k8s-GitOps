@@ -8,6 +8,11 @@ defaultSettings:
   defaultDataPath: ""
   # Reservation rate for filesystem-based volumes
   storageReservedPercentageForDefaultDisk: 25
+# Disable automatic StorageClass creation by Longhorn
+# We manage StorageClasses via GitOps in storageclass.yaml
+persistence:
+  defaultClass: false
+  defaultClassReplicaCount: 1
 # Node selector to exclude specific nodes from running Longhorn manager
 longhornManager:
   nodeSelector:
