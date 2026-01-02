@@ -1,0 +1,85 @@
+# Renovate Helm Chart Values
+# Official chart: https://github.com/renovatebot/helm-charts
+
+# CronJob schedule - Run every 6 hours
+cronjob:
+  schedule: "0 */6 * * *"
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+
+# Use existing secret created manually
+existingSecret: "renovate-secret"
+
+# Environment variables
+env:
+  LOG_LEVEL: "info"
+
+# Renovate configuration
+# Docs: https://docs.renovatebot.com/self-hosted-configuration/
+renovate:
+  # Main configuration as JSON string
+  config: |
+    {
+      "platform": "github",
+      "token": "",
+      "autodiscover": true,
+      "autodiscoverFilter": ["Shion1305/*", "*/*"],
+      "onboarding": true,
+      "requireConfig": "optional",
+      "gitAuthor": "Automation by Shion1305 <bot@github.shion.pro>",
+      "username": "Renovate by Shion1305",
+      "repositories": [],
+      "ignorePaths": [],
+      "enabledManagers": [
+        "argocd",
+        "docker-compose",
+        "dockerfile",
+        "github-actions",
+        "helm-values",
+        "helmfile",
+        "kubernetes",
+        "kustomize",
+        "custom.regex"
+      ],
+      "packageRules": [
+        {
+          "description": "Exclude archived repositories",
+          "matchRepositories": ["**"],
+          "enabled": true
+        }
+      ],
+      "prConcurrentLimit": 10,
+      "prHourlyLimit": 2,
+      "timezone": "UTC"
+    }
+
+# Resource limits
+resources:
+  limits:
+    cpu: 2000m
+    memory: 2Gi
+  requests:
+    cpu: 500m
+    memory: 512Mi
+
+# Pod configuration
+securityContext:
+  fsGroup: 1000
+  runAsNonRoot: true
+  runAsUser: 1000
+  seccompProfile:
+    type: RuntimeDefault
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+  readOnlyRootFilesystem: true
+  runAsNonRoot: true
+  runAsUser: 1000
+
+# Service account
+serviceAccount:
+  create: true
+  name: renovate
