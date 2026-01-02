@@ -29,7 +29,7 @@ global:
     licenseKeySecretKey: ""
 
   # -- The URL where Airbyte will be reached; This should match your Ingress host
-  airbyteUrl: ""
+  airbyteUrl: "https://airbyte.k.shion1305.com"
 
   # Docker image config that will apply to all images.
   image:

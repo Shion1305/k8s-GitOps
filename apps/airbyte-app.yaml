@@ -6,9 +6,9 @@ metadata:
 spec:
   project: default
   sources:
-    - repoURL: https://airbytehq.github.io/helm-charts
+    - repoURL: https://airbytehq.github.io/charts
       chart: airbyte
-      targetRevision: 1.9.2
+      targetRevision: 2.0.18
       helm:
         valueFiles:
           - $values/airbyte/values.yaml
@@ -22,6 +22,8 @@ spec:
     server: https://kubernetes.default.svc
     namespace: airbyte
   syncPolicy:
-    automated: null
+    automated:
+      prune: true
+      selfHeal: true
     syncOptions:
       - CreateNamespace=true
