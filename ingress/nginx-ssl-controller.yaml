@@ -52,7 +52,7 @@ spec:
       containers:
         - name: controller
           # Use a current controller (v1.13.0 as of July 2025)
-          image: registry.k8s.io/ingress-nginx/controller:v1.13.0
+          image: registry.k8s.io/ingress-nginx/controller:v1.14.1
           args:
             - /nginx-ingress-controller
             - --election-id=ingress-nginx-ssl-leader
