@@ -284,4 +284,4 @@ metrics:
 test:
   image:
     repository: alpine
-    tag: "3.18"
+    tag: "3.23"
