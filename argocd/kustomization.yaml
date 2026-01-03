@@ -1,7 +1,0 @@
-apiVersion: kustomize.config.k8s.io/v1beta1
-kind: Kustomization
-resources:
-  # Main ArgoCD ingress for authenticated/admin access
-  - ingress.yaml
-  # Guestbook ingress for anonymous read-only access with method restrictions
-  - guestbook-ingress.yaml

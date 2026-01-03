@@ -5,8 +5,6 @@ configs:
   cm:
     # Admin account
     accounts.admin.enabled: "true"
-    # Anonymous access - allow unauthenticated users to access ArgoCD
-    users.anonymous.enabled: "true"
     # Application URL
     url: https://argocd.k.shion1305.com
     # Dex (GitHub OAuth) configuration
@@ -19,15 +17,6 @@ configs:
           clientID: $github-oauth-secret:dex.github.clientID
           clientSecret: $github-oauth-secret:dex.github.clientSecret
           redirectURI: https://argocd.k.shion1305.com/api/dex/callback
-          # Load GitHub organization and teams for RBAC mapping
-          # This allows ArgoCD to map team memberships to roles
-          orgs:
-            - name: Shion1305Dev
-              # Teams within this org that can access ArgoCD
-              # If teams list is empty or omitted, all org members can authenticate
-              # Teams are mapped in RBAC policy.csv below
-          teamNameField: slug
-          useLoginAsID: false
     # Resource exclusions
     resource.exclusions: |
       ### Network resources created by the Kubernetes control plane and excluded to reduce the number of watched events and UI clutter
@@ -125,32 +114,8 @@ configs:
         - /ports
   # RBAC configuration
   rbac:
-    # Default role for all users (both authenticated and anonymous)
-    # Set to custom 'role:guestbook-viewer' which can ONLY view the guestbook app
-    # Built-in 'role:readonly' has too many permissions (can see all apps)
-    # Authenticated admin users/teams will be elevated via group mapping below
-    policy.default: role:guestbook-viewer
-    # RBAC policies:
-    # - Custom guestbook-viewer role: Can only view the guestbook application
-    # - GitHub team members: Get full admin access
-    # - Specific GitHub users: Get full admin access
-    # - Built-in admin user: Retains admin role
-    policy.csv: |
-      # Define custom role 'guestbook-viewer' with minimal permissions
-      # This role can ONLY view the guestbook application (nothing else)
-      p, role:guestbook-viewer, applications, get, default/guestbook, allow
-
-      # Explicitly assign built-in admin user to admin role
-      g, admin, role:admin
-
-      # Grant admin access to specific GitHub user(s)
-      # GitHub username: Shion1305
-      g, Shion1305, role:admin
-
-      # Grant admin access to GitHub team members
-      # Organization: Shion1305Dev, Team: k-shion1305-com-admin
-      # All members of this team will have full admin access
-      g, Shion1305Dev:k-shion1305-com-admin, role:admin
+    policy.default: role:admin
+    policy.csv: ""
   # Reference to existing secrets
   secret:
     createSecret: false # We'll keep existing argocd-secret
