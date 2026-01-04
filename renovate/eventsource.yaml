@@ -1,0 +1,45 @@
+apiVersion: argoproj.io/v1alpha1
+kind: EventSource
+metadata:
+  name: renovate-github
+  namespace: renovate
+spec:
+  service:
+    ports:
+      - port: 12000
+        targetPort: 12000
+  github:
+    renovate:
+      # GitHub App webhook configuration
+      # No repositories specified - webhook receives events from all installations
+      repositories: []
+
+      # Webhook endpoint configuration
+      webhook:
+        endpoint: /webhook
+        port: "12000"
+        method: POST
+        # External URL (configured in GitHub App settings)
+        url: https://renovate.k.shion1305.com
+
+      # Webhook secret for payload verification
+      # Create secret: kubectl create secret generic github-webhook-secret -n renovate --from-literal=secret=<your-webhook-secret>
+      webhookSecret:
+        name: github-webhook-secret
+        key: secret
+
+      # Event types to listen for
+      # issues: Dependency Dashboard checkbox edits
+      # issue_comment: Comments on Renovate PRs (e.g., "rebase")
+      events:
+        - issues
+        - issue_comment
+
+      # Content type for webhook payloads
+      contentType: json
+
+      # Set to false for production (requires valid TLS)
+      insecure: false
+
+      # Webhook is active
+      active: true

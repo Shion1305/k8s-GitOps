@@ -1,0 +1,11 @@
+apiVersion: argoproj.io/v1alpha1
+kind: EventBus
+metadata:
+  name: default
+  namespace: renovate
+spec:
+  nats:
+    native:
+      # Single replica for simplicity (can scale to 3 for HA)
+      replicas: 1
+      auth: token
