@@ -8,7 +8,7 @@ spec:
   sources:
     - repoURL: https://airbytehq.github.io/charts
       chart: airbyte
-      targetRevision: 2.0.18
+      targetRevision: 2.0.19
       helm:
         valueFiles:
           - $values/airbyte/values.yaml
