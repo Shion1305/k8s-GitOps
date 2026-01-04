@@ -11,8 +11,12 @@ spec:
   github:
     renovate:
       # GitHub App webhook configuration
-      # No repositories specified - webhook receives events from all installations
-      repositories: []
+      # Specify organizations to receive webhooks from
+      owner: "Shion1305"
+      # List organizations the GitHub App is installed on
+      organizations:
+        - "Shion1305"
+        - "Shion1305Dev"
 
       # Webhook endpoint configuration
       webhook:
