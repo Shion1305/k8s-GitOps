@@ -49,6 +49,9 @@ langfuse:
               key: "clientSecret"
         - name: "AUTH_GITHUB_ALLOW_ACCOUNT_LINKING"
           value: "true"
+    features:
+      signUpDisabled: true
+      telemetryEnabled: false
 
   # Worker deployment configuration
   worker:
