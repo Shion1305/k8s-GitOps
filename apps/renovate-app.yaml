@@ -8,29 +8,21 @@ metadata:
 spec:
   project: default
   sources:
-    # Renovate Helm chart
     - repoURL: ghcr.io/renovatebot/charts
       chart: renovate
       targetRevision: 45.64.0
       helm:
         valueFiles:
           - $values/renovate/values.yaml
-    # Argo Events Helm chart (webhook support)
-    - repoURL: https://argoproj.github.io/argo-helm
-      chart: argo-events
-      targetRevision: 2.4.19
-      helm:
-        valueFiles:
-          - $values/renovate/argo-events-values.yaml
-    # Values reference
     - repoURL: https://github.com/Shion1305/k8s-GitOps.git
       targetRevision: HEAD
       ref: values
-    # Additional manifests (webhook components, scripts)
+    # ConfigMap with wrapper script
     - repoURL: https://github.com/Shion1305/k8s-GitOps.git
       targetRevision: HEAD
       path: renovate
-      kustomize: {}
+      directory:
+        include: scripts-configmap.yaml
   destination:
     server: https://kubernetes.default.svc
     namespace: renovate
