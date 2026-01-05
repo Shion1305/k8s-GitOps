@@ -33,32 +33,6 @@ spec:
       # This makes the controller accessible at 10.0.0.4:80 and 10.0.0.4:443
       hostNetwork: true
       dnsPolicy: ClusterFirstWithHostNet
-      initContainers:
-        - name: create-tls-secret
-          image: bitnami/kubectl:latest
-          securityContext:
-            runAsUser: 0
-            runAsGroup: 0
-          resources:
-            requests:
-              cpu: 50m
-              memory: 64Mi
-            limits:
-              cpu: 200m
-              memory: 128Mi
-          volumeMounts:
-            - name: tls-certs
-              mountPath: /etc/letsencrypt
-              readOnly: true
-          command:
-            - sh
-            - -c
-            - |
-              kubectl delete secret nginx-internal-tls-secret -n ingress-nginx --ignore-not-found=true
-              kubectl create secret tls nginx-internal-tls-secret \
-                --cert=/etc/letsencrypt/live/k.shion1305.com/fullchain.pem \
-                --key=/etc/letsencrypt/live/k.shion1305.com/privkey.pem \
-                -n ingress-nginx
       containers:
         - name: controller
           image: registry.k8s.io/ingress-nginx/controller:v1.14.1
@@ -70,7 +44,7 @@ spec:
             - --configmap=$(POD_NAMESPACE)/ingress-nginx-internal-controller
             - --http-port=80
             - --https-port=443
-            - --default-ssl-certificate=ingress-nginx/nginx-internal-tls-secret
+            - --default-ssl-certificate=ingress-nginx/nginx-tls-secret
             - --v=2
             - --enable-ssl-passthrough=false
           env:
@@ -100,21 +74,6 @@ spec:
             limits:
               cpu: 500m
               memory: 512Mi
-          volumeMounts:
-            - name: tls-certs
-              mountPath: /etc/letsencrypt
-              readOnly: true
-            - name: webhook-cert
-              mountPath: /usr/local/certificates/
-              readOnly: true
-      volumes:
-        - name: tls-certs
-          hostPath:
-            path: /etc/letsencrypt
-            type: Directory
-        - name: webhook-cert
-          secret:
-            secretName: ingress-nginx-admission
 ---
 apiVersion: v1
 kind: ConfigMap
