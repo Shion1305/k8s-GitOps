@@ -1,0 +1,30 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: longhorn-ingress
+  namespace: longhorn-system
+  annotations:
+    # Force SSL redirect
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    # Backend protocol is HTTP (Longhorn UI service)
+    nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
+spec:
+  # Use internal-only ingress controller
+  # This controller runs on shion-ubuntu-2505 (10.0.0.4) with IP whitelist
+  ingressClassName: nginx-internal
+  tls:
+    - hosts:
+        - longhorn.k.shion1305.com
+      # Uses default cert from nginx-internal controller (Let's Encrypt wildcard)
+  rules:
+    - host: longhorn.k.shion1305.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: longhorn-frontend
+                port:
+                  number: 80
