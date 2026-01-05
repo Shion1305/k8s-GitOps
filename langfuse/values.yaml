@@ -47,7 +47,7 @@ langfuse:
 # PostgreSQL - use external PostgreSQL managed by postgres-operator
 postgresql:
   deploy: false
-  host: "langfuse.postgres-clusters.svc.cluster.local"
+  host: "langfuse.postgres-operator-deployment.svc.cluster.local"
   port: 5432
   auth:
     username: "langfuse"

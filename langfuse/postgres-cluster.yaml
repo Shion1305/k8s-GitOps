@@ -2,7 +2,7 @@ apiVersion: "acid.zalan.do/v1"
 kind: postgresql
 metadata:
   name: langfuse
-  namespace: postgres-clusters
+  namespace: postgres-operator-deployment
 spec:
   teamId: "langfuse"
   volume:
@@ -19,7 +19,7 @@ spec:
     version: "17"
   resources:
     requests:
-      cpu: 500m
+      cpu: 100m
       memory: 1Gi
     limits:
       cpu: 2000m
