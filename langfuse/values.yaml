@@ -73,6 +73,25 @@ clickhouse:
     limits:
       cpu: 2000m
       memory: 4Gi
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+        - matchExpressions:
+          - key: kubernetes.io/hostname
+            operator: In
+            values:
+            - shion-ubuntu-2505
+  zookeeper:
+    affinity:
+      nodeAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+          - matchExpressions:
+            - key: kubernetes.io/hostname
+              operator: In
+              values:
+              - shion-ubuntu-2505
 
 # Redis - embedded deployment
 redis:
@@ -93,6 +112,15 @@ redis:
       limits:
         cpu: 500m
         memory: 512Mi
+    affinity:
+      nodeAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+          - matchExpressions:
+            - key: kubernetes.io/hostname
+              operator: In
+              values:
+              - shion-ubuntu-2505
 
 # S3-compatible storage (MinIO)
 s3:
@@ -111,6 +139,15 @@ s3:
     limits:
       cpu: 1000m
       memory: 1Gi
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+        - matchExpressions:
+          - key: kubernetes.io/hostname
+            operator: In
+            values:
+            - shion-ubuntu-2505
 
 # Ingress disabled - managed separately via nginx-ssl
 ingress:
