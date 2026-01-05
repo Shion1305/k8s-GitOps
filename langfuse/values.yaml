@@ -6,31 +6,37 @@ langfuse:
     type: ClusterIP
     port: 3000
 
-  # Security configurations - secrets managed via External Secrets Operator
+  # Security configurations - secrets managed directly in Kubernetes
   nextauth:
     url: "https://langfuse.k.shion1305.com"
     secret:
-      existingSecret: "langfuse-credentials"
-      existingSecretKey: "NEXTAUTH_SECRET"
+      secretKeyRef:
+        name: "langfuse-credentials"
+        key: "NEXTAUTH_SECRET"
 
   salt:
-    existingSecret: "langfuse-credentials"
-    existingSecretKey: "SALT"
+    secretKeyRef:
+      name: "langfuse-credentials"
+      key: "SALT"
 
   encryptionKey:
-    existingSecret: "langfuse-credentials"
-    existingSecretKey: "ENCRYPTION_KEY"
+    secretKeyRef:
+      name: "langfuse-credentials"
+      key: "ENCRYPTION_KEY"
 
-  # Resource limits
-  resources:
-    web:
+  # Web deployment configuration
+  web:
+    resources:
       requests:
         cpu: 500m
         memory: 1Gi
       limits:
         cpu: 2000m
         memory: 2Gi
-    worker:
+
+  # Worker deployment configuration
+  worker:
+    resources:
       requests:
         cpu: 250m
         memory: 512Mi
@@ -40,17 +46,15 @@ langfuse:
 
 # PostgreSQL - use external PostgreSQL managed by postgres-operator
 postgresql:
-  enabled: false
-
-# External PostgreSQL configuration
-externalDatabase:
-  enabled: true
+  deploy: false
   host: "langfuse.postgres-clusters.svc.cluster.local"
   port: 5432
-  database: "langfuse"
-  existingSecret: "langfuse-credentials"
-  existingSecretPasswordKey: "DB_PASSWORD"
-  existingSecretUsernameKey: "DB_USER"
+  auth:
+    username: "langfuse"
+    database: "langfuse"
+    existingSecret: "langfuse-credentials"
+    secretKeys:
+      userPasswordKey: "DB_PASSWORD"
 
 # ClickHouse - embedded deployment
 clickhouse:
@@ -95,7 +99,7 @@ s3:
   enabled: true
   auth:
     existingSecret: "langfuse-credentials"
-    existingSecretRootPasswordKey: "S3_ROOT_PASSWORD"
+    rootPasswordSecretKey: "S3_ROOT_PASSWORD"
   persistence:
     enabled: true
     size: 50Gi
