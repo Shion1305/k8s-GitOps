@@ -33,6 +33,22 @@ langfuse:
       limits:
         cpu: 2000m
         memory: 2Gi
+    pod:
+      additionalEnv:
+        - name: "AUTH_DISABLE_USERNAME_PASSWORD"
+          value: "true"
+        - name: "AUTH_GITHUB_CLIENT_ID"
+          valueFrom:
+            secretKeyRef:
+              name: "langfuse-github-oauth-secret"
+              key: "clientID"
+        - name: "AUTH_GITHUB_CLIENT_SECRET"
+          valueFrom:
+            secretKeyRef:
+              name: "langfuse-github-oauth-secret"
+              key: "clientSecret"
+        - name: "AUTH_GITHUB_ALLOW_ACCOUNT_LINKING"
+          value: "true"
 
   # Worker deployment configuration
   worker:
@@ -77,21 +93,21 @@ clickhouse:
     nodeAffinity:
       requiredDuringSchedulingIgnoredDuringExecution:
         nodeSelectorTerms:
-        - matchExpressions:
-          - key: kubernetes.io/hostname
-            operator: In
-            values:
-            - shion-ubuntu-2505
+          - matchExpressions:
+              - key: kubernetes.io/hostname
+                operator: In
+                values:
+                  - shion-ubuntu-2505
   zookeeper:
     affinity:
       nodeAffinity:
         requiredDuringSchedulingIgnoredDuringExecution:
           nodeSelectorTerms:
-          - matchExpressions:
-            - key: kubernetes.io/hostname
-              operator: In
-              values:
-              - shion-ubuntu-2505
+            - matchExpressions:
+                - key: kubernetes.io/hostname
+                  operator: In
+                  values:
+                    - shion-ubuntu-2505
 
 # Redis - embedded deployment
 redis:
@@ -116,11 +132,11 @@ redis:
       nodeAffinity:
         requiredDuringSchedulingIgnoredDuringExecution:
           nodeSelectorTerms:
-          - matchExpressions:
-            - key: kubernetes.io/hostname
-              operator: In
-              values:
-              - shion-ubuntu-2505
+            - matchExpressions:
+                - key: kubernetes.io/hostname
+                  operator: In
+                  values:
+                    - shion-ubuntu-2505
 
 # S3-compatible storage (MinIO)
 s3:
@@ -143,11 +159,11 @@ s3:
     nodeAffinity:
       requiredDuringSchedulingIgnoredDuringExecution:
         nodeSelectorTerms:
-        - matchExpressions:
-          - key: kubernetes.io/hostname
-            operator: In
-            values:
-            - shion-ubuntu-2505
+          - matchExpressions:
+              - key: kubernetes.io/hostname
+                operator: In
+                values:
+                  - shion-ubuntu-2505
 
 # Ingress disabled - managed separately via nginx-ssl
 ingress:
