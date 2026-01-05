@@ -8,7 +8,7 @@ spec:
   sources:
     - repoURL: https://langfuse.github.io/langfuse-k8s
       chart: langfuse
-      targetRevision: 1.0.0
+      targetRevision: 1.5.15
       helm:
         valueFiles:
           - $values/langfuse/values.yaml
