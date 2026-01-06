@@ -530,7 +530,7 @@ ingress:
   # -- Set to true to enable ingress record generation
   enabled: true
   # -- Specifies ingressClassName for clusters >= 1.18+
-  className: "nginx-internal"
+  className: ""
   # -- Ingress annotations done as key:value pairs
   annotations:
     {}
@@ -554,10 +554,8 @@ ingress:
     #       backend: connector-builder-server  # Routes to connector-builder-server
   # -- Custom ingress TLS configuration
   tls:
-    []
-    # - secretName: chart-example-tls
-    #   hosts:
-    #     - chart-example.local
+    - hosts:
+        - airbyte.k.shion1305.com
 
 ## @section Webapp Parameters
 
