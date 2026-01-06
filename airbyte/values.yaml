@@ -530,7 +530,7 @@ ingress:
   # -- Set to true to enable ingress record generation
   enabled: true
   # -- Specifies ingressClassName for clusters >= 1.18+
-  className: ""
+  className: "nginx-internal"
   # -- Ingress annotations done as key:value pairs
   annotations:
     {}
