@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: memgator
+  namespace: memgator
+  labels:
+    app: memgator
+spec:
+  type: ClusterIP
+  ports:
+  - port: 1208
+    targetPort: 1208
+    protocol: TCP
+    name: http
+  selector:
+    app: memgator
