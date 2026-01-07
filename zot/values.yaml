@@ -133,6 +133,20 @@ configFiles:
                   "stripPrefix": false
                 }
               ]
+            },
+            {
+              "urls": ["https://ghcr.io"],
+              "onDemand": true,
+              "tlsVerify": true,
+              "maxRetries": 3,
+              "retryDelay": "5m",
+              "content": [
+                {
+                  "prefix": "**",
+                  "destination": "/",
+                  "stripPrefix": false
+                }
+              ]
             }
           ]
         },
