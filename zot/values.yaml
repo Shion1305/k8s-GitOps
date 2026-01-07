@@ -46,16 +46,15 @@ ingress:
     nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
     nginx.ingress.kubernetes.io/proxy-request-buffering: "off"
     nginx.ingress.kubernetes.io/proxy-buffering: "off"
-  className: "nginx"
+  className: "nginx-internal"
   pathtype: ImplementationSpecific
   hosts:
-    - host: registry.k.shion1305.com
+    - host: docker.k.shion1305.com
       paths:
         - path: /
   tls:
-    - secretName: zot-registry-tls
-      hosts:
-        - registry.k.shion1305.com
+    - hosts:
+        - docker.k.shion1305.com
 # By default, Kubernetes HTTP probes use HTTP 'scheme'. So if TLS is enabled
 # in configuration, to prevent failures, the scheme must be set to 'HTTPS'.
 httpGet:
