@@ -138,6 +138,26 @@ configFiles:
             "updateInterval": "2h"
           }
         },
+        "sync": {
+          "enable": true,
+          "credentialsFile": "",
+          "registries": [
+            {
+              "urls": ["https://registry-1.docker.io"],
+              "onDemand": true,
+              "tlsVerify": true,
+              "maxRetries": 3,
+              "retryDelay": "5m",
+              "content": [
+                {
+                  "prefix": "**",
+                  "destination": "/",
+                  "stripPrefix": true
+                }
+              ]
+            }
+          ]
+        },
         "ui": { "enable": true },
         "trust": {
           "enable": true,
