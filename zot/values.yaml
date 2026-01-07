@@ -91,31 +91,10 @@ configFiles:
         "address": "0.0.0.0",
         "port": "5000",
         "realm": "registry.k.shion1305.com",
-        "auth": {
-          "bearer": {
-            "realm": "https://keycloak.k.shion1305.com/realms/registry/protocol/docker-v2/auth",
-            "service": "registry.k.shion1305.com",
-            "cert": "/etc/zot/keycloak-realm-public.crt"
-          }
-        },
         "accessControl": {
           "repositories": {
-            "maze-maze/toku-chan": {
-              "policies": [
-                {
-                  "users": ["**"],
-                  "actions": ["read", "create", "update", "delete"]
-                }
-              ]
-            },
             "**": {
-              "anonymousPolicy": ["read"],
-              "policies": [
-                {
-                  "users": ["**"],
-                  "actions": ["read", "create", "update", "delete"]
-                }
-              ]
+              "anonymousPolicy": ["read"]
             }
           }
         }
@@ -152,7 +131,7 @@ configFiles:
                 {
                   "prefix": "**",
                   "destination": "/",
-                  "stripPrefix": true
+                  "stripPrefix": false
                 }
               ]
             }
@@ -252,16 +231,9 @@ env:
 #      key: username
 
 # Extra Volume Mounts
-extraVolumeMounts:
-  - name: keycloak-realm-public-key
-    mountPath: /etc/zot
-    readOnly: true
+extraVolumeMounts: []
 # Extra Volumes
-extraVolumes:
-  - name: keycloak-realm-public-key
-    configMap:
-      name: keycloak-realm-public-key
-      optional: true
+extraVolumes: []
 # Extra Containers running alongside the main container
 extraContainers: []
 # - name: data
