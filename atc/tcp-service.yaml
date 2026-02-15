@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: atc-postgres-tcp
+  namespace: postgres-operator-deployment
+  annotations:
+    external-dns.alpha.kubernetes.io/hostname: atc.k.shion1305.com
+spec:
+  type: ClusterIP
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: 5432
+      protocol: TCP
+  selector:
+    application: postgresql
+    cluster-name: atc
+    spilo-role: master
