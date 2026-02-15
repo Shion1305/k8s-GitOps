@@ -10,11 +10,11 @@ spec:
     storageClass: longhorn-ssd
   numberOfInstances: 1
   users:
-    atc-db-user:
+    atcuser:
       - superuser
       - createdb
   databases:
-    atc: atc-db-user
+    atc: atcuser
   postgresql:
     version: "17"
   resources:
