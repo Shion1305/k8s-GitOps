@@ -1,0 +1,39 @@
+apiVersion: "acid.zalan.do/v1"
+kind: postgresql
+metadata:
+  name: atc
+  namespace: postgres-operator-deployment
+spec:
+  teamId: "default"
+  volume:
+    size: 400Gi
+    storageClass: longhorn-ssd
+  numberOfInstances: 1
+  users:
+    atc-db-user:
+      - superuser
+      - createdb
+  databases:
+    atc: atc-db-user
+  postgresql:
+    version: "17"
+  resources:
+    requests:
+      cpu: 100m
+      memory: 1Gi
+    limits:
+      cpu: 2000m
+      memory: 4Gi
+  patroni:
+    pg_hba:
+      - local all all trust
+      - host all all 0.0.0.0/0 md5
+      - hostssl all all 0.0.0.0/0 md5
+  nodeAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: kubernetes.io/hostname
+              operator: In
+              values:
+                - shion-ubuntu-2505
