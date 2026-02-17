@@ -28,6 +28,10 @@ ingress:
 # MongoDB bundled dependency
 mongodb:
   enabled: true
+  image:
+    registry: docker.io
+    repository: bitnamilegacy/mongodb
+    tag: 8.0.13-debian-12-r0
   auth:
     enabled: true
     usernames:
@@ -37,6 +41,15 @@ mongodb:
     existingSecret: librechat-credentials
   persistence:
     storageClass: "longhorn-hdd"
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+          - matchExpressions:
+              - key: kubernetes.io/hostname
+                operator: In
+                values:
+                  - shion-ubuntu-2505
 
 # Meilisearch bundled dependency
 meilisearch:
