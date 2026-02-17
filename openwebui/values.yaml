@@ -25,7 +25,7 @@ extraEnvVars:
       "spec_type":"url","path":"openapi.json","auth_type":"none","key":"",
       "config":{}}]
   - name: ENABLE_SIGNUP
-    value: "True"
+    value: "False"
 
 # Disable chart-managed ingress; we manage our own
 ingress:
