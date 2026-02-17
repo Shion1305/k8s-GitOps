@@ -9,6 +9,15 @@ spec:
       app: mcpo
   policyTypes: ["Egress"]
   egress:
+    # Allow DNS resolution via kube-dns
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53
+    # Allow egress to postgres-mcp in atc namespace
     - to:
         - podSelector:
             matchLabels:
