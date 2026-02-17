@@ -6,7 +6,8 @@ librechat:
   configEnv:
     DOMAIN_CLIENT: "https://librechat.k.shion1305.com"
     DOMAIN_SERVER: "https://librechat.k.shion1305.com"
-    ALLOW_REGISTRATION: "true"
+    ALLOW_REGISTRATION: "false"
+    ALLOW_SOCIAL_REGISTRATION: "false"
     ALLOW_EMAIL_LOGIN: "true"
 
   configYamlContent: |
@@ -28,9 +29,12 @@ ingress:
 mongodb:
   enabled: true
   auth:
-    enabled: false
-  databases:
-    - LibreChat
+    enabled: true
+    usernames:
+      - shion1305
+    databases:
+      - LibreChat
+    existingSecret: librechat-credentials
   persistence:
     storageClass: "longhorn-hdd"
 
