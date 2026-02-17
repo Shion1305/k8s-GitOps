@@ -15,7 +15,7 @@ spec:
               app: postgres-mcp
           namespaceSelector:
             matchLabels:
-              name: atc # MCP is in 'atc' namespace
+              kubernetes.io/metadata.name: atc # MCP is in 'atc' namespace
       ports:
         - protocol: TCP
           port: 8080
