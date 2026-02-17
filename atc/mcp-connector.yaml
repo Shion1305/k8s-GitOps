@@ -15,10 +15,12 @@ spec:
     spec:
       containers:
         - name: postgres-mcp
-          image: crystaldba/mcp-postgres:latest
-          imagePullPolicy: IfNotPresent
+          image: crystaldba/postgres-mcp:latest
+          imagePullPolicy: Always
+          args:
+            - "--transport=sse"
           ports:
-            - containerPort: 8080
+            - containerPort: 8000
               name: http
           env:
             - name: DATABASE_URI
@@ -26,18 +28,6 @@ spec:
                 secretKeyRef:
                   name: atc-database-secret
                   key: ATC_DATABASE_URL
-          readinessProbe:
-            httpGet:
-              path: /health
-              port: http
-            initialDelaySeconds: 8
-            periodSeconds: 10
-          livenessProbe:
-            httpGet:
-              path: /health
-              port: http
-            initialDelaySeconds: 20
-            periodSeconds: 20
           resources:
             requests:
               cpu: "100m"
@@ -57,5 +47,5 @@ spec:
     app: postgres-mcp
   ports:
     - name: http
-      port: 8080
+      port: 8000
       targetPort: http
