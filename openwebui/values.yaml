@@ -1,0 +1,57 @@
+# Disable bundled Ollama (no local LLM)
+ollama:
+  enabled: false
+
+# Disable pipelines
+pipelines:
+  enabled: false
+
+# OpenAI API - key pulled from existing secret via extraEnvVars
+openaiBaseApiUrl: "https://api.openai.com/v1"
+openaiApiKey: ""
+
+extraEnvVars:
+  - name: OPENAI_API_KEY
+    valueFrom:
+      secretKeyRef:
+        name: openwebui-credentials
+        key: OPENAI_API_KEY
+  # mcpo OpenAPI tool server (MCP-to-OpenAPI proxy for postgres-mcp)
+  # This connection is pre-configured via TOOL_SERVER_CONNECTIONS and will
+  # appear automatically under Admin Panel -> Settings -> Tools
+  - name: TOOL_SERVER_CONNECTIONS
+    value: >-
+      [{"type":"openapi","url":"http://mcpo.openwebui.svc.cluster.local:8000",
+      "spec_type":"url","path":"openapi.json","auth_type":"none","key":"",
+      "config":{}}]
+  - name: ENABLE_SIGNUP
+    value: "True"
+
+# Disable chart-managed ingress; we manage our own
+ingress:
+  enabled: false
+
+# Persistence
+persistence:
+  enabled: true
+  size: 50Gi
+  storageClass: "longhorn-hdd"
+
+# Pin to Longhorn node
+affinity:
+  nodeAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: kubernetes.io/hostname
+              operator: In
+              values:
+                - shion-ubuntu-2505
+
+resources:
+  requests:
+    cpu: "200m"
+    memory: "512Mi"
+  limits:
+    cpu: "1000m"
+    memory: "1Gi"
