@@ -31,13 +31,15 @@ mongodb:
     enabled: false
   databases:
     - LibreChat
+  persistence:
+    storageClass: "longhorn-hdd"
 
 # Meilisearch bundled dependency
 meilisearch:
   enabled: true
   persistence:
     enabled: true
-    storageClass: "longhorn"
+    storageClass: "longhorn-hdd"
 
 resources:
   requests:

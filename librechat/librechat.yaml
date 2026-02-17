@@ -1,0 +1,11 @@
+# Minimal fragment; merge into your full librechat.yaml
+mcpSettings:
+  # tighten based on your org policy as needed
+  # e.g., allowed domains/cidrs if your LibreChat build supports it
+  enabled: true
+
+mcpServers:
+  postgres:
+    type: streamable-http
+    url: "http://postgres-mcp.atc.svc.cluster.local:8080/mcp"
+    timeout: 60000
