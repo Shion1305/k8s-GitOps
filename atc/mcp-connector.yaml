@@ -15,13 +15,13 @@ spec:
     spec:
       containers:
         - name: postgres-mcp
-          image: mochoa/mcp-postgres:latest
+          image: crystaldba/mcp-postgres:latest
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8080
               name: http
           env:
-            - name: DATABASE_URL
+            - name: DATABASE_URI
               valueFrom:
                 secretKeyRef:
                   name: atc-database-secret
