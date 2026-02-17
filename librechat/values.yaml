@@ -15,6 +15,10 @@ librechat:
 
     cache: true
 
+    mcpSettings:
+      allowedDomains:
+        - "postgres-mcp.atc.svc.cluster.local"
+
     mcpServers:
       postgres:
         type: streamable-http
