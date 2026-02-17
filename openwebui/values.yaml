@@ -20,12 +20,11 @@ extraEnvVars:
   # This connection is pre-configured via TOOL_SERVER_CONNECTIONS and will
   # appear automatically under Admin Panel -> Settings -> Tools
   - name: TOOL_SERVER_CONNECTIONS
-    value: >-
-      [{"type":"openapi","url":"http://mcpo.openwebui.svc.cluster.local:8000",
-      "spec_type":"url","path":"openapi.json","auth_type":"none","key":"",
-      "config":{}}]
+    value: '[{"type":"openapi","url":"http://mcpo.openwebui.svc.cluster.local:8000/postgres","spec_type":"url","path":"openapi.json","auth_type":"none","key":"","config":{}}]'
   - name: ENABLE_SIGNUP
     value: "False"
+  - name: ENABLE_TOOLS_BY_DEFAULT
+    value: "true"
 
 # Disable chart-managed ingress; we manage our own
 ingress:
