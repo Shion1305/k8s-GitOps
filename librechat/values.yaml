@@ -1,0 +1,54 @@
+global:
+  librechat:
+    existingSecretName: "librechat-credentials"
+
+librechat:
+  configEnv:
+    DOMAIN_CLIENT: "https://librechat.k.shion1305.com"
+    DOMAIN_SERVER: "https://librechat.k.shion1305.com"
+    ALLOW_REGISTRATION: "false"
+    ALLOW_SOCIAL_REGISTRATION: "false"
+    ALLOW_EMAIL_LOGIN: "true"
+
+  configYamlContent: |
+    version: 1.2.1
+
+    cache: true
+
+    mcpServers:
+      postgres:
+        type: streamable-http
+        url: "http://postgres-mcp.atc.svc.cluster.local:8080/mcp"
+        timeout: 60000
+
+# Disable chart-managed ingress; we manage our own
+ingress:
+  enabled: false
+
+# MongoDB bundled dependency
+mongodb:
+  enabled: true
+  auth:
+    enabled: true
+    usernames:
+      - shion1305
+    databases:
+      - LibreChat
+    existingSecret: librechat-credentials
+  persistence:
+    storageClass: "longhorn-hdd"
+
+# Meilisearch bundled dependency
+meilisearch:
+  enabled: true
+  persistence:
+    enabled: true
+    storageClass: "longhorn-hdd"
+
+resources:
+  requests:
+    cpu: "200m"
+    memory: "512Mi"
+  limits:
+    cpu: "1000m"
+    memory: "1Gi"
