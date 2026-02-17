@@ -1,0 +1,21 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-librechat-to-mcp
+  namespace: librechat
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: librechat-librechat
+  policyTypes: ["Egress"]
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: postgres-mcp
+          namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: atc # MCP is in 'atc' namespace
+      ports:
+        - protocol: TCP
+          port: 8080
