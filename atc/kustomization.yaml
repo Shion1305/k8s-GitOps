@@ -5,3 +5,5 @@ resources:
   - postgres-cluster.yaml
   - tcp-service.yaml
   - ws-stream-deployment.yaml
+  - mcp-connector.yaml
+  - network-policy-mcp-to-postgres.yaml

@@ -1,0 +1,61 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres-mcp
+  namespace: atc
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres-mcp
+  template:
+    metadata:
+      labels:
+        app: postgres-mcp
+    spec:
+      containers:
+        - name: postgres-mcp
+          image: mochoa/mcp-postgres:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+              name: http
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: atc-database-secret
+                  key: ATC_DATABASE_URL
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 8
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-mcp
+  namespace: atc
+spec:
+  type: ClusterIP
+  selector:
+    app: postgres-mcp
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http

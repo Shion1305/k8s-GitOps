@@ -1,0 +1,18 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-mcp-to-atc-postgres
+  namespace: atc
+spec:
+  podSelector:
+    matchLabels:
+      app: postgres-mcp
+  policyTypes: ["Egress"]
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: postgres-operator-deployment
+      ports:
+        - protocol: TCP
+          port: 5432
