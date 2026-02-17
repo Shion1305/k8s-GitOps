@@ -41,6 +41,8 @@ mongodb:
 # Meilisearch bundled dependency
 meilisearch:
   enabled: true
+  auth:
+    existingMasterKeySecret: "librechat-credentials"
   persistence:
     enabled: true
     storageClass: "longhorn-hdd"
