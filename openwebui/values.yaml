@@ -17,10 +17,13 @@ extraEnvVars:
         name: openwebui-credentials
         key: OPENAI_API_KEY
   # mcpo OpenAPI tool server (MCP-to-OpenAPI proxy for postgres-mcp)
-  # After deploy, register http://mcpo.openwebui.svc.cluster.local:8000 in
-  # Admin Panel -> Settings -> Tools
+  # This connection is pre-configured via TOOL_SERVER_CONNECTIONS and will
+  # appear automatically under Admin Panel -> Settings -> Tools
   - name: TOOL_SERVER_CONNECTIONS
-    value: '[{"type":"openapi","url":"http://mcpo.openwebui.svc.cluster.local:8000","spec_type":"url","path":"openapi.json","auth_type":"none","key":"","config":{}}]'
+    value: >-
+      [{"type":"openapi","url":"http://mcpo.openwebui.svc.cluster.local:8000",
+      "spec_type":"url","path":"openapi.json","auth_type":"none","key":"",
+      "config":{}}]
   - name: ENABLE_SIGNUP
     value: "True"
 
