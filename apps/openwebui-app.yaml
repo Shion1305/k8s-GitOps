@@ -1,0 +1,30 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: openwebui
+  namespace: argocd
+spec:
+  project: default
+  sources:
+    - repoURL: https://helm.openwebui.com/
+      chart: open-webui
+      targetRevision: 12.3.0
+      helm:
+        valueFiles:
+          - $values/openwebui/values.yaml
+    - repoURL: https://github.com/Shion1305/k8s-GitOps.git
+      targetRevision: HEAD
+      ref: values
+    - repoURL: https://github.com/Shion1305/k8s-GitOps.git
+      targetRevision: HEAD
+      path: openwebui
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: openwebui
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
