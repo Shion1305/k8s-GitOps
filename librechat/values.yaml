@@ -21,8 +21,8 @@ librechat:
 
     mcpServers:
       postgres:
-        type: streamable-http
-        url: "http://postgres-mcp.atc.svc.cluster.local:8080/mcp"
+        type: sse
+        url: "http://postgres-mcp.atc.svc.cluster.local:8000/sse"
         timeout: 60000
 
 # Disable chart-managed ingress; we manage our own

@@ -18,4 +18,4 @@ spec:
               kubernetes.io/metadata.name: atc # MCP is in 'atc' namespace
       ports:
         - protocol: TCP
-          port: 8080
+          port: 8000
