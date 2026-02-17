@@ -19,9 +19,9 @@ spec:
           imagePullPolicy: Always
           args:
             - "--port=8000"
-            - "--server-type=sse"
+            - "--server-type=streamable-http"
             - "--"
-            - "http://postgres-mcp.atc.svc.cluster.local:8000/sse"
+            - "http://postgres-mcp.atc.svc.cluster.local:8000/mcp"
           ports:
             - containerPort: 8000
               name: http
