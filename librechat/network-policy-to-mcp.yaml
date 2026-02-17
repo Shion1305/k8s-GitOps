@@ -9,13 +9,22 @@ spec:
       app.kubernetes.io/name: librechat-librechat
   policyTypes: ["Egress"]
   egress:
+    # Allow DNS resolution via kube-dns
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53
+    # Allow egress to postgres-mcp in atc namespace
     - to:
         - podSelector:
             matchLabels:
               app: postgres-mcp
           namespaceSelector:
             matchLabels:
-              kubernetes.io/metadata.name: atc # MCP is in 'atc' namespace
+              kubernetes.io/metadata.name: atc
       ports:
         - protocol: TCP
           port: 8000
