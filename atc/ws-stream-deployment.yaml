@@ -1,0 +1,33 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ws-stream
+  namespace: atc
+  labels:
+    app: ws-stream
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ws-stream
+  template:
+    metadata:
+      labels:
+        app: ws-stream
+    spec:
+      containers:
+      - name: ws-stream
+        image: ghcr.io/shion1305/crypto-auto-trading/ws-stream:sha-fe5b6ed
+        env:
+        - name: ATC_DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: atc-database-secret
+              key: ATC_DATABASE_URL
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "10m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
