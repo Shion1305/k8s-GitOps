@@ -63,15 +63,15 @@ langfuse:
         cpu: 1000m
         memory: 1Gi
 
-# PostgreSQL - use external PostgreSQL managed by postgres-operator
+# PostgreSQL - use shared postgres instance managed by postgres-operator
 postgresql:
   deploy: false
-  host: "langfuse.postgres-operator-deployment.svc.cluster.local"
+  host: "postgres-shared.postgres-operator-deployment.svc.cluster.local"
   port: 5432
   auth:
     username: "langfuse"
     database: "langfuse"
-    existingSecret: "langfuse-credentials"
+    existingSecret: "langfuse-db-credentials"
     secretKeys:
       userPasswordKey: "DB_PASSWORD"
 

@@ -1,0 +1,21 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: shared-postgres
+  namespace: argocd
+spec:
+  project: default
+  destination:
+    namespace: postgres-operator-deployment
+    server: https://kubernetes.default.svc
+  source:
+    repoURL: https://github.com/Shion1305/k8s-GitOps.git
+    targetRevision: HEAD
+    path: postgres-shared
+  syncPolicy:
+    automated:
+      selfHeal: true
+      prune: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true

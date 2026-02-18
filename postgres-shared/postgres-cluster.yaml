@@ -1,20 +1,22 @@
 apiVersion: "acid.zalan.do/v1"
 kind: postgresql
 metadata:
-  name: langfuse
+  name: postgres-shared
   namespace: postgres-operator-deployment
 spec:
   teamId: "default"
   volume:
-    size: 20Gi
+    size: 1Ti
     storageClass: longhorn-ssd
   numberOfInstances: 1
   users:
-    langfuse:
-      - superuser
-      - createdb
+    openwebui: []
+    langfuse: []
+    keycloak: []
   databases:
+    openwebui: openwebui
     langfuse: langfuse
+    keycloak: keycloak
   postgresql:
     version: "17"
   resources:
