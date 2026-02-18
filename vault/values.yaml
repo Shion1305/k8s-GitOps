@@ -48,6 +48,15 @@ server:
     - mountPath: /vault/userconfig/vault-tls
       name: vault-tls
       readOnly: true
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+          - matchExpressions:
+              - key: kubernetes.io/hostname
+                operator: In
+                values:
+                  - shion-ubuntu-2505
   standalone:
     enabled: false
   ha:
@@ -60,12 +69,12 @@ server:
   dataStorage:
     enabled: true
     size: 10Gi
-    storageClass: null
+    storageClass: longhorn-ssd
     accessMode: ReadWriteOnce
   auditStorage:
     enabled: true
     size: 10Gi
-    storageClass: null
+    storageClass: longhorn-ssd
     accessMode: ReadWriteOnce
 ui:
   enabled: true
