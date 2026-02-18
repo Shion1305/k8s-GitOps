@@ -7,7 +7,7 @@ spec:
   instances: 1
   db:
     vendor: postgres
-    host: keycloak.postgres-operator-deployment.svc.cluster.local
+    host: postgres-shared.postgres-operator-deployment.svc.cluster.local
     port: 5432
     database: keycloak
     usernameSecret:

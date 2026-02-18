@@ -25,6 +25,25 @@ extraEnvVars:
     value: "False"
   - name: ENABLE_TOOLS_BY_DEFAULT
     value: "true"
+  # PostgreSQL database configuration (postgres-shared instance)
+  - name: DATABASE_TYPE
+    value: "postgresql"
+  - name: DATABASE_HOST
+    value: "postgres-shared.postgres-operator-deployment.svc.cluster.local"
+  - name: DATABASE_PORT
+    value: "5432"
+  - name: DATABASE_NAME
+    value: "openwebui"
+  - name: DATABASE_USER
+    valueFrom:
+      secretKeyRef:
+        name: openwebui-db-credentials
+        key: DB_USER
+  - name: DATABASE_PASSWORD
+    valueFrom:
+      secretKeyRef:
+        name: openwebui-db-credentials
+        key: DB_PASSWORD
 
 # Disable chart-managed ingress; we manage our own
 ingress:
