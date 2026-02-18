@@ -6,12 +6,12 @@ metadata:
   annotations:
     nginx.ingress.kubernetes.io/ssl-redirect: "true"
 spec:
-  ingressClassName: nginx-internal
+  ingressClassName: nginx-ssl
   tls:
     - hosts:
-        - openwebui.k.shion1305.com
+        - chat.k.shion1305.com
   rules:
-    - host: openwebui.k.shion1305.com
+    - host: chat.k.shion1305.com
       http:
         paths:
           - path: /
