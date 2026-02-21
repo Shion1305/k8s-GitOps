@@ -16,7 +16,7 @@ spec:
       restartPolicy: OnFailure
       containers:
         - name: cert-sync
-          image: curlimages/curl:8.17.0
+          image: curlimages/curl:8.18.0
           command:
             - /bin/sh
             - -c
