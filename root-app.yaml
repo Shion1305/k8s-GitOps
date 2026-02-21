@@ -10,6 +10,8 @@ spec:
     repoURL: https://github.com/Shion1305/k8s-GitOps.git
     targetRevision: HEAD
     path: apps
+    directory:
+      exclude: 'archived/*'
   destination:
     server: https://kubernetes.default.svc
     namespace: argocd
