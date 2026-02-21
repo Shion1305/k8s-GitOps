@@ -43,7 +43,7 @@ renovate:
       "onboarding": false,
       "requireConfig": "required",
       "gitAuthor": "Automation by Shion1305 <bot@github.shion.pro>",
-      "username": "Renovate by Shion1305[bot]",
+      "username": "renovate-by-shion1305[bot]",
       "repositories": [],
       "ignorePaths": [],
       "enabledManagers": [
