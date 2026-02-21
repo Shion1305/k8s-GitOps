@@ -6,7 +6,7 @@ injector:
 server:
   image:
     repository: hashicorp/vault
-    tag: 1.20.1
+    tag: 1.21.3
   resources:
     requests:
       memory: 256Mi
