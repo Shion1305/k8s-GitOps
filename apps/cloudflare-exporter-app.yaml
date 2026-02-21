@@ -17,7 +17,7 @@ spec:
     # Grafana for Cloudflare
     - repoURL: https://grafana.github.io/helm-charts
       chart: grafana
-      targetRevision: 10.4.3
+      targetRevision: 10.5.15
       helm:
         releaseName: cloudflare-grafana
         valueFiles:
