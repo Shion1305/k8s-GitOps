@@ -2542,7 +2542,7 @@ keycloak:
 
   initContainers:
     initDb:
-      image: "postgres:13-alpine"
+      image: "postgres:18-alpine"
 
   initContainerSecurityContext:
     allowPrivilegeEscalation: false
