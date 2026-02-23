@@ -7,9 +7,10 @@ data:
   run-renovate.sh: |
     #!/bin/bash
     set -e
-    export RENOVATE_AUTODISCOVER="false"
-    echo "Running Renovate against Shion1305/k8s-GitOps only for testing..."
-    exec /scripts/run-renovate-core.sh Shion1305/k8s-GitOps
+    exec /scripts/run-renovate-core.sh
+    # export RENOVATE_AUTODISCOVER="false"
+    # echo "Running Renovate against Shion1305/k8s-GitOps only for testing..."
+    # exec /scripts/run-renovate-core.sh Shion1305/k8s-GitOps
 
   run-renovate-core.sh: |
     #!/bin/bash
