@@ -9,7 +9,10 @@
   "prConcurrentLimit": 5,
   "prHourlyLimit": 2,
   "timezone": "Asia/Tokyo",
-  "labels": ["dependencies", "renovate"],
+  "labels": [
+    "dependencies",
+    "renovate"
+  ],
   "commitMessagePrefix": "chore(deps):",
   "commitMessageAction": "update",
   "commitMessageTopic": "{{depName}}",
@@ -17,42 +20,70 @@
   "packageRules": [
     {
       "description": "Schedule ArgoCD Application Helm chart updates",
-      "matchManagers": ["argocd"],
-      "matchFileNames": ["apps/**/*.yaml"],
+      "matchManagers": [
+        "argocd"
+      ],
+      "matchFileNames": [
+        "apps/**/*.yaml"
+      ],
       "automerge": false,
-      "schedule": ["before 6am on Monday"]
+      "schedule": [
+        "before 6am on Monday"
+      ]
     },
     {
       "description": "Schedule Helm chart updates in ArgoCD Applications",
-      "matchDatasources": ["helm"],
-      "matchFileNames": ["apps/**/*.yaml"],
+      "matchDatasources": [
+        "helm"
+      ],
+      "matchFileNames": [
+        "apps/**/*.yaml"
+      ],
       "automerge": false,
-      "schedule": ["before 6am on Monday"]
+      "schedule": [
+        "before 6am on Monday"
+      ]
     },
     {
       "description": "Docker image updates",
-      "matchDatasources": ["docker"],
+      "matchDatasources": [
+        "docker"
+      ],
       "automerge": false,
-      "schedule": ["before 6am on Monday"]
+      "schedule": [
+        "before 6am on Monday"
+      ]
     },
     {
       "description": "Major updates",
-      "matchUpdateTypes": ["major"],
+      "matchUpdateTypes": [
+        "major"
+      ],
       "automerge": false,
-      "labels": ["dependencies", "renovate", "major"]
+      "labels": [
+        "dependencies",
+        "renovate",
+        "major"
+      ]
     }
   ],
   "argocd": {
-    "fileMatch": ["apps/.*\\.yaml$"]
+    "managerFilePatterns": [
+      "/apps/.*\\.yaml$/"
+    ]
   },
   "kubernetes": {
-    "fileMatch": ["\\.yaml$"]
+    "managerFilePatterns": [
+      "/\\.yaml$/"
+    ]
   },
   "customManagers": [
     {
       "customType": "regex",
       "description": "Update Helm chart versions in ArgoCD Applications",
-      "fileMatch": ["apps/.*\\.yaml$"],
+      "managerFilePatterns": [
+        "/apps/.*\\.yaml$/"
+      ],
       "matchStrings": [
         "repoURL:\\s+(?<registryUrl>https?://[^\\n]+)\\n\\s+chart:\\s+(?<depName>[^\\n]+)\\n\\s+targetRevision:\\s+(?<currentValue>[^\\s#]+)"
       ],
@@ -61,7 +92,9 @@
     {
       "customType": "regex",
       "description": "Update Docker images with specific tags",
-      "fileMatch": ["\\.yaml$"],
+      "managerFilePatterns": [
+        "/\\.yaml$/"
+      ],
       "matchStrings": [
         "image:\\s+(?<depName>[^:\\s]+):(?<currentValue>[^\\s]+)"
       ],
