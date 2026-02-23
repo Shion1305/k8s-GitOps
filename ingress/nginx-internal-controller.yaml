@@ -89,9 +89,8 @@ metadata:
   namespace: ingress-nginx
 data:
   # IP whitelist for internal network
-  # Only allow access from 10.0.0.0/24 subnet (internal network)
   # External users will be blocked even if they somehow reach this controller
-  whitelist-source-range: "10.0.0.0/24"
+  whitelist-source-range: "10.130.5.0/24"
   # Allow snippet annotations for custom configurations
   allow-snippet-annotations: "true"
   annotations-risk-level: "Critical"
