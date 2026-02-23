@@ -40,7 +40,7 @@ renovate:
       "platform": "github",
       "autodiscover": true,
       "autodiscoverFilter": ["Shion1305/*", "*/*"],
-      "onboarding": false,
+      "onboarding": true,
       "requireConfig": "required",
       "gitAuthor": "Automation by Shion1305 <bot@github.shion.pro>",
       "username": "renovate-by-shion1305[bot]",
