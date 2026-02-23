@@ -41,6 +41,10 @@ server:
                 operator: In
                 values:
                   - shion-ubuntu-2505
+  extraSecretEnvironmentVars:
+    - envName: VAULT_TRANSIT_TOKEN
+      secretName: vault-transit-token
+      secretKey: token
   standalone:
     enabled: false
   ha:
@@ -49,7 +53,40 @@ server:
     raft:
       enabled: true
       setNodeId: true
-      config: "ui = true\n\nlistener \"tcp\" {\n  tls_disable = true\n  address = \"[::]:8200\"\n  cluster_address = \"[::]:8201\"\n}\n\nstorage \"raft\" {\n  path = \"/vault/data\"\n  \n  retry_join {\n    leader_api_addr = \"http://vault-0.vault-internal:8200\"\n  }\n  \n  retry_join {\n    leader_api_addr = \"http://vault-1.vault-internal:8200\"\n  }\n  \n  retry_join {\n    leader_api_addr = \"http://vault-2.vault-internal:8200\"\n  }\n}\n\nservice_registration \"kubernetes\" {}\n"
+      config: |
+        ui = true
+
+        listener "tcp" {
+          tls_disable = true
+          address = "[::]:8200"
+          cluster_address = "[::]:8201"
+        }
+
+        seal "transit" {
+          address = "http://vault-active.vault.svc.cluster.local:8200"
+          disable_renewal = "false"
+          key_name = "autounseal"
+          mount_path = "transit/"
+          token = "$VAULT_TRANSIT_TOKEN"
+        }
+
+        storage "raft" {
+          path = "/vault/data"
+
+          retry_join {
+            leader_api_addr = "http://vault-0.vault-internal:8200"
+          }
+
+          retry_join {
+            leader_api_addr = "http://vault-1.vault-internal:8200"
+          }
+
+          retry_join {
+            leader_api_addr = "http://vault-2.vault-internal:8200"
+          }
+        }
+
+        service_registration "kubernetes" {}
   dataStorage:
     enabled: true
     size: 10Gi
