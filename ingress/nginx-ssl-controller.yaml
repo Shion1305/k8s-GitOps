@@ -125,6 +125,8 @@ data:
   annotations-risk-level: "Critical"
   ssl-redirect: "true"
   force-ssl-redirect: "true"
+  # Bind only to the public-facing Ethernet interface IP
+  bind-address: "10.0.0.20"
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole

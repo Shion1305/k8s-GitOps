@@ -49,6 +49,8 @@ spec:
             - --v=2
             - --enable-ssl-passthrough=false
           env:
+            - name: HOST_IP
+              valueFrom: {fieldRef: {fieldPath: status.hostIP}}
             - name: POD_NAME
               valueFrom: {fieldRef: {fieldPath: metadata.name}}
             - name: POD_NAMESPACE
@@ -96,6 +98,8 @@ data:
   # Force SSL redirect for HTTPS
   ssl-redirect: "true"
   force-ssl-redirect: "true"
+  # Bind only to the specified dynamic host IP
+  bind-address: $(HOST_IP)
 ---
 apiVersion: v1
 kind: ConfigMap
