@@ -9,8 +9,8 @@ prometheus:
   enabled: true
   prometheusSpec:
     # Retention settings
-    retention: 30d
-    retentionSize: 15GB
+    retention: 999d # High value to allow size to be the primary retention factor
+    retentionSize: 340GB # About ~85% of total capacity for safety margin
     # Storage configuration
     storageSpec:
       volumeClaimTemplate:
@@ -19,7 +19,7 @@ prometheus:
           accessModes: ["ReadWriteOnce"]
           resources:
             requests:
-              storage: 200Gi
+              storage: 400Gi
     # Service discovery settings - discover all ServiceMonitors
     serviceMonitorSelectorNilUsesHelmValues: false
     serviceMonitorNamespaceSelector: {}
@@ -167,6 +167,8 @@ alertmanager:
       requests:
         cpu: 50m
         memory: 128Mi
+    nodeSelector:
+      kubernetes.io/hostname: shion-ubuntu-2505
 # Node Exporter (disabled since we're deploying it separately)
 nodeExporter:
   enabled: false
