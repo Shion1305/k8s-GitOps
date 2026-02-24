@@ -41,10 +41,6 @@ server:
                 operator: In
                 values:
                   - shion-ubuntu-2505
-  extraSecretEnvironmentVars:
-    - envName: VAULT_TOKEN
-      secretName: vault-transit-token
-      secretKey: token
   standalone:
     enabled: false
   ha:
@@ -60,13 +56,6 @@ server:
           tls_disable = true
           address = "[::]:8200"
           cluster_address = "[::]:8201"
-        }
-
-        seal "transit" {
-          address = "http://vault-active.vault.svc.cluster.local:8200"
-          disable_renewal = "false"
-          key_name = "autounseal"
-          mount_path = "transit/"
         }
 
         storage "raft" {
