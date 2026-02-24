@@ -42,7 +42,7 @@ server:
                 values:
                   - shion-ubuntu-2505
   extraSecretEnvironmentVars:
-    - envName: VAULT_TRANSIT_TOKEN
+    - envName: VAULT_TOKEN
       secretName: vault-transit-token
       secretKey: token
   standalone:
@@ -67,7 +67,6 @@ server:
           disable_renewal = "false"
           key_name = "autounseal"
           mount_path = "transit/"
-          token = "$VAULT_TRANSIT_TOKEN"
         }
 
         storage "raft" {
