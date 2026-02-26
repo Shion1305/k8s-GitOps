@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
       - name: ws-stream
-        image: ghcr.io/shion1305/crypto-auto-trading/ws-stream:sha-526c904
+        image: ghcr.io/shion1305/crypto-auto-trading/ws-stream:sha-5a90c34
         env:
         - name: ATC_DATABASE_URL
           valueFrom:
