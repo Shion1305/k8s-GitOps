@@ -1,0 +1,23 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-datasources-template
+  namespace: atc
+data:
+  datasources.yaml: |
+    apiVersion: 1
+    datasources:
+      - name: atc-postgres
+        type: postgres
+        access: proxy
+        url: "${GRAFANA_PG_HOST}"
+        user: "${GRAFANA_PG_USER}"
+        database: "${GRAFANA_PG_DB}"
+        secureJsonData:
+          password: "${GRAFANA_PG_PASSWORD}"
+        jsonData:
+          sslmode: 'require'
+          maxOpenConns: 100
+          maxIdleConns: 100
+          maxIdleConnsMaxLifetime: 14400
+          postgresVersion: 1700

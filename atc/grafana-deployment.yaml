@@ -1,0 +1,90 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grafana
+  namespace: atc
+  labels:
+    app: grafana
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: grafana
+  template:
+    metadata:
+      labels:
+        app: grafana
+    spec:
+      initContainers:
+        - name: parse-db-url
+          image: busybox:1.36
+          env:
+            - name: ATC_DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: atc-database-secret
+                  key: ATC_DATABASE_URL
+          command:
+            - /bin/sh
+            - -c
+            - |
+              # Parse the URL: postgresql://user:password@host:port/database?sslmode=require
+              # Strip postgresql://
+              URL_NO_PROTO=$(echo "$ATC_DATABASE_URL" | sed 's|^postgresql://||')
+              
+              # Extract user:password
+              CREDENTIALS=$(echo "$URL_NO_PROTO" | cut -d@ -f1)
+              GRAFANA_PG_USER=$(echo "$CREDENTIALS" | cut -d: -f1)
+              GRAFANA_PG_PASSWORD=$(echo "$CREDENTIALS" | cut -d: -f2)
+              
+              # Extract host:port/database?sslmode=require
+              REMAINDER=$(echo "$URL_NO_PROTO" | cut -d@ -f2)
+              GRAFANA_PG_HOST=$(echo "$REMAINDER" | cut -d/ -f1)
+              
+              # Extract database
+              DB_AND_ARGS=$(echo "$REMAINDER" | cut -d/ -f2)
+              GRAFANA_PG_DB=$(echo "$DB_AND_ARGS" | cut -d? -f1)
+              
+              # Replace variables in the template using envsubst-like behavior with sed
+              sed -e "s|\${GRAFANA_PG_HOST}|$GRAFANA_PG_HOST|g" \
+                  -e "s|\${GRAFANA_PG_USER}|$GRAFANA_PG_USER|g" \
+                  -e "s|\${GRAFANA_PG_DB}|$GRAFANA_PG_DB|g" \
+                  -e "s|\${GRAFANA_PG_PASSWORD}|$GRAFANA_PG_PASSWORD|g" \
+                  /etc/grafana-template/datasources.yaml > /etc/grafana/provisioning/datasources/datasources.yaml
+              
+              echo "Datasources provisioning configuration generated successfully!"
+          volumeMounts:
+            - name: grafana-provisioning
+              mountPath: /etc/grafana/provisioning/datasources
+            - name: template-volume
+              mountPath: /etc/grafana-template
+      containers:
+        - name: grafana
+          image: grafana/grafana:11.5.2
+          ports:
+            - containerPort: 3000
+              name: http
+          env:
+            - name: GF_AUTH_ANONYMOUS_ENABLED
+              value: "false"
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          volumeMounts:
+            - name: grafana-provisioning
+              mountPath: /etc/grafana/provisioning/datasources
+              readOnly: true
+            - name: grafana-storage
+              mountPath: /var/lib/grafana
+      volumes:
+        - name: grafana-provisioning
+          emptyDir: {}
+        - name: template-volume
+          configMap:
+            name: grafana-datasources-template
+        - name: grafana-storage
+          emptyDir: {}
