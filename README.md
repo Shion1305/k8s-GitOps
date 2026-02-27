@@ -17,6 +17,7 @@ This repository implements a comprehensive GitOps workflow for Kubernetes using 
 ### Monitoring & Observability
 
 - **Grafana** - Monitoring dashboards and visualization
+- **Prometheus** - Metrics collection and alerting
 - **Node Exporter** - System metrics collection
 
 ### Infrastructure

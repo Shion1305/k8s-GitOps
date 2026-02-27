@@ -176,7 +176,9 @@ Two ingress classes are configured:
    - Used by: ArgoCD, Grafana, Keycloak, Vault, Zot
    - Configuration: `ingress/nginx-ssl-controller.yaml`
 
-2. Standard ingress for internal services
+2. **nginx-internal**: Internal-only ingress with TLS and IP whitelist
+   - Used by: Longhorn, Airbyte, LibreChat, ATC Grafana, ATC Prometheus
+   - Configuration: `ingress/nginx-internal-controller.yaml`
 
 Example ingress pattern:
 
@@ -198,6 +200,11 @@ Each application directory typically contains:
 - `kustomization.yaml`: Kustomize configuration for additional resources
 - Additional manifests: ingress, secrets, jobs, custom resources
 - `README.md`: Application-specific documentation (when present)
+
+## Documentation Responsibility
+
+- **Repository-level documents** (`README.md`, `CLAUDE.md`, `MONITORING.md`): Must remain generic and describe cluster-wide infrastructure, patterns, and conventions. Do not add service-specific details here.
+- **Service-level documents** (`<service-dir>/README.md`): Each service directory should contain its own `README.md` with service-specific details such as endpoints, credentials, architecture, and usage instructions.
 
 ## Common Troubleshooting Patterns
 
