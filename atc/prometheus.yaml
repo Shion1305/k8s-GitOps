@@ -1,0 +1,93 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: prometheus
+  namespace: atc
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: prometheus-atc
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: kube-prometheus-stack-prometheus
+subjects:
+  - kind: ServiceAccount
+    name: prometheus
+    namespace: atc
+---
+apiVersion: monitoring.coreos.com/v1
+kind: Prometheus
+metadata:
+  name: atc
+  namespace: atc
+spec:
+  replicas: 1
+  serviceAccountName: prometheus
+  enableRemoteWriteReceiver: true
+  retention: 999d
+  retentionSize: 85GB
+  resources:
+    requests:
+      cpu: 100m
+      memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 2Gi
+  storage:
+    volumeClaimTemplate:
+      spec:
+        storageClassName: longhorn-hdd
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 100Gi
+  securityContext:
+    fsGroup: 2000
+    runAsGroup: 2000
+    runAsNonRoot: true
+    runAsUser: 1000
+    seccompProfile:
+      type: RuntimeDefault
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: prometheus
+  namespace: atc
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: prometheus
+    prometheus: atc
+  ports:
+    - name: http-web
+      port: 9090
+      targetPort: 9090
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: prometheus
+  namespace: atc
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+spec:
+  ingressClassName: nginx-internal
+  tls:
+    - hosts:
+        - atc-prom.k.shion1305.com
+  rules:
+    - host: atc-prom.k.shion1305.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: prometheus
+                port:
+                  number: 9090

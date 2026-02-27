@@ -21,3 +21,8 @@ data:
           maxIdleConns: 100
           maxIdleConnsMaxLifetime: 14400
           postgresVersion: 1700
+      - name: atc-prometheus
+        type: prometheus
+        access: proxy
+        url: "http://prometheus.atc.svc.cluster.local:9090"
+        isDefault: true
