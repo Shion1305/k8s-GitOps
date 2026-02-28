@@ -46,57 +46,51 @@ server:
     name: "vault-unsealer"
   extraContainers:
     - name: unseal-sidecar
-      image: alpine:latest
+      image: hashicorp/vault:1.21.3
       securityContext:
-        runAsUser: 0
+        runAsNonRoot: true
+        runAsUser: 100
+        runAsGroup: 1000
       command:
         - sh
         - -c
         - |
-          apk add --no-cache curl jq
           echo "Starting KV Auto-Unseal Sidecar..."
+          ACTIVE_ADDR="http://vault-active.vault.svc.cluster.local:8200"
+          LOCAL_ADDR="http://127.0.0.1:8200"
+
           while true; do
             sleep 10
-            STATUS=$(curl -s http://127.0.0.1:8200/v1/sys/seal-status || echo "")
-            if [[ -z "$STATUS" ]]; then
+
+            SEALED=$(VAULT_ADDR="$LOCAL_ADDR" vault status 2>/dev/null | awk '/^Sealed/ {print $2; exit}')
+            if [ -z "$SEALED" ]; then
               continue
             fi
-            
-            IS_SEALED=$(echo "$STATUS" | jq -r '.sealed')
-            if [ "$IS_SEALED" = "true" ]; then
+
+            if [ "$SEALED" = "true" ]; then
               echo "Vault is sealed! Attempting auto-unseal via vault-active..."
-              
-              # 1. Login to active Vault using K8s SA token
+
               SA_TOKEN=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)
-              AUTH_RESP=$(curl -s --request POST \
-                --data '{"jwt": "'"$SA_TOKEN"'", "role": "vault-unsealer"}' \
-                http://vault-active.vault.svc.cluster.local:8200/v1/auth/kubernetes/login)
-                
-              VAULT_TOKEN=$(echo "$AUTH_RESP" | jq -r '.auth.client_token')
-              if [ "$VAULT_TOKEN" = "null" ] || [ -z "$VAULT_TOKEN" ]; then
+              AUTH_JSON=$(VAULT_ADDR="$ACTIVE_ADDR" vault write -format=json auth/kubernetes/login jwt="$SA_TOKEN" role="vault-unsealer" 2>/dev/null || true)
+              VAULT_TOKEN=$(printf '%s' "$AUTH_JSON" | sed -n 's/.*"client_token":"\([^"]*\)".*/\1/p' | head -n 1)
+              if [ -z "$VAULT_TOKEN" ]; then
                 echo "Failed to get Vault token. Active node might be down."
                 continue
               fi
-              
-              # 2. Fetch unseal keys from KV
-              KEYS_RESP=$(curl -s -H "X-Vault-Token: $VAULT_TOKEN" \
-                http://vault-active.vault.svc.cluster.local:8200/v1/secret/data/unseal-keys)
-              
-              KEY1=$(echo "$KEYS_RESP" | jq -r '.data.data.key1')
-              KEY2=$(echo "$KEYS_RESP" | jq -r '.data.data.key2')
-              KEY3=$(echo "$KEYS_RESP" | jq -r '.data.data.key3')
-              
-              if [ "$KEY1" = "null" ]; then
+
+              KEY1=$(VAULT_ADDR="$ACTIVE_ADDR" VAULT_TOKEN="$VAULT_TOKEN" vault kv get -field=key1 secret/unseal-keys 2>/dev/null || true)
+              KEY2=$(VAULT_ADDR="$ACTIVE_ADDR" VAULT_TOKEN="$VAULT_TOKEN" vault kv get -field=key2 secret/unseal-keys 2>/dev/null || true)
+              KEY3=$(VAULT_ADDR="$ACTIVE_ADDR" VAULT_TOKEN="$VAULT_TOKEN" vault kv get -field=key3 secret/unseal-keys 2>/dev/null || true)
+              if [ -z "$KEY1" ] || [ -z "$KEY2" ] || [ -z "$KEY3" ]; then
                 echo "Failed to read keys from KV."
                 continue
               fi
-              
-              # 3. Submit keys to unseal linearly
+
               echo "Submitting unseal keys..."
-              curl -s --request POST --data '{"key": "'"$KEY1"'"}' http://127.0.0.1:8200/v1/sys/unseal >/dev/null
-              curl -s --request POST --data '{"key": "'"$KEY2"'"}' http://127.0.0.1:8200/v1/sys/unseal >/dev/null
-              curl -s --request POST --data '{"key": "'"$KEY3"'"}' http://127.0.0.1:8200/v1/sys/unseal >/dev/null
-              
+              VAULT_ADDR="$LOCAL_ADDR" vault operator unseal "$KEY1" >/dev/null 2>&1 || true
+              VAULT_ADDR="$LOCAL_ADDR" vault operator unseal "$KEY2" >/dev/null 2>&1 || true
+              VAULT_ADDR="$LOCAL_ADDR" vault operator unseal "$KEY3" >/dev/null 2>&1 || true
+
               echo "Unseal commands submitted."
               sleep 5
             fi
