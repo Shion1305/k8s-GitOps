@@ -18,14 +18,6 @@ Key configurations:
 - **Storage**: 10Gi persistent volumes for data and audit logs
 - **Resources**: 256Mi/250m requests, 512Mi/500m limits
 
-### TLS Certificate
-
-Vault requires a TLS certificate named `vault-tls` in the `vault` namespace for:
-
-- Ingress termination at `vault.k.shion1305.com`
-- Internal Raft cluster communication
-- Vault server TLS configuration
-
 ## Access
 
 - **UI**: <https://vault.k.shion1305.com>
