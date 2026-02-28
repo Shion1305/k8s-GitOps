@@ -72,7 +72,7 @@ server:
 
               SA_TOKEN=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)
               AUTH_JSON=$(VAULT_ADDR="$ACTIVE_ADDR" vault write -format=json auth/kubernetes/login jwt="$SA_TOKEN" role="vault-unsealer" 2>/dev/null || true)
-              VAULT_TOKEN=$(printf '%s' "$AUTH_JSON" | sed -n 's/.*"client_token":"\([^"]*\)".*/\1/p' | head -n 1)
+              VAULT_TOKEN=$(printf '%s' "$AUTH_JSON" | sed -n 's/.*"client_token"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n 1)
               if [ -z "$VAULT_TOKEN" ]; then
                 echo "Failed to get Vault token. Active node might be down."
                 continue
