@@ -47,6 +47,8 @@ server:
   extraContainers:
     - name: unseal-sidecar
       image: alpine:latest
+      securityContext:
+        runAsUser: 0
       command:
         - sh
         - -c
