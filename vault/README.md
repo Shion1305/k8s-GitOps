@@ -13,16 +13,17 @@ Vault is deployed in High Availability (HA) mode with Raft storage backend, prov
 Key configurations:
 
 - **HA Mode**: 3 replicas with Raft storage
-- **TLS**: Enabled with custom certificates
-- **Ingress**: Accessible at `https://vault.k.shion1305.com`
-- **Storage**: 10Gi persistent volumes for data and audit logs
+- **TLS**: Disabled at Vault level (terminated at ingress)
+- **Ingress**: Accessible at `http://vault.k.shion1305.com` via `nginx-internal`
+- **Storage**: 10Gi persistent volumes for data and audit logs (longhorn-ssd)
 - **Resources**: 256Mi/250m requests, 512Mi/500m limits
+- **Auto-Unseal**: KV-based sidecar auto-unseal via active node
 
 ## Access
 
 - **UI**: <https://vault.k.shion1305.com>
 - **API**: <https://vault.k.shion1305.com/v1/>
-- **Internal**: <https://vault.vault.svc.cluster.local:8200>
+- **Internal**: <http://vault.vault.svc.cluster.local:8200>
 
 ## Operations
 
@@ -63,6 +64,22 @@ vault operator raft list-peers
 vault status
 ```
 
+## OIDC Authentication (Keycloak)
+
+Vault can be configured for OIDC login via Keycloak:
+
+```bash
+# Port-forward to Vault and set root token
+export VAULT_ADDR=http://127.0.0.1:8200
+export VAULT_TOKEN=<root-token>
+kubectl port-forward svc/vault-active 8200:8200 -n vault &
+
+# Run setup script
+bash vault/scripts/setup-oidc-auth.sh
+```
+
+After setup, select "OIDC" as the auth method in the Vault UI.
+
 ## Integration
 
 Vault integrates with External Secrets Operator for automatic secret synchronization to Kubernetes namespaces. See `../external-secrets/` for ESO configuration.
@@ -70,5 +87,6 @@ Vault integrates with External Secrets Operator for automatic secret synchroniza
 ## Notes
 
 - Uses KV v2 secrets engine mounted at `secret/` path
-- Configured for External Secrets Operator access via dedicated policy
-- ESO reads from `secret/shared/*` paths and distributes to labeled namespaces
+- Configured for External Secrets Operator access via `eso-policy`
+- ESO reads from `secret/shared/*` paths and distributes to namespaces
+- Kubernetes auth role `eso` bound to `external-secrets` service account

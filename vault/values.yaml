@@ -105,6 +105,7 @@ server:
       setNodeId: true
       config: |
         ui = true
+        api_addr = "https://vault.k.shion1305.com"
 
         listener "tcp" {
           tls_disable = true
