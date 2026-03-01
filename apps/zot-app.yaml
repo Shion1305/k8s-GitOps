@@ -8,7 +8,7 @@ spec:
   sources:
     - repoURL: https://zotregistry.dev/helm-charts
       chart: zot
-      targetRevision: 0.1.78
+      targetRevision: 0.1.98
       helm:
         valueFiles:
           - $values/zot/values.yaml
