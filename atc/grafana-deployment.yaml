@@ -17,7 +17,7 @@ spec:
     spec:
       initContainers:
         - name: parse-db-url
-          image: busybox:1.36
+          image: busybox:1.37
           env:
             - name: ATC_DATABASE_URL
               valueFrom:
