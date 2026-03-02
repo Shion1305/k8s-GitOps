@@ -3,6 +3,7 @@ kind: Kustomization
 resources:
   - namespace.yaml
   - vault-secret-store.yaml
+  - db-secret-store.yaml
   - external-secret.yaml
   - mcpo-deployment.yaml
   - network-policy-to-mcp.yaml

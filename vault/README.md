@@ -91,16 +91,16 @@ Each namespace has its own Vault policy and Kubernetes auth role, scoped to only
 | Vault Role | Namespace | Allowed Paths |
 |------------|-----------|---------------|
 | `eso` | external-secrets | `secret/data/shared/app` |
-| `eso-langfuse` | langfuse | `secret/data/shared/langfuse` |
-| `eso-openwebui` | openwebui | `secret/data/shared/openwebui` |
-| `eso-keycloak` | keycloak | `secret/data/shared/keycloak` |
-| `eso-atc` | atc | `secret/data/atc/*` |
+| `eso-atc` | atc | `atc/data/*` |
 
-To add a new namespace, update `vault/scripts/setup-eso-policies.sh` and run it.
+> **Note**: DB credentials for langfuse, openwebui, and keycloak are synced directly from the postgres-operator via ESO's Kubernetes provider (not Vault). See `../external-secrets/README.md`.
+
+To add a new namespace with Vault access, update `vault/scripts/setup-eso-policies.sh` and run it.
 
 ## Notes
 
-- Uses KV v2 secrets engine mounted at `secret/` path
+- Uses KV v2 secrets engine mounted at `secret/` path (and `atc/` for ATC-specific secrets)
 - Per-namespace Vault policies enforce least-privilege access
-- Each namespace has its own `SecretStore` + `ServiceAccount` for isolation
-- Kubernetes auth role `eso` (ClusterExternalSecret) bound to `external-secrets` SA
+- DB credentials use ESO Kubernetes provider for automatic rotation
+- Non-DB secrets use per-namespace `SecretStore` + `ServiceAccount` for Vault isolation
+
