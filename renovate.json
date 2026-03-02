@@ -39,7 +39,7 @@
       "matchFileNames": [
         "apps/**/*.yaml"
       ],
-      "automerge": false,
+      "automerge": true,
       "schedule": [
         "before 6am on Monday"
       ]
@@ -49,7 +49,7 @@
       "matchDatasources": [
         "docker"
       ],
-      "automerge": false,
+      "automerge": true,
       "schedule": [
         "before 6am on Monday"
       ]
@@ -59,7 +59,7 @@
       "matchUpdateTypes": [
         "major"
       ],
-      "automerge": false,
+      "automerge": true,
       "labels": [
         "dependencies",
         "renovate",
