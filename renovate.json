@@ -26,7 +26,7 @@
       "matchFileNames": [
         "apps/**/*.yaml"
       ],
-      "automerge": false,
+      "automerge": true,
       "schedule": [
         "before 6am on Monday"
       ]
