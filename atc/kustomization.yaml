@@ -12,3 +12,5 @@ resources:
   - grafana-service.yaml
   - grafana-ingress.yaml
   - prometheus.yaml
+  - vault-secret-store.yaml
+  - external-secret.yaml

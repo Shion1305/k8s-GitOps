@@ -84,9 +84,23 @@ After setup, select "OIDC" as the auth method in the Vault UI.
 
 Vault integrates with External Secrets Operator for automatic secret synchronization to Kubernetes namespaces. See `../external-secrets/` for ESO configuration.
 
+### Namespace-Scoped Access
+
+Each namespace has its own Vault policy and Kubernetes auth role, scoped to only the secrets it needs:
+
+| Vault Role | Namespace | Allowed Paths |
+|------------|-----------|---------------|
+| `eso` | external-secrets | `secret/data/shared/app` |
+| `eso-langfuse` | langfuse | `secret/data/shared/langfuse` |
+| `eso-openwebui` | openwebui | `secret/data/shared/openwebui` |
+| `eso-keycloak` | keycloak | `secret/data/shared/keycloak` |
+| `eso-atc` | atc | `secret/data/atc/*` |
+
+To add a new namespace, update `vault/scripts/setup-eso-policies.sh` and run it.
+
 ## Notes
 
 - Uses KV v2 secrets engine mounted at `secret/` path
-- Configured for External Secrets Operator access via `eso-policy`
-- ESO reads from `secret/shared/*` paths and distributes to namespaces
-- Kubernetes auth role `eso` bound to `external-secrets` service account
+- Per-namespace Vault policies enforce least-privilege access
+- Each namespace has its own `SecretStore` + `ServiceAccount` for isolation
+- Kubernetes auth role `eso` (ClusterExternalSecret) bound to `external-secrets` SA

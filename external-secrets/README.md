@@ -12,16 +12,31 @@ ESO provides:
 
 ## Architecture
 
+### Shared secrets (ClusterExternalSecret)
+
 ```
-Vault (secret/shared/app) 
+Vault (secret/shared/app)
     ↓
-ClusterSecretStore (vault-cluster) 
-    ↓  
+ClusterSecretStore (vault-cluster) → role "eso" → secret/data/shared/app only
+    ↓
 ClusterExternalSecret (shared-app-credentials)
     ↓
-Creates ExternalSecret in namespace-A → Secret in namespace-A
-Creates ExternalSecret in namespace-B → Secret in namespace-B
+Namespaces labeled secrets-sync/enabled=true → K8s Secret
 ```
+
+### Per-namespace secrets (SecretStore)
+
+```
+Vault (secret/<namespace>/*)
+    ↓
+SecretStore "vault" (in each namespace) → role "eso-<namespace>" → scoped policy
+    ↓
+ExternalSecret (in namespace)
+    ↓
+K8s Secret (in namespace)
+```
+
+Each namespace has its own `SecretStore` + `ServiceAccount`, backed by a Vault role that can only read that namespace's secrets. See `../vault/README.md` for the role/policy table.
 
 ## Configuration Files
 
@@ -210,9 +225,10 @@ kubectl annotate clusterexternalsecret shared-app-credentials \
 
 ## Security Considerations
 
-- **Least privilege**: ESO can only read `secret/data/shared/*` in Vault
-- **Namespace isolation**: Only labeled namespaces receive secrets
-- **Service account binding**: ESO role bound to specific ServiceAccount
+- **Namespace isolation**: Each namespace has its own `SecretStore` + `ServiceAccount` + Vault role
+- **Least privilege**: Per-namespace Vault policies restrict reads to only that namespace's paths
+- **Namespace labeling**: Only labeled namespaces receive shared secrets (via ClusterExternalSecret)
+- **Service account binding**: Each role bound to a specific SA in a specific namespace
 - **Token lifecycle**: Automatic token renewal and rotation
 
 ## Auto-restart on Secret Changes
