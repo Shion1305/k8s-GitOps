@@ -8,7 +8,7 @@ spec:
   sources:
     - repoURL: https://helm.openwebui.com/
       chart: open-webui
-      targetRevision: 12.3.0
+      targetRevision: 12.5.0
       helm:
         valueFiles:
           - $values/openwebui/values.yaml
