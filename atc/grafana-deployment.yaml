@@ -60,7 +60,7 @@ spec:
               mountPath: /etc/grafana-template
       containers:
         - name: grafana
-          image: grafana/grafana:11.6.12
+          image: grafana/grafana:12.4.0
           ports:
             - containerPort: 3000
               name: http
