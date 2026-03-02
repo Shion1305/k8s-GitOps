@@ -32,7 +32,7 @@ spec:
                           - instance-k8s-proxy
           containers:
             - name: ping
-              image: nicolaka/netshoot:v0.14
+              image: nicolaka/netshoot:v0.15
               command: ["/bin/sh", "/scripts/healthcheck.sh"]
               env:
                 - name: HEALTHCHECK_URL
