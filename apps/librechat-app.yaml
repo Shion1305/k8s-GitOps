@@ -8,7 +8,7 @@ spec:
   sources:
     - repoURL: ghcr.io/danny-avila/librechat-chart
       chart: librechat
-      targetRevision: 1.9.7
+      targetRevision: 1.9.8
       helm:
         valueFiles:
           - $values/librechat/values.yaml
