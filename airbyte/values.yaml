@@ -1800,7 +1800,7 @@ temporal:
     # -- The pull policy for the temporal image
     pullPolicy: IfNotPresent
     # -- The temporal image tag to use
-    tag: "1.27.2"
+    tag: "1.29.3"
 
   secretName: ""
 
@@ -1864,7 +1864,7 @@ temporal:
   ## Examples (when using `temporal.containerSecurityContext.readOnlyRootFilesystem=true`):
   ## extraInitContainers:
   ##   - name: config-loader
-  ##     image: temporalio/auto-setup:1.27.2
+  ##     image: temporalio/auto-setup:1.29.3
   ##     command:
   ##       - /bin/sh
   ##       - -c
