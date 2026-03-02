@@ -1959,7 +1959,7 @@ temporalUi:
     repository: temporalio/ui
     # -- The pull policy for the temporal-ui image
     pullPolicy: IfNotPresent
-    tag: "2.30.1"
+    tag: "2.47.2"
 
   service:
     # -- The Kubernetes Service Type
@@ -1994,7 +1994,7 @@ temporalUi:
   ## Examples (when using `temporal.containerSecurityContext.readOnlyRootFilesystem=true`):
   ## extraInitContainers:
   ##   - name: config-loader
-  ##     image: temporalio/ui:2.30.1
+  ##     image: temporalio/ui:2.47.2
   ##     command:
   ##       - /bin/sh
   ##       - -c
