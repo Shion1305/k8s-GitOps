@@ -11,7 +11,7 @@ spec:
     server: https://kubernetes.default.svc
   source:
     repoURL: https://github.com/keycloak/keycloak-k8s-resources.git
-    targetRevision: "26.4.7"  # Renovate will update this
+    targetRevision: "26.5.4"  # Renovate will update this
     path: kubernetes
     directory:
       include: "*-v1.yml"  # Only include CRD files

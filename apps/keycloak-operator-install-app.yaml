@@ -12,7 +12,7 @@ spec:
     server: https://kubernetes.default.svc
   source:
     repoURL: https://github.com/keycloak/keycloak-k8s-resources.git
-    targetRevision: "26.4.7"  # Update this version to upgrade operator
+    targetRevision: "26.5.4"  # Update this version to upgrade operator
     path: kubernetes
   syncPolicy:
     automated:
