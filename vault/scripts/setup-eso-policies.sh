@@ -73,6 +73,17 @@ path "atc/metadata/*" {
 EOF
 echo "✓ Created policy: eso-atc"
 
+# Policy for lumos-bot namespace (separate KV v2 engine mounted at lumos-bot/)
+vault policy write eso-lumos-bot - <<EOF
+path "lumos-bot/data/*" {
+  capabilities = ["read"]
+}
+path "lumos-bot/metadata/*" {
+  capabilities = ["read", "list"]
+}
+EOF
+echo "✓ Created policy: eso-lumos-bot"
+
 echo ""
 echo "=== Creating namespace-scoped Kubernetes auth roles ==="
 
@@ -116,6 +127,14 @@ vault write auth/kubernetes/role/eso-atc \
   ttl=1h
 echo "✓ Created role: eso-atc"
 
+# Lumos Bot
+vault write auth/kubernetes/role/eso-lumos-bot \
+  bound_service_account_names=eso \
+  bound_service_account_namespaces=lumos-bot \
+  policies=eso-lumos-bot \
+  ttl=1h
+echo "✓ Created role: eso-lumos-bot"
+
 echo ""
 echo "=== Removing old broad policy ==="
 vault policy delete eso-policy 2>/dev/null && echo "✓ Deleted old policy: eso-policy" || echo "ⓘ Policy eso-policy not found (already removed)"
@@ -129,3 +148,4 @@ echo "  eso-langfuse → SA eso/langfuse                      → secret/data/sh
 echo "  eso-openwebui→ SA eso/openwebui                     → secret/data/shared/openwebui"
 echo "  eso-keycloak → SA eso/keycloak                      → secret/data/shared/keycloak"
 echo "  eso-atc      → SA eso/atc                           → atc/data/*"
+echo "  eso-lumos-bot→ SA eso/lumos-bot                     → lumos-bot/data/*"
