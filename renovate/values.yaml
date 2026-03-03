@@ -41,7 +41,7 @@ renovate:
       "autodiscover": true,
       "autodiscoverFilter": ["Shion1305/*", "*/*"],
       "onboarding": true,
-      "requireConfig": "required",
+      "requireConfig": "optional",
       "gitAuthor": "Automation by Shion1305 <bot@github.shion.pro>",
       "username": "renovate-by-shion1305[bot]",
       "repositories": [],
