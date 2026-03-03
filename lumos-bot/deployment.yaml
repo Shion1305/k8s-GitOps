@@ -1,0 +1,35 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: discord-amazon-link-shortener
+  namespace: lumos-bot
+  labels:
+    app: discord-amazon-link-shortener
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: discord-amazon-link-shortener
+  template:
+    metadata:
+      labels:
+        app: discord-amazon-link-shortener
+      annotations:
+        reloader.stakater.com/auto: "true"
+    spec:
+      containers:
+        - name: discord-amazon-link-shortener
+          image: ghcr.io/shion1305/discordamazonlinkshortener:1.0.0
+          env:
+            - name: DISCORD_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: discord-token
+                  key: DISCORD_TOKEN
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "10m"
+            limits:
+              memory: "256Mi"
+              cpu: "250m"
