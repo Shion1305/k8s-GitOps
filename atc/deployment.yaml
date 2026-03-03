@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gmocoin-exec-alert
+  namespace: atc
+  labels:
+    app: gmocoin-exec-alert
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: gmocoin-exec-alert
+  template:
+    metadata:
+      labels:
+        app: gmocoin-exec-alert
+      annotations:
+        reloader.stakater.com/auto: "true"
+    spec:
+      containers:
+        - name: gmocoin-exec-alert
+          image: ghcr.io/shion1305/gmocoin-exec-alert:sha-551e174
+          env:
+            - name: GMOCOIN_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: gmo-coin-api-secret
+                  key: API_KEY
+            - name: GMOCOIN_API_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: gmo-coin-api-secret
+                  key: API_SECRET
+            - name: PAGERDUTY_ROUTING_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: pagerduty
+                  key: ROUTING_KEY
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "10m"
+            limits:
+              memory: "256Mi"
+              cpu: "250m"
