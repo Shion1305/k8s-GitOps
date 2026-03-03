@@ -19,7 +19,7 @@ spec:
     spec:
       containers:
         - name: discord-amazon-link-shortener
-          image: ghcr.io/shion1305/discordamazonlinkshortener:1.0.0
+          image: ghcr.io/shion1305/discordamazonlinkshortener:1.0.1
           env:
             - name: DISCORD_TOKEN
               valueFrom:
