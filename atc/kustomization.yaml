@@ -14,3 +14,4 @@ resources:
   - prometheus.yaml
   - vault-secret-store.yaml
   - external-secret.yaml
+  - deployment-gmocoin-exec-alert.yaml
