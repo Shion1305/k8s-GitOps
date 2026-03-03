@@ -51,11 +51,27 @@ renovate:
         "docker-compose",
         "dockerfile",
         "github-actions",
+        "helm",
         "helm-values",
         "helmfile",
         "kubernetes",
         "kustomize",
-        "custom.regex"
+        "custom.regex",
+        "gomod",
+        "npm",
+        "pnpm",
+        "pnpm-lock",
+        "cargo",
+        "pip_requirements",
+        "pip_setup",
+        "poetry",
+        "maven",
+        "gradle",
+        "nuget",
+        "bundler",
+        "composer",
+        "terraform",
+        "ansible"
       ],
       "packageRules": [
         {
