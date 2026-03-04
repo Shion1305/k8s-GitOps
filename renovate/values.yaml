@@ -82,6 +82,7 @@ renovate:
       ],
       "prConcurrentLimit": 10,
       "prHourlyLimit": 2,
+      "pruneStaleBranches": true,
       "timezone": "UTC"
     }
 
