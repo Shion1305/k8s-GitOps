@@ -72,7 +72,7 @@
       "matchManagers": [
         "aqua"
       ],
-      "automerge": true
+      "automerge": false
     }
   ],
   "argocd": {
