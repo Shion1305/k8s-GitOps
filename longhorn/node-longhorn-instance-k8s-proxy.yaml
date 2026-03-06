@@ -1,0 +1,15 @@
+apiVersion: longhorn.io/v1beta2
+kind: Node
+metadata:
+  name: instance-k8s-proxy
+  namespace: longhorn-system
+spec:
+  name: instance-k8s-proxy
+  disks:
+    hdd-50g:
+      allowScheduling: true
+      diskType: filesystem
+      path: /var/lib/longhorn/longhorn-hdd
+      tags: ["hdd"]
+      # Reserve 1 GiB for system use (in bytes)
+      storageReserved: 1073741824

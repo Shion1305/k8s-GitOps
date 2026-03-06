@@ -1,0 +1,15 @@
+apiVersion: longhorn.io/v1beta2
+kind: Node
+metadata:
+  name: instance-2024-1
+  namespace: longhorn-system
+spec:
+  name: instance-2024-1
+  disks:
+    hdd-50g:
+      allowScheduling: true
+      diskType: filesystem
+      path: /var/lib/longhorn/longhorn-hdd
+      tags: ["hdd"]
+      # Reserve 1 GiB for system use (in bytes)
+      storageReserved: 1073741824
