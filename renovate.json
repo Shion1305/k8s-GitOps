@@ -4,7 +4,8 @@
     "config:recommended",
     ":dependencyDashboard",
     ":semanticCommits",
-    ":gitSignOff"
+    ":gitSignOff",
+    "github>aquaproj/aqua-renovate-config#2.10.0"
   ],
   "prConcurrentLimit": 5,
   "prHourlyLimit": 2,
@@ -64,6 +65,16 @@
         "dependencies",
         "renovate",
         "major"
+      ]
+    },
+    {
+      "description": "Aqua package updates",
+      "matchManagers": [
+        "aqua"
+      ],
+      "automerge": true,
+      "schedule": [
+        "before 6am on Monday"
       ]
     }
   ],
