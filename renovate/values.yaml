@@ -47,6 +47,7 @@ renovate:
       "repositories": [],
       "ignorePaths": [],
       "enabledManagers": [
+        "aqua",
         "argocd",
         "docker-compose",
         "dockerfile",
