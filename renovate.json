@@ -4,8 +4,7 @@
     "config:recommended",
     ":dependencyDashboard",
     ":semanticCommits",
-    ":gitSignOff",
-    "github>aquaproj/aqua-renovate-config#2.10.0"
+    ":gitSignOff"
   ],
   "prConcurrentLimit": 5,
   "prHourlyLimit": 2,
@@ -66,13 +65,6 @@
         "renovate",
         "major"
       ]
-    },
-    {
-      "description": "Aqua package updates",
-      "matchManagers": [
-        "aqua"
-      ],
-      "automerge": false
     }
   ],
   "argocd": {
