@@ -37,6 +37,9 @@ renovate:
   # Main configuration as JSON string
   config: |
     {
+      "extends": [
+        "github>aquaproj/aqua-renovate-config#2.10.0"
+      ],
       "platform": "github",
       "autodiscover": true,
       "autodiscoverFilter": ["Shion1305/*", "*/*"],
