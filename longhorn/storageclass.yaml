@@ -18,8 +18,6 @@ apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
   name: longhorn-hdd
-  annotations:
-    storageclass.kubernetes.io/description: "Single replica HDD storage on main storage node only"
 provisioner: driver.longhorn.io
 allowVolumeExpansion: true
 reclaimPolicy: Retain
@@ -28,7 +26,6 @@ parameters:
   dataEngine: "v1"
   fsType: "ext4"
   diskSelector: "hdd"
-  nodeSelector: "kubernetes.io/hostname:shion-ubuntu-2505"
 volumeBindingMode: Immediate
 ---
 apiVersion: storage.k8s.io/v1
@@ -36,7 +33,7 @@ kind: StorageClass
 metadata:
   name: longhorn-hdd-ha
   annotations:
-    storageclass.kubernetes.io/description: "High availability HDD storage with 2 replicas for critical workloads"
+    storageclass.kubernetes.io/description: "High availability HDD storage with 2 replicas for critical workloads (uses all HDD nodes)"
 provisioner: driver.longhorn.io
 allowVolumeExpansion: true
 reclaimPolicy: Retain
@@ -44,7 +41,7 @@ parameters:
   numberOfReplicas: "2"
   dataEngine: "v1"
   fsType: "ext4"
-  diskSelector: "hdd"
+  diskSelector: "hdd,hdd-oci"
   # Prefer spreading replicas across different nodes
   replicaAutoBalance: "best-effort"
 volumeBindingMode: Immediate
