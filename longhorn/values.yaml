@@ -15,25 +15,28 @@ defaultSettings:
 persistence:
   defaultClass: false
   defaultClassReplicaCount: 1
-# Allow Longhorn manager to run on all storage nodes including control-plane
+# Whitelist nodes with longhorn.io/node=true label (excludes raspi-cm4)
 longhornManager:
+  nodeSelector:
+    longhorn.io/node: "true"
   tolerations:
     - key: node-role.kubernetes.io/control-plane
       operator: Exists
       effect: NoSchedule
-# Allow Longhorn driver (CSI plugin) to run on all storage nodes including control-plane
 longhornDriver:
+  nodeSelector:
+    longhorn.io/node: "true"
   tolerations:
     - key: node-role.kubernetes.io/control-plane
       operator: Exists
       effect: NoSchedule
-# Engine image deployment - allow on control-plane
 engineImage:
+  nodeSelector:
+    longhorn.io/node: "true"
   tolerations:
     - key: node-role.kubernetes.io/control-plane
       operator: Exists
       effect: NoSchedule
-# UI deployment
 longhornUI:
   nodeSelector:
     kubernetes.io/hostname: shion-ubuntu-2505
