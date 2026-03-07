@@ -106,8 +106,11 @@ As of this configuration, Vault uses `longhorn-hdd-ha` StorageClass with 2 repli
 
 ### Migrating Existing PVCs (If Needed)
 
-**Important**: Existing Vault PVCs created with `longhorn-hdd` (1 replica) will continue to work, but won't automatically gain the 2-replica redundancy. To migrate:
+**Important**: Existing Vault PVCs created with `longhorn-hdd` (1 replica) will continue to work, but won't automatically gain the 2-replica redundancy.
 
+Changing the `StorageClass` for Vault in `values.yaml` on an existing deployment is **not** guaranteed to sync cleanly with Helm/ArgoCD. The Vault Helm chart uses a `StatefulSet`, and its `volumeClaimTemplates` are immutable; attempting to change the `storageClassName` will typically cause the StatefulSet update to fail reconciliation until it is manually recreated. To avoid this upgrade/sync failure mode, prefer updating the replica count on the underlying Longhorn volumes instead of changing the `StorageClass` for existing PVCs.
+
+To migrate existing data volumes to 2 replicas without recreating the StatefulSet:
 #### Option 1: Update Existing Volumes (Recommended)
 
 ```bash
@@ -139,9 +142,16 @@ kubectl scale statefulset vault -n vault --replicas=0
 kubectl delete pvc -n vault --all
 
 # 4. Apply new configuration (will create PVCs with longhorn-hdd-ha)
-# ArgoCD will automatically sync
+# ArgoCD will automatically sync and recreate the StatefulSet/PVCs
 
-# 5. Restore from snapshot
+# 5. Scale Vault back up (if not already reconciled) and wait for pods to be ready
+# If ArgoCD does not automatically restore replicas, scale manually:
+# kubectl scale statefulset vault -n vault --replicas=3
+# Wait until vault-0 is Running/Ready:
+# kubectl rollout status statefulset/vault -n vault
+# If auto-unseal is disabled, unseal vault-0 before continuing.
+
+# 6. Restore from snapshot (after vault-0 is ready and unsealed)
 kubectl cp ./vault-backup.snap vault/vault-0:/tmp/backup.snap
 kubectl exec -n vault vault-0 -- vault operator raft snapshot restore /tmp/backup.snap
 ```
