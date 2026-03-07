@@ -3,13 +3,11 @@ kind: Setting
 metadata:
   name: replica-soft-anti-affinity
   namespace: longhorn-system
-spec:
-  value: "true"
+value: "true"
 ---
 apiVersion: longhorn.io/v1beta2
 kind: Setting
 metadata:
   name: replica-zone-soft-anti-affinity
   namespace: longhorn-system
-spec:
-  value: "true"
+value: "true"
