@@ -19,6 +19,6 @@ spec:
       allowScheduling: true
       diskType: filesystem
       path: /var/lib/longhorn/longhorn-hdd-202508-20tb
-      tags: ["hdd"]
+      tags: ["hdd", "hdd-ha"]
       # Reserve 10 GiB on the HDD for system use (in bytes).
       storageReserved: 10737418240

@@ -41,7 +41,7 @@ parameters:
   numberOfReplicas: "2"
   dataEngine: "v1"
   fsType: "ext4"
-  diskSelector: "hdd,hdd-oci"
+  diskSelector: "hdd-ha"
   # Prefer spreading replicas across different nodes
   replicaAutoBalance: "best-effort"
 volumeBindingMode: Immediate
