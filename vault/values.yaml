@@ -145,12 +145,12 @@ server:
   dataStorage:
     enabled: true
     size: 10Gi
-    storageClass: longhorn-hdd-ha
+    storageClass: longhorn-hdd
     accessMode: ReadWriteOnce
   auditStorage:
     enabled: true
     size: 10Gi
-    storageClass: longhorn-hdd-ha
+    storageClass: longhorn-hdd
     accessMode: ReadWriteOnce
 ui:
   enabled: true
