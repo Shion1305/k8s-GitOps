@@ -11,6 +11,6 @@ spec:
       allowScheduling: true
       diskType: filesystem
       path: /var/lib/longhorn/longhorn-hdd
-      tags: ["hdd"]
+      tags: ["hdd-oci"]
       # Reserve 1 GiB for system use (in bytes)
       storageReserved: 1073741824
