@@ -5,6 +5,7 @@ metadata:
   namespace: longhorn-system
 spec:
   name: instance-k8s-proxy
+  allowScheduling: true
   disks:
     hdd-50g:
       allowScheduling: true

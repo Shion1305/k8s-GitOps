@@ -5,6 +5,7 @@ metadata:
   namespace: longhorn-system
 spec:
   name: shion-ubuntu-2505
+  allowScheduling: true
   disks:
     ssd-4t:
       allowScheduling: true
