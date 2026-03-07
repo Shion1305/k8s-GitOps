@@ -8,26 +8,35 @@ defaultSettings:
   defaultDataPath: ""
   # Reservation rate for filesystem-based volumes
   storageReservedPercentageForDefaultDisk: 25
+  # Allow Longhorn to run on control-plane nodes
+  taintToleration: "node-role.kubernetes.io/control-plane:NoSchedule"
 # Disable automatic StorageClass creation by Longhorn
 # We manage StorageClasses via GitOps in storageclass.yaml
 persistence:
   defaultClass: false
   defaultClassReplicaCount: 1
-# Node selector to exclude specific nodes from running Longhorn manager
+# Whitelist nodes with longhorn.io/node=true label (excludes raspi-cm4)
 longhornManager:
   nodeSelector:
-    kubernetes.io/hostname: shion-ubuntu-2505
-  tolerations: []
-# Node selector for Longhorn driver (CSI plugin)
+    longhorn.io/node: "true"
+  tolerations:
+    - key: node-role.kubernetes.io/control-plane
+      operator: Exists
+      effect: NoSchedule
 longhornDriver:
   nodeSelector:
-    kubernetes.io/hostname: shion-ubuntu-2505
-  tolerations: []
-# Engine image deployment node selector
+    longhorn.io/node: "true"
+  tolerations:
+    - key: node-role.kubernetes.io/control-plane
+      operator: Exists
+      effect: NoSchedule
 engineImage:
   nodeSelector:
-    kubernetes.io/hostname: shion-ubuntu-2505
-# UI deployment node selector
+    longhorn.io/node: "true"
+  tolerations:
+    - key: node-role.kubernetes.io/control-plane
+      operator: Exists
+      effect: NoSchedule
 longhornUI:
   nodeSelector:
     kubernetes.io/hostname: shion-ubuntu-2505
