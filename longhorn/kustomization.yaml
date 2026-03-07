@@ -11,3 +11,5 @@ resources:
   - storageclass.yaml
   # Internal ingress for Longhorn UI
   - ingress.yaml
+  # Longhorn settings
+  - settings.yaml
