@@ -27,3 +27,21 @@ parameters:
   fsType: "ext4"
   diskSelector: "hdd"
 volumeBindingMode: Immediate
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: longhorn-hdd-ha
+  annotations:
+    storageclass.kubernetes.io/description: "High availability HDD storage with 2 replicas for critical workloads"
+provisioner: driver.longhorn.io
+allowVolumeExpansion: true
+reclaimPolicy: Retain
+parameters:
+  numberOfReplicas: "2"
+  dataEngine: "v1"
+  fsType: "ext4"
+  diskSelector: "hdd"
+  # Prefer spreading replicas across different nodes
+  replicaAutoBalance: "best-effort"
+volumeBindingMode: Immediate
