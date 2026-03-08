@@ -1,0 +1,24 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: github-readme-stats
+  namespace: github-readme-stats
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+spec:
+  ingressClassName: nginx-ssl
+  tls:
+    - hosts:
+        - github-readme-stats.k.shion1305.com
+      secretName: github-readme-stats-tls
+  rules:
+    - host: github-readme-stats.k.shion1305.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: github-readme-stats
+                port:
+                  number: 9000

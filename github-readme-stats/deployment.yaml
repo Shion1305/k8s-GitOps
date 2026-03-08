@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: github-readme-stats
+  namespace: github-readme-stats
+  labels:
+    app: github-readme-stats
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: github-readme-stats
+  template:
+    metadata:
+      labels:
+        app: github-readme-stats
+    spec:
+      containers:
+        - name: github-readme-stats
+          image: ghcr.io/shion1305/github-readme-stats:latest
+          ports:
+            - containerPort: 9000
+              name: http
+          env:
+            - name: PAT_1
+              valueFrom:
+                secretKeyRef:
+                  name: github-readme-stats
+                  key: PAT_1
+            - name: WHITELIST
+              value: "Shion1305"
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
