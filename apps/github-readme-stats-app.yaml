@@ -1,0 +1,23 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: github-readme-stats
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/Shion1305/k8s-GitOps.git
+    targetRevision: HEAD
+    path: github-readme-stats
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: github-readme-stats
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
