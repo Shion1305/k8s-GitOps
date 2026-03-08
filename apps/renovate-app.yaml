@@ -10,7 +10,7 @@ spec:
   sources:
     - repoURL: ghcr.io/renovatebot/charts
       chart: renovate
-      targetRevision: 46.47.0
+      targetRevision: 46.56.3
       helm:
         valueFiles:
           - $values/renovate/values.yaml
