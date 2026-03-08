@@ -55,6 +55,13 @@
       ]
     },
     {
+      "description": "Custom manager updates (aqua, etc)",
+      "matchManagers": [
+        "custom.regex"
+      ],
+      "automerge": true
+    },
+    {
       "description": "Major updates",
       "matchUpdateTypes": [
         "major"
