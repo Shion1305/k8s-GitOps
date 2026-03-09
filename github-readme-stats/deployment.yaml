@@ -28,7 +28,7 @@ spec:
                   name: github-readme-stats
                   key: PAT_1
             - name: WHITELIST
-              value: "Shion1305"
+              value: "Shion1305,tomoyahiroe"
           resources:
             requests:
               cpu: 100m
