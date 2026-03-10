@@ -1,0 +1,20 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-renovate-external-access
+  namespace: renovate
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: renovate
+  policyTypes:
+    - Egress
+  egress:
+    # Allow external HTTPS (GitHub, registries, APIs)
+    - ports:
+        - protocol: TCP
+          port: 443
+    # Allow external SSH (Git repos)
+    - ports:
+        - protocol: TCP
+          port: 22

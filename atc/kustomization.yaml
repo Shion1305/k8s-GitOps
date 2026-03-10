@@ -7,6 +7,8 @@ resources:
   - ws-stream-deployment.yaml
   - mcp-connector.yaml
   - network-policy-mcp-to-postgres.yaml
+  - network-policy-grafana-to-postgres.yaml
+  - network-policy-from-ingress.yaml
   - grafana-config.yaml
   - grafana-deployment.yaml
   - grafana-service.yaml

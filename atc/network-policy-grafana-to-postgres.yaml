@@ -1,0 +1,24 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-grafana-to-atc-postgres
+  namespace: atc
+spec:
+  podSelector:
+    matchLabels:
+      app: grafana
+  policyTypes:
+    - Egress
+  egress:
+    # Allow egress to ATC postgres cluster in postgres-operator-deployment namespace
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: postgres-operator-deployment
+          podSelector:
+            matchLabels:
+              application: spilo
+              cluster-name: atc-postgres-cluster
+      ports:
+        - protocol: TCP
+          port: 5432

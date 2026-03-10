@@ -4,3 +4,4 @@ resources:
   - cluster-secret-store.yaml
   - rbac-db-reader.yaml
   - cluster-external-secret.yaml
+  - network-policy-to-vault.yaml
