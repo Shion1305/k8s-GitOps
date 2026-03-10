@@ -1,0 +1,31 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - namespaces/adminer.yaml
+  - namespaces/airbyte.yaml
+  - namespaces/argocd.yaml
+  - namespaces/atc.yaml
+  - namespaces/external-secrets.yaml
+  - namespaces/gh-analysis.yaml
+  - namespaces/github-readme-stats.yaml
+  - namespaces/grafana.yaml
+  - namespaces/guestbook.yaml
+  - namespaces/keycloak.yaml
+  - namespaces/langfuse.yaml
+  - namespaces/librechat.yaml
+  - namespaces/longhorn-system.yaml
+  - namespaces/lumos-bot.yaml
+  - namespaces/macos-timemachine.yaml
+  - namespaces/memgator.yaml
+  - namespaces/monitoring.yaml
+  - namespaces/network-stress-test.yaml
+  - namespaces/node-exporter.yaml
+  - namespaces/node-healthcheck.yaml
+  - namespaces/openwebui.yaml
+  - namespaces/postgres-operator.yaml
+  - namespaces/postgres-operator-deployment.yaml
+  - namespaces/privacy-focused-gateway.yaml
+  - namespaces/renovate.yaml
+  - namespaces/vault.yaml
+  - namespaces/zot.yaml
