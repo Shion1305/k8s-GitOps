@@ -25,6 +25,7 @@ This repository implements a comprehensive GitOps workflow for Kubernetes using 
 - **Zot** - OCI container registry
 - **Local Storage** - Local path provisioner for persistent volumes
 - **NGINX Ingress** - Ingress controller with SSL support
+- **Network Policies** - Centralized namespace isolation and traffic control
 
 ### Development & Testing
 
@@ -35,6 +36,7 @@ This repository implements a comprehensive GitOps workflow for Kubernetes using 
 
 - `apps/` - ArgoCD Application manifests for all services
 - `argocd/` - ArgoCD configuration and ingress
+- `network-policies/` - Centralized NetworkPolicy configuration for all namespaces
 - `storage/` - Local storage provisioning, policies, and persistent volumes
 - `ingress/` - NGINX ingress controller configuration
 - `charts/` - Custom Helm charts

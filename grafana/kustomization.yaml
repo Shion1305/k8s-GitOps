@@ -3,8 +3,4 @@ kind: Kustomization
 
 resources:
   - ingress.yaml
-  - vault-secret-store.yaml
-  - db-secret-store.yaml
-  - external-secret.yaml
-  - network-policy-to-postgres.yaml
   - network-policy-from-ingress.yaml
