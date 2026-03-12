@@ -41,7 +41,6 @@ server:
                 operator: In
                 values:
                   - shion-ubuntu-2505
-                  - instance-2024-1
                   - instance-k8s-proxy
     podAntiAffinity:
       preferredDuringSchedulingIgnoredDuringExecution:
