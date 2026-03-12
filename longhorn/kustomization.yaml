@@ -3,7 +3,6 @@ kind: Kustomization
 resources:
   # Longhorn node configurations
   - node-longhorn-shion-ubuntu-2505.yaml
-  - node-longhorn-instance-2024-1.yaml
   - node-longhorn-instance-k8s-proxy.yaml
   # Backup target configuration
   - backup-target.yaml
