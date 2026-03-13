@@ -54,7 +54,7 @@ extraObjects:
               restartPolicy: Never
               containers:
                 - name: renovate
-                  image: "ghcr.io/renovatebot/renovate:46.56.3"
+                  image: "ghcr.io/renovatebot/renovate:43.71.0"
                   imagePullPolicy: IfNotPresent
                   command:
                     - /bin/bash
