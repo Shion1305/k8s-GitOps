@@ -27,6 +27,76 @@ extraVolumeMounts:
   - name: scripts
     mountPath: /scripts
 
+extraObjects:
+  - apiVersion: batch/v1
+    kind: CronJob
+    metadata:
+      name: renovate-bug-discussion-41912
+    spec:
+      schedule: "0 * * * *"
+      suspend: true
+      concurrencyPolicy: Forbid
+      failedJobsHistoryLimit: 1
+      successfulJobsHistoryLimit: 1
+      jobTemplate:
+        metadata:
+          labels:
+            app.kubernetes.io/name: renovate
+            app.kubernetes.io/instance: renovate
+        spec:
+          template:
+            metadata:
+              labels:
+                app.kubernetes.io/name: renovate
+                app.kubernetes.io/instance: renovate
+            spec:
+              serviceAccountName: renovate
+              restartPolicy: Never
+              containers:
+                - name: renovate
+                  image: "ghcr.io/renovatebot/renovate:46.56.3"
+                  imagePullPolicy: IfNotPresent
+                  command:
+                    - /bin/bash
+                    - /scripts/run-bug-discussion-41912.sh
+                  volumeMounts:
+                    - name: config-volume
+                      mountPath: /usr/src/app/config.json
+                      subPath: config.json
+                    - mountPath: /scripts
+                      name: scripts
+                  env:
+                    - name: RENOVATE_CONFIG_FILE
+                      value: /usr/src/app/config.json
+                    - name: "LOG_LEVEL"
+                      value: "debug"
+                    - name: "RENOVATE_AUTODISCOVER"
+                      value: "false"
+                  envFrom:
+                    - secretRef:
+                        name: renovate-secret
+                  resources:
+                    limits:
+                      cpu: 2000m
+                      memory: 2Gi
+                    requests:
+                      cpu: 200m
+                      memory: 512Mi
+              volumes:
+                - name: config-volume
+                  configMap:
+                    name: renovate-config
+                - configMap:
+                    defaultMode: 0755
+                    name: renovate-scripts
+                  name: scripts
+              securityContext:
+                fsGroup: 1000
+                runAsNonRoot: true
+                runAsUser: 1000
+                seccompProfile:
+                  type: RuntimeDefault
+
 # Environment variables
 env:
   LOG_LEVEL: "info"
