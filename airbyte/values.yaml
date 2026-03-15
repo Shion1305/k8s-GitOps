@@ -3085,7 +3085,7 @@ stiggSidecar:
   image:
     repository: public.ecr.aws/stigg/sidecar
     pullPolicy: IfNotPresent
-    tag: 5.258.0
+    tag: 6.7.3
 
   service:
     type: ClusterIP
