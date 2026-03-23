@@ -31,8 +31,9 @@ resources:
   requests:
     cpu: 100m
     memory: 30Mi
-# Host network and PID for proper node metrics collection
-hostNetwork: true
+# hostNetwork disabled so pod gets a CNI IP reachable by Prometheus
+# (hostNetwork: true caused pod to use the node host IP which is firewalled)
+hostNetwork: false
 hostPID: true
 # Mount host filesystem for metrics collection
 hostRootFSMount:
