@@ -20,7 +20,7 @@ spec:
       path: node-exporter
   destination:
     server: https://kubernetes.default.svc
-    namespace: node-exporter
+    namespace: grafana
   syncPolicy:
     automated:
       prune: true
