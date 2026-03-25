@@ -26,10 +26,7 @@
       "matchFileNames": [
         "apps/**/*.yaml"
       ],
-      "automerge": true,
-      "schedule": [
-        "before 6am on Monday"
-      ]
+      "automerge": true
     },
     {
       "description": "Schedule Helm chart updates in ArgoCD Applications",
@@ -39,20 +36,14 @@
       "matchFileNames": [
         "apps/**/*.yaml"
       ],
-      "automerge": true,
-      "schedule": [
-        "before 6am on Monday"
-      ]
+      "automerge": true
     },
     {
       "description": "Docker image updates",
       "matchDatasources": [
         "docker"
       ],
-      "automerge": true,
-      "schedule": [
-        "before 6am on Monday"
-      ]
+      "automerge": true
     },
     {
       "description": "Custom manager updates (aqua, etc)",
