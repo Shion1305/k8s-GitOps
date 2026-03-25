@@ -62,6 +62,14 @@
       "automerge": true
     },
     {
+      "description": "Grafana dashboard revision updates",
+      "matchDatasources": [
+        "grafana-dashboards"
+      ],
+      "groupName": "grafana dashboards",
+      "automerge": true
+    },
+    {
       "description": "Major updates",
       "matchUpdateTypes": [
         "major"
@@ -84,7 +92,28 @@
       "/\\.yaml$/"
     ]
   },
+  "customDatasources": {
+    "grafana-dashboards": {
+      "defaultRegistryUrlTemplate": "https://grafana.com/api/dashboards/{{packageName}}",
+      "format": "json",
+      "transformTemplates": [
+        "{\"releases\": [{\"version\": $string(revision)}]}"
+      ]
+    }
+  },
   "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Update Grafana dashboard revisions",
+      "managerFilePatterns": [
+        "/\\.yaml$/"
+      ],
+      "matchStrings": [
+        "gnetId: (?<depName>\\d+)\\s+revision: (?<currentValue>\\d+)"
+      ],
+      "datasourceTemplate": "grafana-dashboards",
+      "versioningTemplate": "regex:^(?<major>\\d+)$"
+    },
     {
       "customType": "regex",
       "description": "Update Helm chart versions in ArgoCD Applications",
