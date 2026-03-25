@@ -106,7 +106,7 @@
       "customType": "regex",
       "description": "Update Grafana dashboard revisions",
       "managerFilePatterns": [
-        "/grafana/values\\.yaml$/"
+        "/\\.yaml$/"
       ],
       "matchStrings": [
         "gnetId: (?<depName>\\d+)\\s+revision: (?<currentValue>\\d+)"
