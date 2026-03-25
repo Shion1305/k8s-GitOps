@@ -109,7 +109,7 @@
         "/grafana/values\\.yaml$/"
       ],
       "matchStrings": [
-        "# renovate: datasource=grafana-dashboards depName=(?<depName>\\d+)\\s+gnetId: \\d+\\s+revision: (?<currentValue>\\d+)"
+        "gnetId: (?<depName>\\d+)\\s+revision: (?<currentValue>\\d+)"
       ],
       "datasourceTemplate": "grafana-dashboards",
       "versioningTemplate": "regex:^(?<major>\\d+)$"

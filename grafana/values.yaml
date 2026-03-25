@@ -84,23 +84,19 @@ grafana:
   dashboards:
     default:
       kubernetes-cluster-monitoring:
-        # renovate: datasource=grafana-dashboards depName=7249
         gnetId: 7249
         revision: 1
         datasource: Prometheus
       kubernetes-node-exporter:
-        # renovate: datasource=grafana-dashboards depName=1860
         gnetId: 1860
         revision: 37
         datasource: Prometheus
     node-exporter:
       node-exporter-full:
-        # renovate: datasource=grafana-dashboards depName=1860
         gnetId: 1860
         revision: 37
         datasource: Prometheus
       node-exporter-server-metrics:
-        # renovate: datasource=grafana-dashboards depName=405
         gnetId: 405
         revision: 8
         datasource: Prometheus
