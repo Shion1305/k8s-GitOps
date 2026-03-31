@@ -1,0 +1,19 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: network-policies
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/shion1305/k8s-GitOps.git  # Update with your repo URL
+    targetRevision: main
+    path: network-policies
+  destination:
+    server: https://kubernetes.default.svc
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false  # Namespaces should already exist

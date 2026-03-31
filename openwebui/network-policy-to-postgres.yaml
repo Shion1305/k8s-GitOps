@@ -1,0 +1,24 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-openwebui-to-postgres
+  namespace: openwebui
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: open-webui
+  policyTypes:
+    - Egress
+  egress:
+    # Allow egress to postgres-shared in postgres-operator-deployment namespace
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: postgres-operator-deployment
+          podSelector:
+            matchLabels:
+              application: spilo
+              cluster-name: postgres-shared
+      ports:
+        - protocol: TCP
+          port: 5432

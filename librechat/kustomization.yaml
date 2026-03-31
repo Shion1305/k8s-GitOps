@@ -4,4 +4,5 @@ resources:
   - namespace.yaml
   - network-policy-to-mcp.yaml
   - network-policy-mongodb.yaml
+  - network-policy-from-ingress.yaml
   - ingress.yaml
