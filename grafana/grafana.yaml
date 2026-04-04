@@ -1,0 +1,66 @@
+apiVersion: grafana.integreatly.org/v1beta1
+kind: Grafana
+metadata:
+  name: main-grafana
+  namespace: grafana
+  labels:
+    dashboards: main-grafana
+spec:
+  config:
+    server:
+      root_url: "https://o11y.k.shion1305.com/grafana/"
+      serve_from_sub_path: "true"
+    auth.anonymous:
+      enabled: "false"
+    auth.basic:
+      enabled: "false"
+    auth:
+      disable_login_form: "true"
+      disable_signout_menu: "false"
+      oauth_auto_login: "true"
+    auth.github:
+      enabled: "true"
+      allow_sign_up: "true"
+      client_id: ${dex.github.clientID}
+      client_secret: ${dex.github.clientSecret}
+      scopes: user:email,read:org
+      auth_url: https://github.com/login/oauth/authorize
+      token_url: https://github.com/login/oauth/access_token
+      api_url: https://api.github.com/user
+      allowed_organizations: Shion1305Dev
+      allow_assign_grafana_admin: "true"
+      role_attribute_path: contains(groups[*], '@Shion1305Dev/k-shion1305-com-admin') && 'Admin' || 'Viewer'
+    security:
+      admin_user: admin
+  deployment:
+    spec:
+      template:
+        spec:
+          containers:
+            - name: grafana
+              envFrom:
+                - secretRef:
+                    name: grafana-github-oauth-secret
+              resources:
+                limits:
+                  cpu: 500m
+                  memory: 1Gi
+                requests:
+                  cpu: 250m
+                  memory: 512Mi
+  service:
+    metadata: {}
+    spec:
+      type: NodePort
+      ports:
+        - port: 3000
+          targetPort: 3000
+          nodePort: 30080
+  persistentVolumeClaim:
+    spec:
+      accessModes:
+        - ReadWriteOnce
+      storageClassName: longhorn-hdd
+      resources:
+        requests:
+          storage: 10Gi

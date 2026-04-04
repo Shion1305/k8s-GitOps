@@ -1,0 +1,10 @@
+apiVersion: grafana.integreatly.org/v1beta1
+kind: GrafanaFolder
+metadata:
+  name: cloudflare-monitoring
+  namespace: monitoring
+spec:
+  instanceSelector:
+    matchLabels:
+      dashboards: cloudflare-grafana
+  title: "Cloudflare Monitoring"

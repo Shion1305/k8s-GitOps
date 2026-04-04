@@ -1,0 +1,27 @@
+apiVersion: grafana.integreatly.org/v1beta1
+kind: GrafanaDashboard
+metadata:
+  name: cloudflare-analytics
+  namespace: monitoring
+spec:
+  instanceSelector:
+    matchLabels:
+      dashboards: cloudflare-grafana
+  folderRef: cloudflare-monitoring
+  grafanaCom:
+    id: 12133
+    revision: 1
+---
+apiVersion: grafana.integreatly.org/v1beta1
+kind: GrafanaDashboard
+metadata:
+  name: cloudflare-overview
+  namespace: monitoring
+spec:
+  instanceSelector:
+    matchLabels:
+      dashboards: cloudflare-grafana
+  folderRef: cloudflare-monitoring
+  grafanaCom:
+    id: 13133
+    revision: 1
