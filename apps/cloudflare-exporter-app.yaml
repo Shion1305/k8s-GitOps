@@ -14,14 +14,6 @@ spec:
         releaseName: cloudflare-exporter
         valueFiles:
           - $values/cloudflare-exporter/values.yaml
-    # Grafana for Cloudflare
-    - repoURL: https://grafana.github.io/helm-charts
-      chart: grafana
-      targetRevision: 10.5.15
-      helm:
-        releaseName: cloudflare-grafana
-        valueFiles:
-          - $values/cloudflare-exporter/grafana-values.yaml
     # Values reference
     - repoURL: https://github.com/Shion1305/k8s-GitOps.git
       targetRevision: HEAD
