@@ -6,8 +6,6 @@ backendStore:
     host: "postgres-shared.postgres-operator-deployment.svc.cluster.local"
     port: 5432
     database: "mlflow"
-    user: "mlflow"
-    password: "dummy"
     driver: "psycopg2"
   existingDatabaseSecret:
     name: "mlflow-db-credentials"
