@@ -13,10 +13,12 @@ spec:
     openwebui: []
     langfuse: []
     keycloak: []
+    mlflow: []
   databases:
     openwebui: openwebui
     langfuse: langfuse
     keycloak: keycloak
+    mlflow: mlflow
   postgresql:
     version: "17"
   resources:

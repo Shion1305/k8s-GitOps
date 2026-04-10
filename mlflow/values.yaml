@@ -1,0 +1,36 @@
+backendStore:
+  databaseMigration: true
+  databaseConnectionCheck: true
+  postgres:
+    enabled: true
+    host: "postgres-shared.postgres-operator-deployment.svc.cluster.local"
+    port: 5432
+    database: "mlflow"
+    user: "mlflow"
+    password: "dummy"
+    driver: "psycopg2"
+  existingDatabaseSecret:
+    name: "mlflow-db-credentials"
+    usernameKey: "DB_USER"
+    passwordKey: "DB_PASSWORD"
+
+artifactRoot:
+  defaultArtifactRoot: "/mlflow/artifacts"
+
+extraVolumes:
+  - name: mlflow-artifacts
+    persistentVolumeClaim:
+      claimName: mlflow-artifacts
+
+extraVolumeMounts:
+  - name: mlflow-artifacts
+    mountPath: /mlflow/artifacts
+
+ingress:
+  enabled: false
+
+postgresql:
+  enabled: false
+
+mysql:
+  enabled: false
