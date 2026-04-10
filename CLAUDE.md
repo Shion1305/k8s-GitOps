@@ -27,11 +27,14 @@ spec:
     path: <app-dir>  # Additional manifests (ingress, secrets, etc.)
 ```
 
+Not all apps use this multi-source pattern. Some apps use a **single-source pattern** pointing directly at a repo directory (e.g., `apps/ingress.yaml`), where ArgoCD deploys raw manifests or Kustomize from the directory. Check the existing app manifest to see which pattern is used.
+
 When modifying applications:
 
 - Helm chart configurations go in `<app-name>/values.yaml`
-- Additional Kubernetes manifests (Ingress, Secrets, Jobs) go in the app's directory
+- Additional Kubernetes manifests (Ingress, Secrets, Jobs) go in the app's directory, referenced by `kustomization.yaml`
 - Version updates are done by changing `targetRevision` in `apps/<app-name>-app.yaml`
+- To decommission an app, move its `apps/*.yaml` manifest to `apps/archived/`
 
 ## Key Commands
 
@@ -245,6 +248,16 @@ kubectl get volumes -n longhorn-system
 # View PV/PVC status
 kubectl get pv,pvc --all-namespaces
 ```
+
+## Dependency Management (Renovate)
+
+Renovate runs in-cluster (deployed via Helm chart in `renovate/`) and automatically creates PRs for dependency updates:
+
+- Configuration: `renovate.json` at repo root
+- Manages: ArgoCD Helm chart versions in `apps/*.yaml`, Docker image tags across all YAML files, and Grafana dashboard revisions
+- All dependency update PRs are set to **automerge**
+- Commit prefix: `chore(deps):` with semantic commits and git sign-off
+- PR limits: 5 concurrent, 2 per hour
 
 ## Important Notes
 
