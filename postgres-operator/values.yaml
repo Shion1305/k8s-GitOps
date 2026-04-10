@@ -3,6 +3,10 @@ image:
   repository: zalando/postgres-operator
   tag: v1.15.1
   pullPolicy: IfNotPresent
+# Use ConfigMap instead of OperatorConfigurationCRD to avoid CRD schema
+# defaults causing ArgoCD to normalize the configuration to {}, which
+# silently drops settings like enable_database_access.
+configTarget: "ConfigMap"
 # Operator configuration
 configGeneral:
   enable_crd_registration: true
