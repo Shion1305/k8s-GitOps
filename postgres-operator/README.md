@@ -292,7 +292,26 @@ spec:
     size: 50Gi  # Increases from current size
 ```
 
+## Configuration: `configTarget: ConfigMap`
+
+This deployment uses `configTarget: "ConfigMap"` instead of the default `OperatorConfigurationCRD`. This is intentional — see the incident report below for details.
+
 ## Troubleshooting
+
+### New users/databases not created after CRD update
+
+If you add a user to a `postgresql` CRD's `spec.users` and the operator creates the Kubernetes secret but the SQL role does not appear in the database:
+
+1. Verify the operator ConfigMap has `enable_database_access: "true"`:
+   ```bash
+   kubectl get configmap postgres-operator -n postgres-operator -o jsonpath='{.data.enable_database_access}'
+   ```
+2. If missing, check that `configTarget: "ConfigMap"` is set in `postgres-operator/values.yaml` and ArgoCD has synced.
+3. Restart the operator and trigger a resync:
+   ```bash
+   kubectl rollout restart deployment -n postgres-operator -l app.kubernetes.io/name=postgres-operator
+   kubectl annotate postgresql <cluster> -n <namespace> zalando.org/resync="$(date +%s)" --overwrite
+   ```
 
 ### Common Issues
 
@@ -313,7 +332,7 @@ spec:
 
 ```bash
 # Check operator logs
-kubectl logs -n postgres-operator -l name=postgres-operator
+kubectl logs -n postgres-operator -l app.kubernetes.io/name=postgres-operator
 
 # Check cluster events
 kubectl describe postgresql my-cluster
@@ -323,6 +342,72 @@ kubectl logs my-cluster-0 -c postgres
 
 # Check operator status
 kubectl get postgresql my-cluster -o yaml
+```
+
+## Incident Report: PostgreSQL User Provisioning Failure (2026-04-10)
+
+### Symptom
+
+When adding new users/databases to the `postgres-shared` postgresql CRD (e.g., `mlflow`), the operator:
+- Created the Kubernetes credential secret
+- **Did not** create the actual PostgreSQL role or database
+- Reported "cluster has been updated" with no errors
+
+Applications failed with `FATAL: password authentication failed`. This was a recurring issue, previously worked around by manually creating SQL roles.
+
+### Root Cause
+
+The failure involved three components:
+
+```
+Helm Chart ──renders──▶ OperatorConfiguration CRD
+                              │
+                        CRD has OpenAPI schema defaults
+                        matching all Helm values
+                              │
+ArgoCD compares desired ◀─────┘
+vs live state, sees no diff
+                              │
+                        Applies configuration: {}
+                              │
+Operator reads empty config ◀─┘
+enable_database_access defaults
+to false internally
+                              │
+                        Operator skips all SQL operations ◀── ROOT CAUSE
+                        (CREATE ROLE, CREATE DATABASE, etc.)
+```
+
+**Step 1:** The Helm chart renders a full `OperatorConfiguration` with `debug.enable_database_access: true`.
+
+**Step 2:** The `OperatorConfiguration` CRD defines OpenAPI v3 schema defaults for nearly every field. When a resource is applied, the Kubernetes API server automatically populates missing fields.
+
+**Step 3:** ArgoCD compares desired state (Helm output) with live state (CRD + defaults). Because CRD defaults match Helm values, ArgoCD sees no diff and applies `configuration: {}`.
+
+**Evidence** — the `last-applied-configuration` annotation showed:
+```json
+{"configuration":{},"kind":"OperatorConfiguration",...}
+```
+
+**Step 4:** The operator reads the empty config. Its internal Go default for `enable_database_access` is `false`. With this disabled, the operator manages Kubernetes secrets but skips all direct database access — no `CREATE ROLE`, no `CREATE DATABASE`, no errors logged.
+
+### Why existing users worked
+
+The `openwebui`, `langfuse`, and `keycloak` users were created during the initial cluster bootstrap by Patroni/Spilo (via `initdb`), not by the operator's sync loop. `enable_database_access` only affects post-bootstrap operations on existing clusters.
+
+### Fix
+
+Switched `configTarget` from `OperatorConfigurationCRD` to `ConfigMap` in `postgres-operator/values.yaml` (PR #191). ConfigMaps don't have CRD schema defaulting, so ArgoCD applies all key-value pairs as rendered by Helm.
+
+### Post-fix verification
+
+```bash
+# Confirm ConfigMap has the setting
+kubectl get configmap postgres-operator -n postgres-operator -o jsonpath='{.data.enable_database_access}'
+# Should output: true
+
+# Confirm user was created
+kubectl exec -n postgres-operator-deployment postgres-shared-0 -- psql -U postgres -c "SELECT usename FROM pg_shadow;"
 ```
 
 ## Security
