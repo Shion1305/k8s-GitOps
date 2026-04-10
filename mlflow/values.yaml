@@ -25,7 +25,7 @@ extraVolumeMounts:
     mountPath: /mlflow/artifacts
 
 extraEnvVars:
-  MLFLOW_ALLOWED_HOSTS: "mlflow.k.shion1305.com"
+  MLFLOW_SERVER_ALLOWED_HOSTS: "mlflow.k.shion1305.com"
 
 ingress:
   enabled: false
