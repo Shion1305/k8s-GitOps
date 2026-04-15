@@ -23,16 +23,6 @@ spec:
           - --config
           - /freqtrade/user_data/config.json
         env:
-        - name: FREQTRADE__EXCHANGE__KEY
-          valueFrom:
-            secretKeyRef:
-              name: freqtrade-secrets
-              key: EXCHANGE_KEY
-        - name: FREQTRADE__EXCHANGE__SECRET
-          valueFrom:
-            secretKeyRef:
-              name: freqtrade-secrets
-              key: EXCHANGE_SECRET
         - name: FREQTRADE__API_SERVER__JWT_SECRET_KEY
           valueFrom:
             secretKeyRef:
