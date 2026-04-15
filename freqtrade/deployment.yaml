@@ -22,6 +22,32 @@ spec:
           - trade
           - --config
           - /freqtrade/user_data/config.json
+        env:
+        - name: FREQTRADE__EXCHANGE__KEY
+          valueFrom:
+            secretKeyRef:
+              name: freqtrade-secrets
+              key: EXCHANGE_KEY
+        - name: FREQTRADE__EXCHANGE__SECRET
+          valueFrom:
+            secretKeyRef:
+              name: freqtrade-secrets
+              key: EXCHANGE_SECRET
+        - name: FREQTRADE__API_SERVER__JWT_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: freqtrade-secrets
+              key: JWT_SECRET_KEY
+        - name: FREQTRADE__API_SERVER__USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: freqtrade-secrets
+              key: API_USERNAME
+        - name: FREQTRADE__API_SERVER__PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: freqtrade-secrets
+              key: API_PASSWORD
         ports:
         - containerPort: 8080
           name: http

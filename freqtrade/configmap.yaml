@@ -17,8 +17,6 @@ data:
       "cancel_open_orders_on_exit": false,
       "exchange": {
         "name": "binance",
-        "key": "",
-        "secret": "",
         "ccxt_sync_config": {},
         "ccxt_async_config": {}
       },
@@ -28,10 +26,7 @@ data:
         "listen_port": 8080,
         "verbosity": "error",
         "enable_openapi": true,
-        "jwt_secret_key": "change-me-to-a-random-string",
-        "CORS_origins": [],
-        "username": "freqtrader",
-        "password": "freqtrader"
+        "CORS_origins": []
       },
       "bot_name": "freqtrade",
       "initial_state": "running",

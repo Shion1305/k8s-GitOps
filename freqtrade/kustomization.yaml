@@ -4,6 +4,8 @@ kind: Kustomization
 namespace: freqtrade
 
 resources:
+  - vault-secret-store.yaml
+  - external-secret.yaml
   - configmap.yaml
   - pvc.yaml
   - deployment.yaml
