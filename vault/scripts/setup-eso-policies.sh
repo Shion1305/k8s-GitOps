@@ -84,12 +84,12 @@ path "lumos-bot/metadata/*" {
 EOF
 echo "✓ Created policy: eso-lumos-bot"
 
-# Policy for freqtrade namespace
+# Policy for freqtrade namespace (separate KV v2 engine mounted at freqtrade/)
 vault policy write eso-freqtrade - <<EOF
-path "secret/data/shared/freqtrade" {
+path "freqtrade/data/*" {
   capabilities = ["read"]
 }
-path "secret/metadata/shared/freqtrade" {
+path "freqtrade/metadata/*" {
   capabilities = ["read", "list"]
 }
 EOF
@@ -168,4 +168,4 @@ echo "  eso-openwebui→ SA eso/openwebui                     → secret/data/sh
 echo "  eso-keycloak → SA eso/keycloak                      → secret/data/shared/keycloak"
 echo "  eso-atc      → SA eso/atc                           → atc/data/*"
 echo "  eso-lumos-bot→ SA eso/lumos-bot                     → lumos-bot/data/*"
-echo "  eso-freqtrade→ SA eso/freqtrade                    → secret/data/shared/freqtrade"
+echo "  eso-freqtrade→ SA eso/freqtrade                    → freqtrade/data/*"
