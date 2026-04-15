@@ -6,7 +6,6 @@ metadata:
 data:
   config.json: |
     {
-      "strategy": "SampleStrategy",
       "trading_mode": "spot",
       "margin_mode": "",
       "max_open_trades": 5,

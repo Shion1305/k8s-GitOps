@@ -6,6 +6,7 @@ namespace: freqtrade
 resources:
   - vault-secret-store.yaml
   - external-secret.yaml
+  - external-secret-strategy.yaml
   - configmap.yaml
   - pvc.yaml
   - deployment.yaml
