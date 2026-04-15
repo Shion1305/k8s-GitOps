@@ -25,7 +25,6 @@ data:
         "listen_ip_address": "0.0.0.0",
         "listen_port": 8080,
         "verbosity": "error",
-        "enable_openapi": true,
         "CORS_origins": []
       },
       "bot_name": "freqtrade",

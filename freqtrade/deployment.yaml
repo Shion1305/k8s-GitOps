@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
       - name: freqtrade
-        image: freqtradeorg/freqtrade:2025.3
+        image: freqtradeorg/freqtrade:stable
         args:
           - trade
           - --config
@@ -72,15 +72,15 @@ spec:
           initialDelaySeconds: 10
           periodSeconds: 5
         volumeMounts:
+        - name: user-data
+          mountPath: /freqtrade/user_data
         - name: config
           mountPath: /freqtrade/user_data/config.json
           subPath: config.json
-        - name: user-data
-          mountPath: /freqtrade/user_data/data
       volumes:
-      - name: config
-        configMap:
-          name: freqtrade-config
       - name: user-data
         persistentVolumeClaim:
           claimName: freqtrade-data
+      - name: config
+        configMap:
+          name: freqtrade-config
