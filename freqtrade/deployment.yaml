@@ -20,7 +20,7 @@ spec:
       initContainers:
       - name: copy-strategy
         image: busybox:1.37
-        command: ["sh", "-c", "mkdir -p /user-data/strategies && cp /strategy/*.py /user-data/strategies/"]
+        command: ["sh", "-c", "mkdir -p /user-data/strategies && cp /strategy/*.py /user-data/strategies/ || echo 'WARN: no strategy files found'"]
         volumeMounts:
         - name: user-data
           mountPath: /user-data
