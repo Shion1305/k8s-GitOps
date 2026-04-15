@@ -14,7 +14,18 @@ spec:
     metadata:
       labels:
         app: freqtrade
+      annotations:
+        reloader.stakater.com/auto: "true"
     spec:
+      initContainers:
+      - name: copy-strategy
+        image: busybox:1.37
+        command: ["sh", "-c", "mkdir -p /user-data/strategies && cp /strategy/*.py /user-data/strategies/ || echo 'WARN: no strategy files found'"]
+        volumeMounts:
+        - name: user-data
+          mountPath: /user-data
+        - name: strategy
+          mountPath: /strategy
       containers:
       - name: freqtrade
         image: freqtradeorg/freqtrade:stable
@@ -23,6 +34,11 @@ spec:
           - --config
           - /freqtrade/user_data/config.json
         env:
+        - name: FREQTRADE__STRATEGY
+          valueFrom:
+            secretKeyRef:
+              name: freqtrade-secrets
+              key: STRATEGY
         - name: FREQTRADE__API_SERVER__JWT_SECRET_KEY
           valueFrom:
             secretKeyRef:
@@ -74,3 +90,6 @@ spec:
       - name: config
         configMap:
           name: freqtrade-config
+      - name: strategy
+        secret:
+          secretName: freqtrade-strategy
