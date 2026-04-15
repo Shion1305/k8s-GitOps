@@ -84,6 +84,17 @@ path "lumos-bot/metadata/*" {
 EOF
 echo "✓ Created policy: eso-lumos-bot"
 
+# Policy for freqtrade namespace (separate KV v2 engine mounted at freqtrade/)
+vault policy write eso-freqtrade - <<EOF
+path "freqtrade/data/*" {
+  capabilities = ["read"]
+}
+path "freqtrade/metadata/*" {
+  capabilities = ["read", "list"]
+}
+EOF
+echo "✓ Created policy: eso-freqtrade"
+
 echo ""
 echo "=== Creating namespace-scoped Kubernetes auth roles ==="
 
@@ -135,6 +146,14 @@ vault write auth/kubernetes/role/eso-lumos-bot \
   ttl=1h
 echo "✓ Created role: eso-lumos-bot"
 
+# Freqtrade
+vault write auth/kubernetes/role/eso-freqtrade \
+  bound_service_account_names=eso \
+  bound_service_account_namespaces=freqtrade \
+  policies=eso-freqtrade \
+  ttl=1h
+echo "✓ Created role: eso-freqtrade"
+
 echo ""
 echo "=== Removing old broad policy ==="
 vault policy delete eso-policy 2>/dev/null && echo "✓ Deleted old policy: eso-policy" || echo "ⓘ Policy eso-policy not found (already removed)"
@@ -149,3 +168,4 @@ echo "  eso-openwebui→ SA eso/openwebui                     → secret/data/sh
 echo "  eso-keycloak → SA eso/keycloak                      → secret/data/shared/keycloak"
 echo "  eso-atc      → SA eso/atc                           → atc/data/*"
 echo "  eso-lumos-bot→ SA eso/lumos-bot                     → lumos-bot/data/*"
+echo "  eso-freqtrade→ SA eso/freqtrade                    → freqtrade/data/*"

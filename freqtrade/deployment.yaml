@@ -1,0 +1,76 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: freqtrade
+  namespace: freqtrade
+  labels:
+    app: freqtrade
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: freqtrade
+  template:
+    metadata:
+      labels:
+        app: freqtrade
+    spec:
+      containers:
+      - name: freqtrade
+        image: freqtradeorg/freqtrade:stable
+        args:
+          - trade
+          - --config
+          - /freqtrade/user_data/config.json
+        env:
+        - name: FREQTRADE__API_SERVER__JWT_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: freqtrade-secrets
+              key: JWT_SECRET_KEY
+        - name: FREQTRADE__API_SERVER__USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: freqtrade-secrets
+              key: API_USERNAME
+        - name: FREQTRADE__API_SERVER__PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: freqtrade-secrets
+              key: API_PASSWORD
+        ports:
+        - containerPort: 8080
+          name: http
+          protocol: TCP
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "50m"
+          limits:
+            memory: "1Gi"
+            cpu: "1"
+        livenessProbe:
+          httpGet:
+            path: /api/v1/ping
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /api/v1/ping
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 5
+        volumeMounts:
+        - name: user-data
+          mountPath: /freqtrade/user_data
+        - name: config
+          mountPath: /freqtrade/user_data/config.json
+          subPath: config.json
+      volumes:
+      - name: user-data
+        persistentVolumeClaim:
+          claimName: freqtrade-data
+      - name: config
+        configMap:
+          name: freqtrade-config
