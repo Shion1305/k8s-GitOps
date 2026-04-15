@@ -52,6 +52,11 @@ data:
         "30": 0.02,
         "0": 0.04
       },
+      "pairlists": [
+        {
+          "method": "StaticPairList"
+        }
+      ],
       "stoploss": -0.10,
       "api_server": {
         "enabled": true,
