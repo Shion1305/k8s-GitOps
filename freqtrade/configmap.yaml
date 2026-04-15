@@ -15,11 +15,44 @@ data:
       "dry_run": true,
       "dry_run_wallet": 1000,
       "cancel_open_orders_on_exit": false,
+      "entry_pricing": {
+        "price_side": "same",
+        "use_order_book": true,
+        "order_book_top": 1,
+        "price_last_balance": 0.0
+      },
+      "exit_pricing": {
+        "price_side": "same",
+        "use_order_book": true,
+        "order_book_top": 1,
+        "price_last_balance": 0.0
+      },
       "exchange": {
         "name": "binance",
+        "pair_whitelist": [
+          "BTC/USDT",
+          "ETH/USDT"
+        ],
+        "pair_blacklist": [],
         "ccxt_sync_config": {},
         "ccxt_async_config": {}
       },
+      "unfilledtimeout": {
+        "entry": 10,
+        "exit": 10
+      },
+      "order_types": {
+        "entry": "limit",
+        "exit": "limit",
+        "stoploss": "market",
+        "stoploss_on_exchange": false
+      },
+      "minimal_roi": {
+        "60": 0.01,
+        "30": 0.02,
+        "0": 0.04
+      },
+      "stoploss": -0.10,
       "api_server": {
         "enabled": true,
         "listen_ip_address": "0.0.0.0",
