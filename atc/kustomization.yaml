@@ -15,3 +15,7 @@ resources:
   - vault-secret-store.yaml
   - external-secret.yaml
   - deployment-gmocoin-exec-alert.yaml
+  - minio-external-secret.yaml
+  - minio-statefulset.yaml
+  - minio-service.yaml
+  - minio-ingress.yaml
