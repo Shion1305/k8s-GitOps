@@ -1,0 +1,33 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: seaweedfs-historical-source
+  namespace: atc
+  labels:
+    app: seaweedfs-historical-source
+spec:
+  type: ClusterIP
+  selector:
+    app: seaweedfs-historical-source
+  ports:
+    - name: master-http
+      port: 9333
+      targetPort: 9333
+    - name: master-grpc
+      port: 19333
+      targetPort: 19333
+    - name: volume-http
+      port: 8080
+      targetPort: 8080
+    - name: volume-grpc
+      port: 18080
+      targetPort: 18080
+    - name: filer-http
+      port: 8888
+      targetPort: 8888
+    - name: filer-grpc
+      port: 18888
+      targetPort: 18888
+    - name: s3-http
+      port: 8333
+      targetPort: 8333
