@@ -1,0 +1,96 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: seaweedfs-historical-source
+  namespace: atc
+  labels:
+    app: seaweedfs-historical-source
+spec:
+  serviceName: seaweedfs-historical-source
+  replicas: 1
+  selector:
+    matchLabels:
+      app: seaweedfs-historical-source
+  template:
+    metadata:
+      annotations:
+        reloader.stakater.com/auto: "true"
+      labels:
+        app: seaweedfs-historical-source
+    spec:
+      securityContext:
+        fsGroup: 1000
+        runAsUser: 1000
+        runAsNonRoot: true
+      containers:
+        - name: seaweedfs
+          image: chrislusf/seaweedfs:4.20
+          args:
+            - server
+            - -dir=/data
+            - -master
+            - -master.volumeSizeLimitMB=1024
+            - -volume
+            - -volume.max=0
+            - -filer
+            - -s3
+            - -s3.config=/etc/seaweedfs/s3.config.json
+          ports:
+            - name: master-http
+              containerPort: 9333
+            - name: master-grpc
+              containerPort: 19333
+            - name: volume-http
+              containerPort: 8080
+            - name: volume-grpc
+              containerPort: 18080
+            - name: filer-http
+              containerPort: 8888
+            - name: filer-grpc
+              containerPort: 18888
+            - name: s3-http
+              containerPort: 8333
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 1000m
+              memory: 1Gi
+          livenessProbe:
+            httpGet:
+              path: /cluster/status
+              port: 9333
+            initialDelaySeconds: 30
+            periodSeconds: 20
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /cluster/status
+              port: 9333
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            failureThreshold: 3
+          volumeMounts:
+            - name: data
+              mountPath: /data
+            - name: s3-config
+              mountPath: /etc/seaweedfs
+              readOnly: true
+      volumes:
+        - name: s3-config
+          secret:
+            secretName: seaweedfs-historical-source-credentials
+            items:
+              - key: s3.config.json
+                path: s3.config.json
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        storageClassName: longhorn-hdd
+        resources:
+          requests:
+            storage: 500Gi
