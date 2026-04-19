@@ -11,7 +11,7 @@ spec:
     path: atc
   destination:
     server: https://kubernetes.default.svc
-    namespace: postgres-operator-deployment
+    namespace: atc
   syncPolicy:
     automated:
       prune: true
