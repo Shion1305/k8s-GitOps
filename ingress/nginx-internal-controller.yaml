@@ -90,7 +90,7 @@ metadata:
 data:
   # IP whitelist for internal network
   # External users will be blocked even if they somehow reach this controller
-  whitelist-source-range: "10.130.5.0/24"
+  whitelist-source-range: "10.130.5.0/24,192.168.40.0/24"
   # Allow snippet annotations for custom configurations
   allow-snippet-annotations: "true"
   annotations-risk-level: "Critical"
