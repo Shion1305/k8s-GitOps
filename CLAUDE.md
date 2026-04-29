@@ -125,12 +125,6 @@ This cluster uses a layered secret management approach:
   - `registry`: Docker registry authentication
 - **GitHub Actions Integration**: Uses OIDC token exchange via `gha-exchanger` client
 
-### Zot Registry
-
-- OCI container registry with Keycloak authentication
-- Auth URL: <https://keycloak.k.shion1305.com/realms/registry/protocol/docker-v2/auth>
-- Integrated with GitHub Actions for CI/CD workflows
-
 ## Storage
 
 ### Longhorn (Distributed Storage)
@@ -176,7 +170,7 @@ Service discovery via ServiceMonitors - Prometheus automatically discovers and s
 Two ingress classes are configured:
 
 1. **nginx-ssl**: SSL-enabled ingress with TLS termination
-   - Used by: ArgoCD, Grafana, Keycloak, Vault, Zot
+   - Used by: ArgoCD, Grafana, Keycloak, Vault
    - Configuration: `ingress/nginx-ssl-controller.yaml`
 
 2. **nginx-internal**: Internal-only ingress with TLS and IP whitelist

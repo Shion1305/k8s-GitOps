@@ -22,7 +22,6 @@ This repository implements a comprehensive GitOps workflow for Kubernetes using 
 
 ### Infrastructure
 
-- **Zot** - OCI container registry
 - **Local Storage** - Local path provisioner for persistent volumes
 - **NGINX Ingress** - Ingress controller with SSL support
 

@@ -6,7 +6,7 @@ metadata:
 spec:
   project: default
   sources:
-    - repoURL: https://helm.openwebui.com/
+    - repoURL: https://helm.openwebui.com
       chart: open-webui
       targetRevision: 13.3.1
       helm:
