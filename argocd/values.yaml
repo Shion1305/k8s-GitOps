@@ -129,6 +129,11 @@ server:
   # Keep existing service
   service:
     type: ClusterIP
+  # Increase probe timeouts to tolerate transient node pressure (default 1s caused crashloops)
+  livenessProbe:
+    timeoutSeconds: 5
+  readinessProbe:
+    timeoutSeconds: 5
 # Dex configuration
 dex:
   enabled: true
@@ -138,9 +143,15 @@ redis:
 # Application controller
 controller:
   replicas: 1
+  readinessProbe:
+    timeoutSeconds: 5
 # Repo server
 repoServer:
   replicas: 1
+  livenessProbe:
+    timeoutSeconds: 5
+  readinessProbe:
+    timeoutSeconds: 5
 # ApplicationSet controller
 applicationSet:
   replicas: 1
