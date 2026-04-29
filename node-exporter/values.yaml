@@ -17,10 +17,7 @@ securityContext:
   runAsNonRoot: true
   runAsUser: 65534
   fsGroup: 65534
-# Node selector to avoid cordoned nodes (deploy only to available nodes)
-nodeSelector:
-  kubernetes.io/hostname: shion-ubuntu-2505
-# Tolerations - allow deployment on all nodes including master
+# Tolerations - allow deployment on all nodes including control-plane
 tolerations:
   - operator: Exists
 # Resource limits
