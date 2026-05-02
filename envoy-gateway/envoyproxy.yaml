@@ -11,6 +11,12 @@
 # --base-id 1 is required because Cilium runs its own Envoy (cilium-envoy) on
 # the same node in the host network namespace. Both default to base-id=0 and
 # fight over the shared-memory domain socket (errno=98 EADDRINUSE on bind).
+#
+# useListenerPortAsContainerPort: true makes Envoy bind the Gateway's listener
+# ports directly (80/443) instead of the default 10000-offset ports
+# (10080/10443). Required for hostNetwork because there is no Service in front
+# to remap ports. NET_BIND_SERVICE (set in the patch below) lets the unprivileged
+# envoy user bind ports <1024.
 apiVersion: gateway.envoyproxy.io/v1alpha1
 kind: EnvoyProxy
 metadata:
@@ -18,6 +24,7 @@ metadata:
   namespace: envoy-gateway-system
 spec:
   mergeGateways: true
+  useListenerPortAsContainerPort: true
   extraArgs:
     - --base-id
     - "1"
