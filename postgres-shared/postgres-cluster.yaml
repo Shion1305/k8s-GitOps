@@ -20,7 +20,7 @@ spec:
     langfuse: langfuse
     keycloak: keycloak
     mlflow: mlflow
-    nc-press-chotatsu-data: nc_press_chotatsu_data
+    nc_press_chotatsu_data: nc_press_chotatsu_data
   postgresql:
     version: "17"
   resources:
