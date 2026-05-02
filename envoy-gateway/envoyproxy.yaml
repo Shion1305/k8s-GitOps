@@ -59,6 +59,12 @@ spec:
                   containers:
                     - name: envoy
                       securityContext:
+                        # allowPrivilegeEscalation must be true so the
+                        # NET_BIND_SERVICE capability can be promoted into the
+                        # process's effective set; without it, the kernel keeps
+                        # the cap in permitted-only and bind(80/443) fails with
+                        # EACCES under runAsNonRoot.
+                        allowPrivilegeEscalation: true
                         capabilities:
                           add:
                             - NET_BIND_SERVICE
