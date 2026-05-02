@@ -58,13 +58,17 @@ spec:
                   dnsPolicy: ClusterFirstWithHostNet
                   containers:
                     - name: envoy
+                      # Run envoy as root (UID 0) so it can bind privileged
+                      # ports 80/443 under hostNetwork. The distroless envoy
+                      # binary has no file capabilities (`setcap`) baked in,
+                      # so passing NET_BIND_SERVICE via capabilities.add is a
+                      # no-op for non-root users — the kernel clears
+                      # permitted/effective sets on exec. capabilities.drop
+                      # ALL keeps the privilege surface narrow even as root.
                       securityContext:
-                        # allowPrivilegeEscalation must be true so the
-                        # NET_BIND_SERVICE capability can be promoted into the
-                        # process's effective set; without it, the kernel keeps
-                        # the cap in permitted-only and bind(80/443) fails with
-                        # EACCES under runAsNonRoot.
-                        allowPrivilegeEscalation: true
+                        runAsUser: 0
+                        runAsGroup: 0
+                        runAsNonRoot: false
                         capabilities:
                           add:
                             - NET_BIND_SERVICE
