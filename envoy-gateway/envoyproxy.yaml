@@ -1,7 +1,12 @@
 # Data plane configuration for the Envoy Gateway controller.
-# Pins the Envoy proxy DaemonSet to instance-k8s-proxy and binds 80/443 via hostNetwork
+# Pins the Envoy proxy Pod to instance-k8s-proxy and binds 80/443 via hostNetwork
 # so that *.i.shion1305.com (10.130.5.21) and test-external.shion1305.com (141.147.189.36)
 # resolve directly to this node.
+#
+# hostNetwork / dnsPolicy are not native EnvoyProxy CRD fields (removed in v1.0.0,
+# tracking issue: envoyproxy/gateway#1928). The official escape hatch is the
+# StrategicMerge patch on envoyDeployment. NET_BIND_SERVICE is required because
+# the data plane binds privileged ports (<1024).
 apiVersion: gateway.envoyproxy.io/v1alpha1
 kind: EnvoyProxy
 metadata:
@@ -21,8 +26,6 @@ spec:
             - key: node-role.kubernetes.io/control-plane
               operator: Exists
               effect: NoSchedule
-          hostNetwork: true
-          dnsPolicy: ClusterFirstWithHostNet
         container:
           resources:
             requests:
@@ -31,6 +34,20 @@ spec:
             limits:
               cpu: 1000m
               memory: 512Mi
+        patch:
+          type: StrategicMerge
+          value:
+            spec:
+              template:
+                spec:
+                  hostNetwork: true
+                  dnsPolicy: ClusterFirstWithHostNet
+                  containers:
+                    - name: envoy
+                      securityContext:
+                        capabilities:
+                          add:
+                            - NET_BIND_SERVICE
       envoyService:
         # Pod uses hostNetwork so the Service is informational only.
         type: ClusterIP
