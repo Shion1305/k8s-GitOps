@@ -1,0 +1,36 @@
+# Data plane configuration for the Envoy Gateway controller.
+# Pins the Envoy proxy DaemonSet to instance-k8s-proxy and binds 80/443 via hostNetwork
+# so that *.i.shion1305.com (10.130.5.21) and test-external.shion1305.com (141.147.189.36)
+# resolve directly to this node.
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: EnvoyProxy
+metadata:
+  name: instance-k8s-proxy
+  namespace: envoy-gateway-system
+spec:
+  mergeGateways: true
+  provider:
+    type: Kubernetes
+    kubernetes:
+      envoyDeployment:
+        replicas: 1
+        pod:
+          nodeSelector:
+            kubernetes.io/hostname: instance-k8s-proxy
+          tolerations:
+            - key: node-role.kubernetes.io/control-plane
+              operator: Exists
+              effect: NoSchedule
+          hostNetwork: true
+          dnsPolicy: ClusterFirstWithHostNet
+        container:
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 1000m
+              memory: 512Mi
+      envoyService:
+        # Pod uses hostNetwork so the Service is informational only.
+        type: ClusterIP

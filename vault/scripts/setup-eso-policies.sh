@@ -95,6 +95,17 @@ path "freqtrade/metadata/*" {
 EOF
 echo "✓ Created policy: eso-freqtrade"
 
+# Policy for cert-manager namespace (system/ KV v2 mount, cert-manager only)
+vault policy write eso-cert-manager - <<EOF
+path "system/data/cert-manager" {
+  capabilities = ["read"]
+}
+path "system/metadata/cert-manager" {
+  capabilities = ["read", "list"]
+}
+EOF
+echo "✓ Created policy: eso-cert-manager"
+
 echo ""
 echo "=== Creating namespace-scoped Kubernetes auth roles ==="
 
@@ -154,6 +165,14 @@ vault write auth/kubernetes/role/eso-freqtrade \
   ttl=1h
 echo "✓ Created role: eso-freqtrade"
 
+# cert-manager
+vault write auth/kubernetes/role/eso-cert-manager \
+  bound_service_account_names=eso \
+  bound_service_account_namespaces=cert-manager \
+  policies=eso-cert-manager \
+  ttl=1h
+echo "✓ Created role: eso-cert-manager"
+
 echo ""
 echo "=== Removing old broad policy ==="
 vault policy delete eso-policy 2>/dev/null && echo "✓ Deleted old policy: eso-policy" || echo "ⓘ Policy eso-policy not found (already removed)"
@@ -169,3 +188,4 @@ echo "  eso-keycloak → SA eso/keycloak                      → secret/data/sh
 echo "  eso-atc      → SA eso/atc                           → atc/data/*"
 echo "  eso-lumos-bot→ SA eso/lumos-bot                     → lumos-bot/data/*"
 echo "  eso-freqtrade→ SA eso/freqtrade                    → freqtrade/data/*"
+echo "  eso-cert-manager→ SA eso/cert-manager              → system/data/cert-manager"

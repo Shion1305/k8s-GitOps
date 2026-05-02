@@ -1,0 +1,31 @@
+# Wildcard certificates issued via Let's Encrypt DNS-01 (Cloudflare).
+# Stored in the envoy-gateway-system namespace so Gateway resources can reference them.
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: wildcard-i-shion1305-com
+  namespace: envoy-gateway-system
+spec:
+  secretName: wildcard-i-shion1305-com-tls
+  issuerRef:
+    name: letsencrypt-prod
+    kind: ClusterIssuer
+  commonName: "*.i.shion1305.com"
+  dnsNames:
+    - "*.i.shion1305.com"
+    - "i.shion1305.com"
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: wildcard-shion1305-com
+  namespace: envoy-gateway-system
+spec:
+  secretName: wildcard-shion1305-com-tls
+  issuerRef:
+    name: letsencrypt-prod
+    kind: ClusterIssuer
+  commonName: "*.shion1305.com"
+  dnsNames:
+    - "*.shion1305.com"
+    - "shion1305.com"

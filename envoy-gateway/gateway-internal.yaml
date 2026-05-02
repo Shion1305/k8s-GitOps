@@ -1,0 +1,29 @@
+# Internal Gateway: serves *.i.shion1305.com (resolves to 10.130.5.21).
+# IP-level access control is provided by the network topology — the WireGuard CIDR
+# is the only path to 10.130.5.21 — so no SecurityPolicy allowlist is attached here.
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: internal
+  namespace: envoy-gateway-system
+spec:
+  gatewayClassName: envoy-default
+  listeners:
+    - name: http
+      port: 80
+      protocol: HTTP
+      hostname: "*.i.shion1305.com"
+      allowedRoutes:
+        namespaces:
+          from: All
+    - name: https
+      port: 443
+      protocol: HTTPS
+      hostname: "*.i.shion1305.com"
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - name: wildcard-i-shion1305-com-tls
+      allowedRoutes:
+        namespaces:
+          from: All
