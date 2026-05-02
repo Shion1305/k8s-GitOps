@@ -1,0 +1,16 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: guestbook-external
+  namespace: guestbook
+spec:
+  parentRefs:
+    - name: external
+      namespace: envoy-gateway-system
+      sectionName: https
+  hostnames:
+    - test-external.shion1305.com
+  rules:
+    - backendRefs:
+        - name: guestbook-ui
+          port: 80

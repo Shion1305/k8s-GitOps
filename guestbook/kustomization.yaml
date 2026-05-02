@@ -5,3 +5,6 @@ resources:
   - redis-master-service.yaml
   - guestbook-ui-deployment.yaml
   - guestbook-ui-svc.yaml
+  - reference-grant.yaml
+  - httproute-internal.yaml
+  - httproute-external.yaml
