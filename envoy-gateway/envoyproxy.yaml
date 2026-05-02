@@ -24,13 +24,13 @@ metadata:
   namespace: envoy-gateway-system
 spec:
   mergeGateways: true
-  useListenerPortAsContainerPort: true
   extraArgs:
     - --base-id
     - "1"
   provider:
     type: Kubernetes
     kubernetes:
+      useListenerPortAsContainerPort: true
       envoyDeployment:
         replicas: 1
         pod:
