@@ -7,6 +7,10 @@
 # tracking issue: envoyproxy/gateway#1928). The official escape hatch is the
 # StrategicMerge patch on envoyDeployment. NET_BIND_SERVICE is required because
 # the data plane binds privileged ports (<1024).
+#
+# --base-id 1 is required because Cilium runs its own Envoy (cilium-envoy) on
+# the same node in the host network namespace. Both default to base-id=0 and
+# fight over the shared-memory domain socket (errno=98 EADDRINUSE on bind).
 apiVersion: gateway.envoyproxy.io/v1alpha1
 kind: EnvoyProxy
 metadata:
@@ -14,6 +18,9 @@ metadata:
   namespace: envoy-gateway-system
 spec:
   mergeGateways: true
+  extraArgs:
+    - --base-id
+    - "1"
   provider:
     type: Kubernetes
     kubernetes:
