@@ -27,3 +27,16 @@ spec:
       allowedRoutes:
         namespaces:
           from: All
+    # TLS passthrough listener for raw TCP services (e.g. Postgres) that
+    # multiplex on SNI. Envoy does not terminate TLS — the backend handles
+    # the certificate. Routing decisions are made on the SNI hostname only.
+    - name: tls-passthrough
+      port: 5432
+      protocol: TLS
+      tls:
+        mode: Passthrough
+      allowedRoutes:
+        namespaces:
+          from: All
+        kinds:
+          - kind: TLSRoute
