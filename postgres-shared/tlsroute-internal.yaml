@@ -1,0 +1,20 @@
+# Routes TLS connections with SNI=postgres-shared.i.shion1305.com on the
+# internal Gateway's port 5432 listener to the postgres-shared master Service.
+# Envoy does not terminate TLS — Spilo presents its self-signed cert and the
+# client must connect with sslmode=require (or distribute the CA for verify-full).
+apiVersion: gateway.networking.k8s.io/v1alpha2
+kind: TLSRoute
+metadata:
+  name: postgres-shared
+  namespace: postgres-operator-deployment
+spec:
+  parentRefs:
+    - name: internal
+      namespace: envoy-gateway-system
+      sectionName: tls-passthrough
+  hostnames:
+    - postgres-shared.i.shion1305.com
+  rules:
+    - backendRefs:
+        - name: postgres-shared
+          port: 5432
