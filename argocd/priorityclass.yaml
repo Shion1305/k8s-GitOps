@@ -1,0 +1,8 @@
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: argocd-critical
+value: 1000000
+globalDefault: false
+preemptionPolicy: PreemptLowerPriority
+description: "Priority class for critical ArgoCD components (controller, repo-server, server, redis). Ensures GitOps engine stays scheduled under node pressure."
