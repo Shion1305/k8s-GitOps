@@ -1,0 +1,41 @@
+# Monitoring-stack self-observation dashboards.
+# These intentionally have no folderRef so they land in the default folder.
+---
+apiVersion: grafana.integreatly.org/v1beta1
+kind: GrafanaDashboard
+metadata:
+  name: alertmanager-overview
+  namespace: grafana
+spec:
+  instanceSelector:
+    matchLabels:
+      dashboards: main-grafana
+  configMapRef:
+    name: kube-prometheus-stack-alertmanager-overview
+    key: alertmanager-overview.json
+---
+apiVersion: grafana.integreatly.org/v1beta1
+kind: GrafanaDashboard
+metadata:
+  name: prometheus
+  namespace: grafana
+spec:
+  instanceSelector:
+    matchLabels:
+      dashboards: main-grafana
+  configMapRef:
+    name: kube-prometheus-stack-prometheus
+    key: prometheus.json
+---
+apiVersion: grafana.integreatly.org/v1beta1
+kind: GrafanaDashboard
+metadata:
+  name: grafana-overview
+  namespace: grafana
+spec:
+  instanceSelector:
+    matchLabels:
+      dashboards: main-grafana
+  configMapRef:
+    name: kube-prometheus-stack-grafana-overview
+    key: grafana-overview.json
