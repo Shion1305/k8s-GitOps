@@ -53,11 +53,10 @@ spec:
   service:
     metadata: {}
     spec:
-      type: NodePort
+      type: ClusterIP
       ports:
         - port: 3000
           targetPort: 3000
-          nodePort: 30080
   persistentVolumeClaim:
     spec:
       accessModes:
