@@ -1,53 +1,43 @@
-apiVersion: grafana.integreatly.org/v1beta1
-kind: GrafanaDashboard
-metadata:
-  name: kubernetes-cluster-monitoring
-  namespace: grafana
-spec:
-  instanceSelector:
-    matchLabels:
-      dashboards: main-grafana
-  grafanaCom:
-    id: 7249
-    revision: 1
+# Per-node OS-level dashboards (CPU, memory, disk, network).
 ---
 apiVersion: grafana.integreatly.org/v1beta1
 kind: GrafanaDashboard
 metadata:
-  name: kubernetes-node-exporter
-  namespace: grafana
-spec:
-  instanceSelector:
-    matchLabels:
-      dashboards: main-grafana
-  grafanaCom:
-    id: 1860
-    revision: 37
----
-apiVersion: grafana.integreatly.org/v1beta1
-kind: GrafanaDashboard
-metadata:
-  name: node-exporter-full
+  name: node-cluster-rsrc-use
   namespace: grafana
 spec:
   instanceSelector:
     matchLabels:
       dashboards: main-grafana
   folderRef: node-metrics
-  grafanaCom:
-    id: 1860
-    revision: 37
+  configMapRef:
+    name: kube-prometheus-stack-node-cluster-rsrc-use
+    key: node-cluster-rsrc-use.json
 ---
 apiVersion: grafana.integreatly.org/v1beta1
 kind: GrafanaDashboard
 metadata:
-  name: node-exporter-server-metrics
+  name: node-rsrc-use
   namespace: grafana
 spec:
   instanceSelector:
     matchLabels:
       dashboards: main-grafana
   folderRef: node-metrics
-  grafanaCom:
-    id: 405
-    revision: 8
+  configMapRef:
+    name: kube-prometheus-stack-node-rsrc-use
+    key: node-rsrc-use.json
+---
+apiVersion: grafana.integreatly.org/v1beta1
+kind: GrafanaDashboard
+metadata:
+  name: nodes
+  namespace: grafana
+spec:
+  instanceSelector:
+    matchLabels:
+      dashboards: main-grafana
+  folderRef: node-metrics
+  configMapRef:
+    name: kube-prometheus-stack-nodes
+    key: nodes.json

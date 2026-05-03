@@ -7,4 +7,6 @@ resources:
   - grafana.yaml
   - datasource.yaml
   - folders.yaml
-  - dashboards.yaml
+  - dashboards/kubernetes.yaml
+  - dashboards/node-metrics.yaml
+  - dashboards/monitoring.yaml
