@@ -116,3 +116,10 @@ prometheus-node-exporter:
         - sourceLabels: [__meta_kubernetes_pod_node_name]
           action: replace
           targetLabel: node
+        # Pin job=node-exporter so the bundled chart dashboards
+        # (which hard-code job="node-exporter") resolve correctly.
+        # The default job name derives from the ServiceMonitor name
+        # (kube-prometheus-stack-prometheus-node-exporter) and does
+        # not match those queries.
+        - replacement: node-exporter
+          targetLabel: job
