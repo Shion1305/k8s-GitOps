@@ -134,17 +134,20 @@ server:
     timeoutSeconds: 5
   readinessProbe:
     timeoutSeconds: 5
+  priorityClassName: argocd-critical
 # Dex configuration
 dex:
   enabled: true
 # Redis
 redis:
   enabled: true
+  priorityClassName: argocd-critical
 # Application controller
 controller:
   replicas: 1
   readinessProbe:
     timeoutSeconds: 5
+  priorityClassName: argocd-critical
 # Repo server
 repoServer:
   replicas: 1
@@ -152,6 +155,7 @@ repoServer:
     timeoutSeconds: 5
   readinessProbe:
     timeoutSeconds: 5
+  priorityClassName: argocd-critical
 # ApplicationSet controller
 applicationSet:
   replicas: 1
