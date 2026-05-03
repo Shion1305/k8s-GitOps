@@ -65,15 +65,54 @@ alertmanager:
         memory: 128Mi
     nodeSelector:
       kubernetes.io/hostname: shion-ubuntu-2505
-# Node Exporter (disabled since we're deploying it separately)
+# Node Exporter — managed as the chart's bundled subchart so dashboards
+# (nodes, node-rsrc-use, node-cluster-rsrc-use) auto-render and stay in sync
+# with the DaemonSet labels/ServiceMonitor.
 nodeExporter:
-  enabled: false
+  enabled: true
+  operatingSystems:
+    aix:
+      enabled: false
+    darwin:
+      enabled: false
 # Kube State Metrics
 kubeStateMetrics:
   enabled: true
-# Prometheus Node Exporter Service Monitor
-prometheusNodeExporter:
-  enabled: false # We'll use our separate deployment
-# Service Monitors
+# Subchart configuration for prometheus-node-exporter
 prometheus-node-exporter:
-  enabled: true
+  podLabels:
+    app: node-exporter
+    component: metrics
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 65534
+    fsGroup: 65534
+  tolerations:
+    - operator: Exists
+  resources:
+    limits:
+      cpu: 200m
+      memory: 50Mi
+    requests:
+      cpu: 100m
+      memory: 30Mi
+  # hostNetwork disabled so pod gets a CNI IP reachable by Prometheus
+  # (hostNetwork: true caused the pod to use the firewalled host IP).
+  hostNetwork: false
+  hostPID: true
+  hostRootFSMount:
+    enabled: true
+    mountPropagation: HostToContainer
+  prometheus:
+    monitor:
+      enabled: true
+      jobLabel: node-exporter
+      interval: 30s
+      scrapeTimeout: 10s
+      relabelings:
+        - sourceLabels: [__meta_kubernetes_pod_node_name]
+          action: replace
+          targetLabel: instance
+        - sourceLabels: [__meta_kubernetes_pod_node_name]
+          action: replace
+          targetLabel: node
