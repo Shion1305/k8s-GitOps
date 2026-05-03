@@ -39,8 +39,11 @@ prometheus:
         cpu: 1000m
         memory: 4Gi
 # Grafana is managed by grafana-operator; disable the bundled chart instance
+# but still render the chart's bundled dashboard ConfigMaps so the operator
+# can adopt them via GrafanaDashboard CRs (see grafana/dashboards.yaml).
 grafana:
   enabled: false
+  forceDeployDashboards: true
 # AlertManager configuration
 alertmanager:
   enabled: true

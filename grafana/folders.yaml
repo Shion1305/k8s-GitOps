@@ -8,3 +8,14 @@ spec:
     matchLabels:
       dashboards: main-grafana
   title: "Node Metrics"
+---
+apiVersion: grafana.integreatly.org/v1beta1
+kind: GrafanaFolder
+metadata:
+  name: kubernetes
+  namespace: grafana
+spec:
+  instanceSelector:
+    matchLabels:
+      dashboards: main-grafana
+  title: "Kubernetes"
