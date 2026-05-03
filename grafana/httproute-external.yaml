@@ -9,7 +9,7 @@ spec:
       namespace: envoy-gateway-system
       sectionName: https
   hostnames:
-    - o11y.k.shion1305.com
+    - o11y.shion1305.com
   rules:
     - backendRefs:
         - name: kube-prometheus-stack-grafana
