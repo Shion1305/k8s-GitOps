@@ -12,8 +12,10 @@ spec:
       serve_from_sub_path: "true"
     auth.anonymous:
       enabled: "false"
-    auth.basic:
-      enabled: "false"
+    # auth.basic must remain enabled (the default) so grafana-operator can
+    # authenticate to /api via the admin credentials it manages. The login
+    # form is hidden via auth.disable_login_form below — interactive users
+    # still go through GitHub OAuth.
     auth:
       disable_login_form: "true"
       disable_signout_menu: "false"
@@ -51,11 +53,10 @@ spec:
   service:
     metadata: {}
     spec:
-      type: NodePort
+      type: ClusterIP
       ports:
         - port: 3000
           targetPort: 3000
-          nodePort: 30080
   persistentVolumeClaim:
     spec:
       accessModes:
