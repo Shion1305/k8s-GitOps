@@ -1,0 +1,228 @@
+# =============================================================================
+# Keycloak Realm Import: zot
+# =============================================================================
+#
+# This file is reconciled by the Keycloak Operator (KeycloakRealmImport CRD).
+# It declares the `zot` realm used to authenticate:
+#   - Human users logging in to the zot UI at https://registry.shion1305.com
+#     via OIDC Authorization Code flow (client: `zot-registry`).
+#   - GitHub Actions workflows pushing images to the zot registry, via OIDC
+#     token exchange (client: `gha-exchanger`) using GitHub's OIDC issuer
+#     (https://token.actions.githubusercontent.com) as an Identity Provider.
+#
+# Token exchange is enabled cluster-wide via `KC_FEATURES=token-exchange`
+# already set on the Keycloak CR (see `keycloak.yaml`). No realm-level toggle
+# is required.
+#
+# -----------------------------------------------------------------------------
+# Manual post-import steps (one-time, after first successful sync):
+# -----------------------------------------------------------------------------
+# 1. Retrieve the auto-generated client secret for the `zot-registry` client
+#    from the Keycloak admin UI:
+#      https://keycloak.k.shion1305.com → realm `zot` → Clients → zot-registry
+#      → Credentials tab → "Client secret" (Regenerate if needed).
+#    The placeholder `PLACEHOLDER_REPLACE_AFTER_REALM_IMPORT` declared below
+#    is overwritten by Keycloak on first import; the realm import does NOT
+#    re-apply the placeholder on subsequent reconciles, so it is safe to let
+#    Keycloak own the value.
+#
+# 2. Push the actual client secret into Vault so ESO can sync it into the zot
+#    namespace (used by zot for OIDC code-flow token exchange):
+#      vault kv put zot/keycloak-client clientsecret=<value-from-keycloak-ui>
+#
+# 3. Generate the zot UI session encryption key and store it in Vault:
+#      vault kv put zot/session-keys key=$(openssl rand -base64 64)
+#
+# 4. (Optional) Repeat step 1-2 for the `gha-exchanger` client if/when its
+#    secret is needed by GHA workflows for the token-exchange grant. Store at
+#    `zot/gha-exchanger-client` (key: `clientsecret`) if required.
+#
+# -----------------------------------------------------------------------------
+# Out of scope for this YAML:
+# -----------------------------------------------------------------------------
+# - Adding human users to the `zot-admin` group requires creating the user
+#   (in this `zot` realm or via brokering from the `master` realm) and then
+#   assigning group membership manually in the Keycloak admin UI.
+# - Vault-side policy / role setup (`eso-zot`) is documented in the deployment
+#   plan and tracked under `vault/scripts/setup-eso-policies.sh`.
+# =============================================================================
+apiVersion: k8s.keycloak.org/v2alpha1
+kind: KeycloakRealmImport
+metadata:
+  name: zot
+  namespace: keycloak
+spec:
+  keycloakCRName: keycloak
+  realm:
+    realm: zot
+    enabled: true
+    registrationAllowed: false
+    # HTTPS required for external traffic; cluster-internal HTTP (service mesh)
+    # is permitted for the operator/health checks.
+    sslRequired: external
+
+    # -------------------------------------------------------------------------
+    # Realm roles (top-level, NOT client roles). These are the role names that
+    # zot's accessControl policy keys off of via the `groups` claim in the JWT
+    # (groups carry their associated realmRole into the claim).
+    # -------------------------------------------------------------------------
+    roles:
+      realm:
+        - name: zot-admin
+          description: Full admin (read/create/update/delete) on all repositories in zot
+        - name: pusher-shion1305
+          description: Push/pull on shion1305/** repositories
+        - name: pusher-shion1305dev
+          description: Push/pull on shion1305dev/** repositories
+
+    # -------------------------------------------------------------------------
+    # Groups mirror the realm roles. The `groups` OIDC claim is what zot's
+    # accessControl uses for authorization, so each group is granted its
+    # corresponding realmRole, and the group-membership mapper on each client
+    # ensures the group name lands in the JWT.
+    # -------------------------------------------------------------------------
+    groups:
+      - name: zot-admin
+        realmRoles:
+          - zot-admin
+      - name: pusher-shion1305
+        realmRoles:
+          - pusher-shion1305
+      - name: pusher-shion1305dev
+        realmRoles:
+          - pusher-shion1305dev
+
+    # -------------------------------------------------------------------------
+    # Clients
+    # -------------------------------------------------------------------------
+    clients:
+      # zot-registry: confidential client used by zot for both:
+      #   - the UI Authorization Code flow (human OIDC login)
+      #   - the audience of JWTs minted via gha-exchanger token exchange
+      - clientId: zot-registry
+        protocol: openid-connect
+        publicClient: false
+        clientAuthenticatorType: client-secret
+        # NOTE: This placeholder is replaced by a Keycloak-generated secret on
+        # first import. The real value is retrieved from the admin UI and
+        # written to Vault at `zot/keycloak-client` (key: `clientsecret`).
+        # Do NOT commit the actual secret to git.
+        secret: PLACEHOLDER_REPLACE_AFTER_REALM_IMPORT
+        standardFlowEnabled: true
+        directAccessGrantsEnabled: false
+        serviceAccountsEnabled: false
+        redirectUris:
+          - https://registry.shion1305.com/*
+        webOrigins:
+          - https://registry.shion1305.com
+        attributes:
+          # 1 hour access token lifespan — long enough for `docker push` of
+          # large images without forcing mid-push re-auth.
+          access.token.lifespan: "3600"
+        protocolMappers:
+          # Emit `groups` claim in id_token, access_token and userinfo so that
+          # zot's accessControl can authorize human UI users by group membership.
+          - name: groups
+            protocolMapper: oidc-group-membership-mapper
+            protocol: openid-connect
+            consentRequired: false
+            config:
+              claim.name: "groups"
+              full.path: "false"
+              id.token.claim: "true"
+              access.token.claim: "true"
+              userinfo.token.claim: "true"
+
+      # gha-exchanger: confidential client used by GitHub Actions to exchange
+      # GitHub OIDC id_tokens for zot-registry-audience JWTs via the
+      # urn:ietf:params:oauth:grant-type:token-exchange grant.
+      - clientId: gha-exchanger
+        protocol: openid-connect
+        publicClient: false
+        clientAuthenticatorType: client-secret
+        # NOTE: This placeholder is replaced by a Keycloak-generated secret on
+        # first import. The token-exchange grant requires the GHA workflow to
+        # present this client_secret; rotate it manually post-import and store
+        # in Vault (e.g. `zot/gha-exchanger-client` key `clientsecret`) if it
+        # ever needs to be consumed via ESO.
+        secret: PLACEHOLDER_REPLACE_AFTER_REALM_IMPORT
+        standardFlowEnabled: false
+        directAccessGrantsEnabled: false
+        # serviceAccountsEnabled is required for the token-exchange flow so
+        # that the client itself can act as the requester.
+        serviceAccountsEnabled: true
+        attributes:
+          oauth2.device.authorization.grant.enabled: "false"
+        protocolMappers:
+          # Same group-membership mapper as zot-registry: the JWT minted via
+          # token exchange must carry the assigned `pusher-*` group in the
+          # `groups` claim so zot's accessControl can authorize the push.
+          - name: groups
+            protocolMapper: oidc-group-membership-mapper
+            protocol: openid-connect
+            consentRequired: false
+            config:
+              claim.name: "groups"
+              full.path: "false"
+              id.token.claim: "true"
+              access.token.claim: "true"
+              userinfo.token.claim: "true"
+
+    # -------------------------------------------------------------------------
+    # Identity Providers
+    # -------------------------------------------------------------------------
+    identityProviders:
+      # GitHub Actions OIDC issuer. Used as the source of truth for verifying
+      # GitHub OIDC id_tokens presented to the gha-exchanger client during
+      # token exchange.
+      - alias: github-actions
+        providerId: oidc
+        enabled: true
+        storeToken: false
+        addReadTokenRoleOnCreate: false
+        trustEmail: false
+        firstBrokerLoginFlowAlias: "first broker login"
+        config:
+          issuer: "https://token.actions.githubusercontent.com"
+          # GitHub's OIDC issuer does not implement a classical token endpoint,
+          # but Keycloak's OIDC IdP requires the field. Set it to the canonical
+          # token URL; it is unused by the token-exchange flow itself.
+          tokenUrl: "https://token.actions.githubusercontent.com/token"
+          jwksUrl: "https://token.actions.githubusercontent.com/.well-known/jwks"
+          useJwksUrl: "true"
+          validateSignature: "true"
+          clientAuthMethod: "client_secret_post"
+          # The audience the GHA workflow must request when fetching the
+          # GitHub OIDC token (this is what GitHub embeds in the `aud` claim).
+          clientId: "zot-registry"
+          defaultScope: "openid"
+          prompt: ""
+          # GitHub OIDC has no userinfo endpoint; skip it to avoid 404s.
+          disableUserInfo: "true"
+
+    # -------------------------------------------------------------------------
+    # Identity Provider Mappers
+    # -------------------------------------------------------------------------
+    # Use `oidc-advanced-group-idp-mapper` to conditionally assign a group
+    # based on the `repository_owner` claim from the GitHub OIDC token. This
+    # is the standard mapper for value-conditional group assignment when
+    # brokering OIDC; the `claims` config takes a JSON array of {key,value}
+    # pairs that must all match for the mapping to fire.
+    identityProviderMappers:
+      - name: gha-shion1305-pusher
+        identityProviderAlias: github-actions
+        identityProviderMapper: oidc-advanced-group-idp-mapper
+        config:
+          syncMode: FORCE
+          claims: '[{"key":"repository_owner","value":"Shion1305"}]'
+          are.claim.values.regex: "false"
+          group: "/pusher-shion1305"
+
+      - name: gha-shion1305dev-pusher
+        identityProviderAlias: github-actions
+        identityProviderMapper: oidc-advanced-group-idp-mapper
+        config:
+          syncMode: FORCE
+          claims: '[{"key":"repository_owner","value":"Shion1305Dev"}]'
+          are.claim.values.regex: "false"
+          group: "/pusher-shion1305dev"
