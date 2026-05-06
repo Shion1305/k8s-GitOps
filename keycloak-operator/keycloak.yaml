@@ -19,12 +19,11 @@ spec:
   http:
     httpEnabled: true
   hostname:
-    hostname: keycloak.k.shion1305.com
+    hostname: keycloak.shion1305.com
   proxy:
     headers: xforwarded
   ingress:
-    enabled: true
-    className: nginx-ssl
+    enabled: false
   # Resource limits
   unsupported:
     podTemplate:

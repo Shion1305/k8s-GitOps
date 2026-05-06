@@ -33,8 +33,9 @@ The Keycloak Operator is **fully managed by ArgoCD** via three applications:
 
 The `keycloak.yaml` custom resource defines:
 - **Database**: External PostgreSQL (`keycloak.postgres-operator-deployment.svc.cluster.local`)
-- **Hostname**: `keycloak.k.shion1305.com`
-- **Ingress**: nginx-ssl with xforwarded proxy headers
+- **Hostname**: `keycloak.shion1305.com`
+- **Routing**: envoy-gateway (`HTTPRoute keycloak-external`); legacy `keycloak.k.shion1305.com` 308-redirects to the new host via `keycloak-legacy-redirect`
+- **Proxy headers**: xforwarded (Gateway terminates TLS, sets `X-Forwarded-Proto: https`)
 - **Features**: token-exchange enabled
 - **Resources**: 1.5Gi memory request, 4Gi limit
 
@@ -77,7 +78,7 @@ ArgoCD will sync the changes automatically. The operator will then handle rollin
 Admin credentials are managed separately (not by the operator). Access the admin console at:
 
 ```
-https://keycloak.k.shion1305.com
+https://keycloak.shion1305.com
 ```
 
 Default admin user: `admin`

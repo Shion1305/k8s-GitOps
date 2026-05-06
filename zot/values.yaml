@@ -40,7 +40,7 @@ configFiles:
             "providers": {
               "keycloak": {
                 "name": "keycloak",
-                "issuer": "https://keycloak.k.shion1305.com/realms/zot",
+                "issuer": "https://keycloak.shion1305.com/realms/zot",
                 "clientid": "zot-registry",
                 "clientsecret": "/etc/zot/secrets/clientsecret",
                 "scopes": ["openid", "email", "groups"]
