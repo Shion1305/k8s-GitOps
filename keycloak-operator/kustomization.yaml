@@ -10,4 +10,5 @@ resources:
   - db-secret-store.yaml
   - external-secret.yaml
   - zot-realm.yaml
-  - grafana-realm.yaml
+  - user-realm.yaml
+  - ynufes-tech-realm.yaml

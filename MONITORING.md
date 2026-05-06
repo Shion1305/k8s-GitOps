@@ -33,7 +33,7 @@ This repository now includes a comprehensive monitoring stack with node-exporter
 
 - **URL**: `http://<node-ip>:30080`
 - **Username**: `admin`
-- **Password**: `admin123` (change in production!)
+- **Password**: stored in the `kube-prometheus-stack-grafana` Secret in the `grafana` namespace; never committed to this repo
 
 ### Pre-configured Dashboards
 
