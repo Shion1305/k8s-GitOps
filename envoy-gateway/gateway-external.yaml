@@ -23,3 +23,19 @@ spec:
       allowedRoutes:
         namespaces:
           from: All
+    # Legacy *.k.shion1305.com listener — exists solely to terminate TLS for
+    # 308-redirect HTTPRoutes that move old URLs to their *.shion1305.com
+    # equivalents during the ingress-nginx → Gateway migration. Once all
+    # consumers are migrated and the legacy ingress-nginx subdomain is
+    # decommissioned, this listener (and the matching cert) can be removed.
+    - name: https-legacy-k
+      port: 443
+      protocol: HTTPS
+      hostname: "*.k.shion1305.com"
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - name: wildcard-k-shion1305-com-tls
+      allowedRoutes:
+        namespaces:
+          from: All

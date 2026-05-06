@@ -29,3 +29,21 @@ spec:
   dnsNames:
     - "*.shion1305.com"
     - "shion1305.com"
+---
+# Issued for the legacy *.k.shion1305.com hostname space so envoy-gateway can
+# serve 308 redirects from old URLs (e.g. keycloak.k.shion1305.com →
+# keycloak.shion1305.com) during the ingress-nginx → Gateway migration.
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: wildcard-k-shion1305-com
+  namespace: envoy-gateway-system
+spec:
+  secretName: wildcard-k-shion1305-com-tls
+  issuerRef:
+    name: letsencrypt-prod
+    kind: ClusterIssuer
+  commonName: "*.k.shion1305.com"
+  dnsNames:
+    - "*.k.shion1305.com"
+    - "k.shion1305.com"
