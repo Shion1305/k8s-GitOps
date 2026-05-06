@@ -8,3 +8,5 @@ resources:
   - grafana-datasource.yaml
   - grafana-folder.yaml
   - grafana-dashboards.yaml
+  - vault-secret-store.yaml
+  - external-secret.yaml
