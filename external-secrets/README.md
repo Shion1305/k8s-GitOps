@@ -54,15 +54,6 @@ Used today by `langfuse`, `openwebui`, `mlflow`, and `keycloak`. The `Role` + `R
 - Resource limits and requests
 - Webhook and cert controller settings
 
-### cluster-secret-store.yaml
-
-Defines the cluster-wide connection to Vault (`secret/` mount) used by other cluster-scoped resources:
-
-- **Server**: `http://vault.vault.svc.cluster.local:8200`
-- **Path**: `secret` (KV v2 mount)
-- **Auth**: Kubernetes service account authentication
-- **ServiceAccount**: `external-secrets` in `external-secrets` namespace
-
 ### github-app-clustersecretstore.yaml / github-app-clusterexternalsecret.yaml
 
 Distributes the Grafana GitHub OAuth credentials (read from the `github-app-shared` Vault mount) into every namespace labeled `secrets-sync/enabled=true`.
@@ -174,7 +165,7 @@ ESO authenticates as the `eso` ServiceAccount, exchanges its token for a Vault t
 kubectl get pods -n external-secrets
 
 # Check (Cluster)SecretStore status
-kubectl describe clustersecretstore vault-cluster
+kubectl describe clustersecretstore vault-github-app
 kubectl describe secretstore vault -n <namespace>
 
 # Check (Cluster)ExternalSecret status
