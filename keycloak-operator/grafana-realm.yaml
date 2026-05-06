@@ -1,0 +1,126 @@
+# =============================================================================
+# Keycloak Realm Import: grafana
+# =============================================================================
+#
+# This file is reconciled by the Keycloak Operator (KeycloakRealmImport CRD).
+# It declares the `grafana` realm used to authenticate human users logging in
+# to Grafana instances via OIDC Authorization Code flow. Today this is consumed
+# by `cloudflare-grafana` (in the `monitoring` namespace); additional Grafana
+# clients can be added below as new instances onboard.
+#
+# Role-to-Grafana-role mapping is performed inside Grafana via
+# `auth.generic_oauth.role_attribute_path`, keying off the `groups` claim
+# emitted by the group-membership protocol mapper attached to each client.
+#
+# -----------------------------------------------------------------------------
+# Manual post-import steps (one-time, after first successful sync):
+# -----------------------------------------------------------------------------
+# 1. Retrieve the auto-generated client secret for the `cloudflare-grafana`
+#    client from the Keycloak admin UI:
+#      https://keycloak.k.shion1305.com → realm `grafana` → Clients →
+#      cloudflare-grafana → Credentials tab → "Client secret".
+#    The placeholder `PLACEHOLDER_REPLACE_AFTER_REALM_IMPORT` declared below
+#    is overwritten by Keycloak on first import; the realm import does NOT
+#    re-apply the placeholder on subsequent reconciles, so it is safe to let
+#    Keycloak own the value.
+#
+# 2. Push the actual client secret into Vault so ESO can sync it into the
+#    `monitoring` namespace as the `cloudflare-grafana-oauth` Secret consumed
+#    by the Grafana CR via /etc/grafana/secrets/clientsecret:
+#      vault secrets enable -path=cloudflare-grafana kv-v2   # one-time
+#      vault kv put cloudflare-grafana/keycloak-client clientsecret=<value>
+#
+# 3. Assign human users to the `grafana-admin`, `grafana-editor`, or
+#    `grafana-viewer` group in the Keycloak admin UI. Group membership is the
+#    sole authorization signal: users without any of these groups still log
+#    in and receive `Viewer` (default fallback in role_attribute_path).
+#
+# -----------------------------------------------------------------------------
+# Out of scope for this YAML:
+# -----------------------------------------------------------------------------
+# - Vault-side policy / role setup (`eso-cloudflare-grafana`) is tracked in
+#   `vault/scripts/setup-eso-policies.sh`.
+# - User provisioning: this realm has no IdP brokering yet; users must be
+#   created locally in the `grafana` realm (or brokered later if needed).
+# =============================================================================
+apiVersion: k8s.keycloak.org/v2alpha1
+kind: KeycloakRealmImport
+metadata:
+  name: grafana
+  namespace: keycloak
+spec:
+  keycloakCRName: keycloak
+  realm:
+    realm: grafana
+    enabled: true
+    registrationAllowed: false
+    # `external` = HTTPS required for any non-loopback request. Cluster-internal
+    # plaintext (Pod IP, ClusterIP) still satisfies this because traffic is TLS-
+    # terminated at the ingress and the `xforwarded` proxy headers config on
+    # the Keycloak CR makes Keycloak treat `X-Forwarded-Proto: https` requests
+    # as HTTPS.
+    sslRequired: external
+
+    # -------------------------------------------------------------------------
+    # Realm roles. Mirrored 1:1 by groups below; the group-membership mapper
+    # on each client carries the group name into the `groups` claim, which
+    # Grafana's role_attribute_path consumes.
+    # -------------------------------------------------------------------------
+    roles:
+      realm:
+        - name: grafana-admin
+          description: Grafana Admin role (full instance admin)
+        - name: grafana-editor
+          description: Grafana Editor role (create/edit dashboards)
+        - name: grafana-viewer
+          description: Grafana Viewer role (read-only, default fallback)
+
+    groups:
+      - name: grafana-admin
+        realmRoles:
+          - grafana-admin
+      - name: grafana-editor
+        realmRoles:
+          - grafana-editor
+      - name: grafana-viewer
+        realmRoles:
+          - grafana-viewer
+
+    # -------------------------------------------------------------------------
+    # Clients
+    # -------------------------------------------------------------------------
+    clients:
+      # cloudflare-grafana: confidential client used by the cloudflare-grafana
+      # instance (monitoring namespace) for the Authorization Code flow.
+      - clientId: cloudflare-grafana
+        protocol: openid-connect
+        publicClient: false
+        clientAuthenticatorType: client-secret
+        # NOTE: This placeholder is replaced by a Keycloak-generated secret on
+        # first import. The real value is retrieved from the admin UI and
+        # written to Vault at `cloudflare-grafana/keycloak-client`
+        # (key: `clientsecret`). Do NOT commit the actual secret to git.
+        secret: PLACEHOLDER_REPLACE_AFTER_REALM_IMPORT
+        standardFlowEnabled: true
+        directAccessGrantsEnabled: false
+        serviceAccountsEnabled: false
+        # TODO: migrate hostname to envoy-gateway-fronted (e.g.
+        # cloudflare-grafana.shion1305.com) once the HTTPRoute is added; until
+        # then the production hostname is the existing nginx-ssl ingress.
+        redirectUris:
+          - https://ynufes-cf.k.shion1305.com/*
+        webOrigins:
+          - https://ynufes-cf.k.shion1305.com
+        protocolMappers:
+          # Emit `groups` claim in id_token, access_token and userinfo so
+          # Grafana's role_attribute_path can map group → org role.
+          - name: groups
+            protocolMapper: oidc-group-membership-mapper
+            protocol: openid-connect
+            consentRequired: false
+            config:
+              claim.name: "groups"
+              full.path: "false"
+              id.token.claim: "true"
+              access.token.claim: "true"
+              userinfo.token.claim: "true"

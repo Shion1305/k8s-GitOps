@@ -12,24 +12,30 @@ spec:
       serve_from_sub_path: "false"
     auth.anonymous:
       enabled: "false"
-    auth.basic:
-      enabled: "false"
+    # auth.basic must remain enabled (the default) so grafana-operator can
+    # authenticate to /api via the admin credentials it manages. The login
+    # form is hidden via auth.disable_login_form below — interactive users
+    # still go through Keycloak OIDC.
     auth:
       disable_login_form: "true"
       disable_signout_menu: "false"
       oauth_auto_login: "true"
-    auth.github:
+    auth.generic_oauth:
       enabled: "true"
+      name: Keycloak
       allow_sign_up: "true"
-      client_id: ${dex.github.clientID}
-      client_secret: ${dex.github.clientSecret}
-      scopes: user:email,read:org
-      auth_url: https://github.com/login/oauth/authorize
-      token_url: https://github.com/login/oauth/access_token
-      api_url: https://api.github.com/user
-      allowed_organizations: Shion1305Dev
-      allow_assign_grafana_admin: "true"
-      role_attribute_path: contains(groups[*], '@Shion1305Dev/k-shion1305-com-admin') && 'Admin' || 'Viewer'
+      client_id: cloudflare-grafana
+      # File-based to avoid leaking the client secret through the Pod env.
+      # The Secret is produced by ESO from Vault (cloudflare-grafana/keycloak-client)
+      # and mounted at /etc/grafana/secrets via the deployment override below.
+      client_secret: $__file{/etc/grafana/secrets/clientsecret}
+      scopes: openid email profile groups
+      # NOTE: Depends on PR3 introducing the keycloak.shion1305.com hostname.
+      # Until PR3 merges, OIDC login will fail; the auth.basic fix is independent.
+      auth_url: https://keycloak.shion1305.com/realms/grafana/protocol/openid-connect/auth
+      token_url: https://keycloak.shion1305.com/realms/grafana/protocol/openid-connect/token
+      api_url: https://keycloak.shion1305.com/realms/grafana/protocol/openid-connect/userinfo
+      role_attribute_path: contains(groups[*], 'grafana-admin') && 'Admin' || contains(groups[*], 'grafana-editor') && 'Editor' || 'Viewer'
     security:
       admin_user: admin
   deployment:
@@ -38,9 +44,6 @@ spec:
         spec:
           containers:
             - name: grafana
-              envFrom:
-                - secretRef:
-                    name: grafana-github-oauth-secret
               resources:
                 limits:
                   cpu: 500m
@@ -48,6 +51,14 @@ spec:
                 requests:
                   cpu: 250m
                   memory: 256Mi
+              volumeMounts:
+                - name: oauth-client-secret
+                  mountPath: /etc/grafana/secrets
+                  readOnly: true
+          volumes:
+            - name: oauth-client-secret
+              secret:
+                secretName: cloudflare-grafana-oauth
   service:
     metadata: {}
     spec:
