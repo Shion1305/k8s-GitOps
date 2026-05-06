@@ -52,7 +52,7 @@ configFiles:
         "accessControl": {
           "repositories": {
             "**": {
-              "anonymousPolicy": ["read"],
+              "defaultPolicy": ["read"],
               "policies": [
                 {
                   "groups": ["zot-admin"],
@@ -61,6 +61,7 @@ configFiles:
               ]
             },
             "shion1305/**": {
+              "defaultPolicy": ["read"],
               "policies": [
                 {
                   "groups": ["pusher-shion1305"],
@@ -69,6 +70,7 @@ configFiles:
               ]
             },
             "shion1305dev/**": {
+              "defaultPolicy": ["read"],
               "policies": [
                 {
                   "groups": ["pusher-shion1305dev"],
