@@ -34,6 +34,7 @@ configFiles:
       "http": {
         "address": "0.0.0.0",
         "port": "5000",
+        "externalUrl": "https://registry.shion1305.com",
         "realm": "zot",
         "auth": {
           "openid": {
@@ -51,7 +52,7 @@ configFiles:
         "accessControl": {
           "repositories": {
             "**": {
-              "anonymousPolicy": ["read"],
+              "defaultPolicy": ["read"],
               "policies": [
                 {
                   "groups": ["zot-admin"],
@@ -60,6 +61,7 @@ configFiles:
               ]
             },
             "shion1305/**": {
+              "defaultPolicy": ["read"],
               "policies": [
                 {
                   "groups": ["pusher-shion1305"],
@@ -68,6 +70,7 @@ configFiles:
               ]
             },
             "shion1305dev/**": {
+              "defaultPolicy": ["read"],
               "policies": [
                 {
                   "groups": ["pusher-shion1305dev"],
