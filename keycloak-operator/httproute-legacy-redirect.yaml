@@ -1,10 +1,14 @@
 # Backward-compat for the old hostname (keycloak.k.shion1305.com).
-# Issues a 308 Permanent Redirect to keycloak.shion1305.com so existing browser
+# Issues a 301 Permanent Redirect to keycloak.shion1305.com so existing browser
 # bookmarks keep working. Server-to-server OIDC clients should NOT rely on this
 # — they must be migrated to https://keycloak.shion1305.com directly because
 # OIDC discovery at /realms/<realm>/.well-known/openid-configuration returns the
 # canonical issuer URL, and most JWT validators reject mismatched issuers
 # regardless of how the discovery URL was reached.
+#
+# Gateway API spec restricts requestRedirect.statusCode to 301 or 302 — 308 is
+# rejected with a CEL validation error, so we use 301 (the closest semantic
+# match for permanent + method-preserving-by-convention).
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
@@ -23,4 +27,4 @@ spec:
           requestRedirect:
             scheme: https
             hostname: keycloak.shion1305.com
-            statusCode: 308
+            statusCode: 301
