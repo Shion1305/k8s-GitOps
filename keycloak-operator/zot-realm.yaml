@@ -106,6 +106,23 @@ spec:
           - pusher-shion1305dev
 
     # -------------------------------------------------------------------------
+    # Client scopes
+    # -------------------------------------------------------------------------
+    # `groups` is not a built-in OIDC scope; Keycloak rejects auth requests
+    # with `scope=openid email groups` ("invalid_scope") unless `groups` is
+    # registered as a realm client scope. The actual `groups` claim is still
+    # produced by the per-client `oidc-group-membership-mapper` declared on
+    # `zot-registry` and `gha-exchanger` below — this scope only registers
+    # the name so it can appear in the auth request.
+    clientScopes:
+      - name: groups
+        description: Group memberships claim
+        protocol: openid-connect
+        attributes:
+          include.in.token.scope: "true"
+          display.on.consent.screen: "false"
+
+    # -------------------------------------------------------------------------
     # Clients
     # -------------------------------------------------------------------------
     clients:
