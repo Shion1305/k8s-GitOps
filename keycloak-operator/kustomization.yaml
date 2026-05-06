@@ -3,6 +3,9 @@ kind: Kustomization
 
 resources:
   - keycloak.yaml
+  - reference-grant.yaml
+  - httproute-external.yaml
+  - httproute-legacy-redirect.yaml
   - vault-secret-store.yaml
   - db-secret-store.yaml
   - external-secret.yaml

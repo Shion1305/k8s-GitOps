@@ -1,0 +1,20 @@
+# Internal registry URL — reachable only via WireGuard (the *.i.shion1305.com
+# DNS A record points to 10.130.5.21). Provides a low-latency / no-egress path
+# for in-cluster CI/CD or trusted hosts that have WG connectivity, while the
+# public docker.shion1305.com URL handles GitHub Actions and external pulls.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: zot-internal
+  namespace: zot
+spec:
+  parentRefs:
+    - name: internal
+      namespace: envoy-gateway-system
+      sectionName: https
+  hostnames:
+    - docker.i.shion1305.com
+  rules:
+    - backendRefs:
+        - name: zot
+          port: 5000

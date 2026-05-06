@@ -1,0 +1,21 @@
+# Public registry URL — used by browsers (zot UI / OIDC code-flow login) and by
+# `docker push` from any host that can resolve the public DNS. No SecurityPolicy
+# is attached because the Docker registry v2 protocol negotiates its own bearer
+# tokens (zot delegates to Keycloak), which conflicts with gateway-level JWT
+# enforcement.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: zot-external
+  namespace: zot
+spec:
+  parentRefs:
+    - name: external
+      namespace: envoy-gateway-system
+      sectionName: https
+  hostnames:
+    - docker.shion1305.com
+  rules:
+    - backendRefs:
+        - name: zot
+          port: 5000

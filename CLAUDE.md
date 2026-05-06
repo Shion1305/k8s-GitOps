@@ -115,7 +115,7 @@ This cluster uses a layered secret management approach:
 ### Keycloak Setup
 
 - **Purpose**: Provides OIDC/SAML authentication and Docker Registry v2 auth
-- **URL**: <https://keycloak.k.shion1305.com>
+- **URL**: <https://keycloak.shion1305.com> (legacy <https://keycloak.k.shion1305.com> 308-redirects to the new host)
 - **Admin credentials**: admin/admin123
 - **Realms**:
   - `master`: Admin realm
