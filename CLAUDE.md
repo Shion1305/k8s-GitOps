@@ -96,22 +96,19 @@ This cluster uses a layered secret management approach:
 
 - Deployed in HA mode with 3 replicas (Raft storage)
 - UI: <https://vault.k.shion1305.com>
-- Mount path: `secret/` (KV v2)
-- Stores centralized secrets in paths like `secret/shared/app`
+- Default mount path: `secret/` (KV v2); each app typically gets its own dedicated KV v2 mount
 
 ### External Secrets Operator
 
-- Reads from Vault using ClusterSecretStore (`vault-cluster`)
-- Authenticates via Kubernetes service account (`external-secrets`)
-- Uses ClusterExternalSecret to distribute secrets across namespaces
-- Only namespaces labeled with `secrets-sync/enabled=true` receive secrets
+- Reads from Vault using per-namespace `SecretStore` + `ServiceAccount`, each backed by a scoped Vault role/policy
+- Also uses the Kubernetes provider to copy postgres-operator-generated DB credentials into app namespaces
 
 ### Adding Secrets to Applications
 
-1. Store secret in Vault: `vault kv put secret/shared/<service-name> KEY=value`
-2. Create ClusterExternalSecret in `external-secrets/` directory
-3. Label target namespace: `kubectl label namespace <ns> secrets-sync/enabled=true`
-4. ESO automatically creates Secret in labeled namespaces
+1. Enable a per-service KV mount in Vault (`vault secrets enable -path=<svc> kv-v2`) and write the secret (`vault kv put <svc>/<key> ...`)
+2. Create a Vault policy and a Kubernetes auth role bound to the namespace's ServiceAccount (add to `vault/scripts/setup-eso-policies.sh`)
+3. Add a namespace-scoped `SecretStore` + `ExternalSecret` in the app directory referencing the Vault path
+4. ESO syncs the Vault data to a Kubernetes Secret in that namespace
 
 ## Identity & Authentication
 
