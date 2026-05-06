@@ -38,8 +38,8 @@ configFiles:
         "auth": {
           "openid": {
             "providers": {
-              "keycloak": {
-                "name": "keycloak",
+              "oidc": {
+                "name": "oidc",
                 "issuer": "https://keycloak.shion1305.com/realms/zot",
                 "credentialsFile": "/etc/zot/secrets/keycloak-credentials.json",
                 "scopes": ["openid", "email", "groups"]
