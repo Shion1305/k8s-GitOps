@@ -4,7 +4,7 @@
 #
 # This file is reconciled by the Keycloak Operator (KeycloakRealmImport CRD).
 # It declares the `zot` realm used to authenticate:
-#   - Human users logging in to the zot UI at https://docker.shion1305.com
+#   - Human users logging in to the zot UI at https://registry.shion1305.com
 #     via OIDC Authorization Code flow (client: `zot-registry`).
 #   - GitHub Actions workflows pushing images to the zot registry, via OIDC
 #     token exchange (client: `gha-exchanger`) using GitHub's OIDC issuer
@@ -125,9 +125,9 @@ spec:
         directAccessGrantsEnabled: false
         serviceAccountsEnabled: false
         redirectUris:
-          - https://docker.shion1305.com/*
+          - https://registry.shion1305.com/*
         webOrigins:
-          - https://docker.shion1305.com
+          - https://registry.shion1305.com
         attributes:
           # 1 hour access token lifespan — long enough for `docker push` of
           # large images without forcing mid-push re-auth.

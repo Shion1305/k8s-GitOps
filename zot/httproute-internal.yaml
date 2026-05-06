@@ -13,7 +13,7 @@ spec:
       namespace: envoy-gateway-system
       sectionName: https
   hostnames:
-    - docker.i.shion1305.com
+    - registry.i.shion1305.com
   rules:
     - backendRefs:
         - name: zot
