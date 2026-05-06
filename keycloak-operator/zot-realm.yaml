@@ -62,9 +62,8 @@ spec:
     # terminated at Envoy Gateway and the `xforwarded` proxy headers config on
     # the Keycloak CR makes Keycloak treat `X-Forwarded-Proto: https` requests
     # as HTTPS. Net effect: every flow that traverses
-    # `*.shion1305.com` / `*.i.shion1305.com` (Cloudflare → Gateway TLS) is
-    # HTTPS-enforced, while loopback health checks from the Keycloak operator
-    # remain unaffected.
+    # `*.shion1305.com` / `*.i.shion1305.com` (Gateway TLS) is HTTPS-enforced,
+    # while loopback health checks from the Keycloak operator remain unaffected.
     sslRequired: external
 
     # -------------------------------------------------------------------------
