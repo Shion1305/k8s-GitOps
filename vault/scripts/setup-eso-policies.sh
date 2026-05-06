@@ -18,17 +18,6 @@ set -euo pipefail
 
 echo "=== Creating namespace-scoped ESO policies ==="
 
-# Policy for ClusterExternalSecret (shared/app only)
-vault policy write eso-shared - <<EOF
-path "secret/data/shared/app" {
-  capabilities = ["read"]
-}
-path "secret/metadata/shared/app" {
-  capabilities = ["read", "list"]
-}
-EOF
-echo "✓ Created policy: eso-shared"
-
 # Policy for langfuse namespace
 vault policy write eso-langfuse - <<EOF
 path "secret/data/shared/langfuse" {
@@ -106,16 +95,19 @@ path "system/metadata/cert-manager" {
 EOF
 echo "✓ Created policy: eso-cert-manager"
 
+# Policy for zot namespace (separate KV v2 engine mounted at zot/)
+vault policy write eso-zot - <<EOF
+path "zot/data/*" {
+  capabilities = ["read"]
+}
+path "zot/metadata/*" {
+  capabilities = ["read", "list"]
+}
+EOF
+echo "✓ Created policy: eso-zot"
+
 echo ""
 echo "=== Creating namespace-scoped Kubernetes auth roles ==="
-
-# Update existing "eso" role to use scoped policy (ClusterExternalSecret only)
-vault write auth/kubernetes/role/eso \
-  bound_service_account_names=external-secrets \
-  bound_service_account_namespaces=external-secrets \
-  policies=eso-shared \
-  ttl=1h
-echo "✓ Updated role: eso (scoped to eso-shared)"
 
 # Langfuse
 vault write auth/kubernetes/role/eso-langfuse \
@@ -173,6 +165,14 @@ vault write auth/kubernetes/role/eso-cert-manager \
   ttl=1h
 echo "✓ Created role: eso-cert-manager"
 
+# zot
+vault write auth/kubernetes/role/eso-zot \
+  bound_service_account_names=eso \
+  bound_service_account_namespaces=zot \
+  policies=eso-zot \
+  ttl=1h
+echo "✓ Created role: eso-zot"
+
 echo ""
 echo "=== Removing old broad policy ==="
 vault policy delete eso-policy 2>/dev/null && echo "✓ Deleted old policy: eso-policy" || echo "ⓘ Policy eso-policy not found (already removed)"
@@ -181,11 +181,11 @@ echo ""
 echo "=== Setup Complete ==="
 echo ""
 echo "Per-namespace roles created:"
-echo "  eso          → SA external-secrets/external-secrets → secret/data/shared/app"
-echo "  eso-langfuse → SA eso/langfuse                      → secret/data/shared/langfuse"
-echo "  eso-openwebui→ SA eso/openwebui                     → secret/data/shared/openwebui"
-echo "  eso-keycloak → SA eso/keycloak                      → secret/data/shared/keycloak"
-echo "  eso-atc      → SA eso/atc                           → atc/data/*"
-echo "  eso-lumos-bot→ SA eso/lumos-bot                     → lumos-bot/data/*"
-echo "  eso-freqtrade→ SA eso/freqtrade                    → freqtrade/data/*"
-echo "  eso-cert-manager→ SA eso/cert-manager              → system/data/cert-manager"
+echo "  eso-langfuse    → SA eso/langfuse        → secret/data/shared/langfuse"
+echo "  eso-openwebui   → SA eso/openwebui       → secret/data/shared/openwebui"
+echo "  eso-keycloak    → SA eso/keycloak        → secret/data/shared/keycloak"
+echo "  eso-atc         → SA eso/atc             → atc/data/*"
+echo "  eso-lumos-bot   → SA eso/lumos-bot       → lumos-bot/data/*"
+echo "  eso-freqtrade   → SA eso/freqtrade       → freqtrade/data/*"
+echo "  eso-cert-manager→ SA eso/cert-manager    → system/data/cert-manager"
+echo "  eso-zot         → SA eso/zot             → zot/data/*"
