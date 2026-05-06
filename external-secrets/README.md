@@ -12,7 +12,7 @@ ESO provides:
 
 ## Architecture
 
-The cluster uses two real patterns:
+The cluster uses three real patterns:
 
 ### 1. Per-namespace Vault mount (primary pattern)
 
@@ -46,6 +46,32 @@ K8s Secret (in app namespace) consumed by the app
 
 Used today by `langfuse`, `openwebui`, `mlflow`, and `keycloak`. The `Role` + `RoleBinding` per consumer namespace are defined in `rbac-db-reader.yaml`.
 
+### 3. Cluster-scoped Vault distribution (one secret → many namespaces)
+
+When a single Vault credential needs to be fanned out (read-only) into multiple consumer namespaces, a cluster-scoped store reads it once and a `ClusterExternalSecret` projects the resulting K8s Secret into every namespace matching a label selector. This avoids duplicating SecretStore/SA/role/policy per consumer. App-scoped secrets should still use pattern 1.
+
+```
+Vault (github-app-shared/<key>)
+    ↓
+ClusterSecretStore "vault-github-app" → role "eso-github-app" → ServiceAccount "external-secrets/external-secrets"
+    ↓
+ClusterExternalSecret (namespaceSelector: secrets-sync/enabled=true)
+    ↓
+K8s Secret (in every selected namespace)
+```
+
+Unlike pattern 1, the Vault role binds to the ESO operator's own SA (`external-secrets/external-secrets`) rather than a per-namespace `eso` SA, because there is no consumer-side SA — the operator itself authenticates and writes the Secret into each selected namespace.
+
+Used today: the `github-app-shared` mount holds shared GitHub OAuth credentials that are distributed as the `grafana-github-oauth-secret` Secret into the `grafana` and `monitoring` namespaces (both labeled `secrets-sync/enabled=true`).
+
+#### Onboarding a new consumer namespace
+
+```bash
+kubectl label ns <namespace> secrets-sync/enabled=true
+```
+
+The operator picks up the new namespace on the next reconcile and creates `grafana-github-oauth-secret` in it.
+
 ## Configuration Files
 
 ### values.yaml
@@ -54,18 +80,13 @@ Used today by `langfuse`, `openwebui`, `mlflow`, and `keycloak`. The `Role` + `R
 - Resource limits and requests
 - Webhook and cert controller settings
 
-### cluster-secret-store.yaml
+### github-app-clustersecretstore.yaml
 
-Defines the cluster-wide connection to Vault (`secret/` mount) used by other cluster-scoped resources:
+`ClusterSecretStore` named `vault-github-app`. Reads the `github-app-shared` Vault KV v2 mount and authenticates as the ESO operator SA (`external-secrets/external-secrets`) using the cluster-scoped Vault role `eso-github-app`. Implements pattern 3 above.
 
-- **Server**: `http://vault.vault.svc.cluster.local:8200`
-- **Path**: `secret` (KV v2 mount)
-- **Auth**: Kubernetes service account authentication
-- **ServiceAccount**: `external-secrets` in `external-secrets` namespace
+### github-app-clusterexternalsecret.yaml
 
-### github-app-clustersecretstore.yaml / github-app-clusterexternalsecret.yaml
-
-Distributes the Grafana GitHub OAuth credentials (read from the `github-app-shared` Vault mount) into every namespace labeled `secrets-sync/enabled=true`.
+`ClusterExternalSecret` named `grafana-github-oauth`. Selects every namespace labeled `secrets-sync/enabled=true` and produces a `grafana-github-oauth-secret` (Opaque) in each — its keys (`dex.github.clientID`, `dex.github.clientSecret`) are sourced from the `k8s-at-shion1305-com` entry under the `github-app-shared` mount.
 
 ### rbac-db-reader.yaml
 
@@ -174,11 +195,12 @@ ESO authenticates as the `eso` ServiceAccount, exchanges its token for a Vault t
 kubectl get pods -n external-secrets
 
 # Check (Cluster)SecretStore status
-kubectl describe clustersecretstore vault-cluster
+kubectl describe clustersecretstore vault-github-app
 kubectl describe secretstore vault -n <namespace>
 
 # Check (Cluster)ExternalSecret status
 kubectl describe externalsecret <name> -n <namespace>
+kubectl get clusterexternalsecret grafana-github-oauth -o yaml
 
 # View ESO logs
 kubectl logs -n external-secrets -l app.kubernetes.io/name=external-secrets

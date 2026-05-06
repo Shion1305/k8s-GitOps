@@ -106,6 +106,17 @@ path "zot/metadata/*" {
 EOF
 echo "✓ Created policy: eso-zot"
 
+# Policy for github-app shared credentials (cluster-scoped store, separate KV v2 engine mounted at github-app-shared/)
+vault policy write eso-github-app - <<EOF
+path "github-app-shared/data/*" {
+  capabilities = ["read"]
+}
+path "github-app-shared/metadata/*" {
+  capabilities = ["read", "list"]
+}
+EOF
+echo "✓ Created policy: eso-github-app"
+
 echo ""
 echo "=== Creating namespace-scoped Kubernetes auth roles ==="
 
@@ -173,6 +184,14 @@ vault write auth/kubernetes/role/eso-zot \
   ttl=1h
 echo "✓ Created role: eso-zot"
 
+# github-app (cluster-scoped store; binds to the ESO operator SA, not a per-namespace SA)
+vault write auth/kubernetes/role/eso-github-app \
+  bound_service_account_names=external-secrets \
+  bound_service_account_namespaces=external-secrets \
+  policies=eso-github-app \
+  ttl=1h
+echo "✓ Created role: eso-github-app"
+
 echo ""
 echo "=== Removing old broad policy ==="
 vault policy delete eso-policy 2>/dev/null && echo "✓ Deleted old policy: eso-policy" || echo "ⓘ Policy eso-policy not found (already removed)"
@@ -189,3 +208,4 @@ echo "  eso-lumos-bot   → SA eso/lumos-bot       → lumos-bot/data/*"
 echo "  eso-freqtrade   → SA eso/freqtrade       → freqtrade/data/*"
 echo "  eso-cert-manager→ SA eso/cert-manager    → system/data/cert-manager"
 echo "  eso-zot         → SA eso/zot             → zot/data/*"
+echo "  eso-github-app  → SA external-secrets/external-secrets → github-app-shared/data/*"
