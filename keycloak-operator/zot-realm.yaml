@@ -37,6 +37,14 @@
 #    secret is needed by GHA workflows for the token-exchange grant. Store at
 #    `zot/gha-exchanger-client` (key: `clientsecret`) if required.
 #
+# 5. Bind the Browser authentication flow to "Identity Provider Redirector"
+#    pinned to alias `user`, so human web logins skip the choice screen and
+#    go straight to the `user` realm (passkey-only):
+#      Authentication -> Flows -> Browser -> add "Identity Provider Redirector"
+#      execution at the top, Required, with config
+#      `Default Identity Provider = user`. Bind that flow as the realm's
+#      Browser flow. This step is not declarative on the CRD shape used here.
+#
 # -----------------------------------------------------------------------------
 # Out of scope for this YAML:
 # -----------------------------------------------------------------------------
@@ -176,7 +184,53 @@ spec:
     # -------------------------------------------------------------------------
     # Identity Providers
     # -------------------------------------------------------------------------
+    # NOTE on Browser flow: human web logins to the zot UI should auto-redirect
+    # through the `user` IdP (passkey-only) without showing a choice screen.
+    # This is wired in the admin UI as a manual post-import step:
+    #   Authentication -> Flows -> Browser -> add "Identity Provider Redirector"
+    #   execution at the top, set Required, with config
+    #   `Default Identity Provider = user`. Bind that flow as the realm's
+    #   Browser flow.
+    # Token-exchange via the `gha-exchanger` client is unaffected -- it does
+    # not traverse the Browser flow.
     identityProviders:
+      # user: brokered OIDC IdP pointing at the central `user` realm. This is
+      # the human-login path for the zot UI; users authenticate with a passkey
+      # in the `user` realm and are then provisioned into this `zot` realm
+      # via first-broker-login. Group membership (zot-admin, pusher-*) is
+      # assigned in this realm post-provisioning by an admin.
+      - alias: user
+        displayName: "Sign in with passkey"
+        providerId: keycloak-oidc
+        enabled: true
+        storeToken: false
+        addReadTokenRoleOnCreate: false
+        trustEmail: true
+        firstBrokerLoginFlowAlias: "first broker login"
+        config:
+          # OIDC discovery against the `user` realm running on the same
+          # Keycloak server. Using the public hostname (rather than an
+          # in-cluster Service URL) keeps the redirect / token issuer aligned
+          # with the front-channel browser flow.
+          issuer: "https://keycloak.shion1305.com/realms/user"
+          authorizationUrl: "https://keycloak.shion1305.com/realms/user/protocol/openid-connect/auth"
+          tokenUrl: "https://keycloak.shion1305.com/realms/user/protocol/openid-connect/token"
+          userInfoUrl: "https://keycloak.shion1305.com/realms/user/protocol/openid-connect/userinfo"
+          logoutUrl: "https://keycloak.shion1305.com/realms/user/protocol/openid-connect/logout"
+          jwksUrl: "https://keycloak.shion1305.com/realms/user/protocol/openid-connect/certs"
+          useJwksUrl: "true"
+          validateSignature: "true"
+          # Brokering this realm into `user` does not require a confidential
+          # client on the `user` side because PKCE-protected public clients
+          # are sufficient for this flow; keep the auth method explicit.
+          clientAuthMethod: "client_secret_post"
+          # Public OIDC client created automatically by the broker; the
+          # secret placeholder is the standard pattern.
+          clientId: "zot-broker"
+          clientSecret: PLACEHOLDER_REPLACE_AFTER_REALM_IMPORT
+          defaultScope: "openid profile email"
+          syncMode: IMPORT
+
       # GitHub Actions OIDC issuer. Used as the source of truth for verifying
       # GitHub OIDC id_tokens presented to the gha-exchanger client during
       # token exchange.

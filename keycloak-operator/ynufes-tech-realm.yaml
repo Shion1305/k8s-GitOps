@@ -1,0 +1,181 @@
+# =============================================================================
+# Keycloak Realm Import: ynufes-tech
+# =============================================================================
+#
+# This file is reconciled by the Keycloak Operator (KeycloakRealmImport CRD).
+# It declares the `ynufes-tech` realm, which authenticates human users for
+# Grafana instances scoped to the ynufes-tech / cloudflare-monitoring use case.
+# Today this is consumed by `cloudflare-grafana` (in the `monitoring`
+# namespace); additional Grafana clients can be added below as new instances
+# onboard for this audience.
+#
+# This realm has its own user pool (it is NOT brokered through the central
+# `user` realm): the audience is a small set of accounts tied to a specific
+# external GitHub identity, distinct from the cluster-admin passkey realm.
+#
+# Authentication policy:
+#   - Self-registration disabled.
+#   - GitHub OAuth IdP is the ONLY login path. The admin manually creates user
+#     records and the user links their GitHub identity at first login.
+#   - The local password form is suppressed by binding the Browser flow to the
+#     "Identity Provider Redirector" so users land directly on GitHub.
+#
+# Role-to-Grafana-role mapping is performed inside Grafana via
+# `auth.generic_oauth.role_attribute_path`, keying off the `groups` claim
+# emitted by the group-membership protocol mapper attached to each client.
+#
+# -----------------------------------------------------------------------------
+# Manual post-import steps (one-time, after first successful sync):
+# -----------------------------------------------------------------------------
+# 1. Configure the `github` Identity Provider in the Keycloak admin UI:
+#      https://keycloak.shion1305.com -> realm `ynufes-tech` -> Identity
+#      Providers -> github -> set "Client ID" and "Client Secret" to the
+#      values from the GitHub OAuth App.
+#    Two options for the GitHub OAuth App:
+#      a. Re-use the existing OAuth App that was registered against the
+#         (now-deleted) `grafana` realm. The redirect URL on the GitHub side
+#         must be updated to the `ynufes-tech` realm's broker callback:
+#           https://keycloak.shion1305.com/realms/ynufes-tech/broker/github/endpoint
+#      b. Register a new GitHub OAuth App for this realm and use its
+#         credentials. The redirect URL is the same as in (a).
+#    The placeholder `PLACEHOLDER_REPLACE_AFTER_REALM_IMPORT` declared below
+#    is the literal string the operator imports; the admin overwrites it via
+#    the UI on first import.
+#
+# 2. Bind the Browser authentication flow to "Identity Provider Redirector"
+#    pinned to alias `github`, so users skip the password form and go straight
+#    to GitHub:
+#      Authentication -> Flows -> Browser -> add "Identity Provider Redirector"
+#      execution at the top, set to required, with a config of
+#      `Default Identity Provider = github`. Bind that flow as the realm's
+#      Browser flow.
+#    This step is configured via the admin UI rather than declaratively
+#    because the `KeycloakRealmImport` CRD's `authenticationFlows` shape is
+#    brittle and not worth the maintenance cost for a single executor.
+#
+# 3. Retrieve the auto-generated client secret for the `cloudflare-grafana`
+#    client and write it into Vault so ESO can sync the
+#    `cloudflare-grafana-oauth` Secret in the `monitoring` namespace:
+#      vault kv put cloudflare-grafana/keycloak-client clientsecret=<value>
+#    (The Vault mount and ESO policy are unchanged from the previous
+#    `grafana` realm setup, so only the secret value needs refreshing.)
+#
+# 4. Assign human users to the `grafana-admin`, `grafana-editor`, or
+#    `grafana-viewer` group in the Keycloak admin UI. Group membership is the
+#    sole authorization signal: users without any of these groups still log
+#    in and receive `Viewer` (default fallback in role_attribute_path).
+#
+# -----------------------------------------------------------------------------
+# Out of scope for this YAML:
+# -----------------------------------------------------------------------------
+# - Vault-side policy / role setup (`eso-cloudflare-grafana`) is tracked in
+#   `vault/scripts/setup-eso-policies.sh` and is unchanged.
+# - User provisioning: this realm has its own local user pool. Users must be
+#   created manually in the admin UI and then link their GitHub identity at
+#   first login.
+# =============================================================================
+apiVersion: k8s.keycloak.org/v2alpha1
+kind: KeycloakRealmImport
+metadata:
+  name: ynufes-tech
+  namespace: keycloak
+spec:
+  keycloakCRName: keycloak
+  realm:
+    realm: ynufes-tech
+    enabled: true
+    registrationAllowed: false
+    resetPasswordAllowed: false
+    loginWithEmailAllowed: true
+    rememberMe: false
+
+    # `external` = HTTPS required for any non-loopback request. Same rationale
+    # as the other realms.
+    sslRequired: external
+
+    # -------------------------------------------------------------------------
+    # Realm roles. Mirrored 1:1 by groups below; the group-membership mapper
+    # on each client carries the group name into the `groups` claim, which
+    # Grafana's role_attribute_path consumes. Role names match the previous
+    # `grafana` realm so no Grafana-side mapping needs updating.
+    # -------------------------------------------------------------------------
+    roles:
+      realm:
+        - name: grafana-admin
+          description: Grafana Admin role (full instance admin)
+        - name: grafana-editor
+          description: Grafana Editor role (create/edit dashboards)
+        - name: grafana-viewer
+          description: Grafana Viewer role (read-only, default fallback)
+
+    groups:
+      - name: grafana-admin
+        realmRoles:
+          - grafana-admin
+      - name: grafana-editor
+        realmRoles:
+          - grafana-editor
+      - name: grafana-viewer
+        realmRoles:
+          - grafana-viewer
+
+    # -------------------------------------------------------------------------
+    # Clients
+    # -------------------------------------------------------------------------
+    clients:
+      # cloudflare-grafana: confidential client used by the cloudflare-grafana
+      # instance (monitoring namespace) for the Authorization Code flow.
+      - clientId: cloudflare-grafana
+        protocol: openid-connect
+        publicClient: false
+        clientAuthenticatorType: client-secret
+        # NOTE: This placeholder is replaced by a Keycloak-generated secret on
+        # first import. The real value is retrieved from the admin UI and
+        # written to Vault at `cloudflare-grafana/keycloak-client`
+        # (key: `clientsecret`). Do NOT commit the actual secret to git.
+        secret: PLACEHOLDER_REPLACE_AFTER_REALM_IMPORT
+        standardFlowEnabled: true
+        directAccessGrantsEnabled: false
+        serviceAccountsEnabled: false
+        redirectUris:
+          - https://ynufes-cf.k.shion1305.com/*
+        webOrigins:
+          - https://ynufes-cf.k.shion1305.com
+        protocolMappers:
+          # Emit `groups` claim in id_token, access_token and userinfo so
+          # Grafana's role_attribute_path can map group -> org role.
+          - name: groups
+            protocolMapper: oidc-group-membership-mapper
+            protocol: openid-connect
+            consentRequired: false
+            config:
+              claim.name: "groups"
+              full.path: "false"
+              id.token.claim: "true"
+              access.token.claim: "true"
+              userinfo.token.claim: "true"
+
+    # -------------------------------------------------------------------------
+    # Identity Providers
+    # -------------------------------------------------------------------------
+    # GitHub OAuth IdP. The admin overwrites clientId / clientSecret in the
+    # Keycloak UI post-import (see manual step 1 in the header). The redirect
+    # URL on the GitHub side must point at:
+    #   https://keycloak.shion1305.com/realms/ynufes-tech/broker/github/endpoint
+    identityProviders:
+      - alias: github
+        providerId: github
+        enabled: true
+        storeToken: false
+        addReadTokenRoleOnCreate: false
+        trustEmail: true
+        firstBrokerLoginFlowAlias: "first broker login"
+        config:
+          # NOTE: These placeholders are replaced via the admin UI after the
+          # initial import; the realm import does NOT re-apply them on
+          # subsequent reconciles, so it is safe to let Keycloak own the
+          # values. Do NOT commit real OAuth credentials to git.
+          clientId: PLACEHOLDER_REPLACE_AFTER_REALM_IMPORT
+          clientSecret: PLACEHOLDER_REPLACE_AFTER_REALM_IMPORT
+          defaultScope: "user:email"
+          syncMode: IMPORT

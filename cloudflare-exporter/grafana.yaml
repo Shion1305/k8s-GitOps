@@ -30,11 +30,12 @@ spec:
       # and mounted at /etc/grafana/secrets via the deployment override below.
       client_secret: $__file{/etc/grafana/secrets/clientsecret}
       scopes: openid email profile groups
-      # NOTE: Depends on PR3 introducing the keycloak.shion1305.com hostname.
-      # Until PR3 merges, OIDC login will fail; the auth.basic fix is independent.
-      auth_url: https://keycloak.shion1305.com/realms/grafana/protocol/openid-connect/auth
-      token_url: https://keycloak.shion1305.com/realms/grafana/protocol/openid-connect/token
-      api_url: https://keycloak.shion1305.com/realms/grafana/protocol/openid-connect/userinfo
+      # OIDC realm is `ynufes-tech` (replaces the legacy `grafana` realm).
+      # Authentication is GitHub OAuth via Keycloak's IdP; group-to-role
+      # mapping is performed below via role_attribute_path.
+      auth_url: https://keycloak.shion1305.com/realms/ynufes-tech/protocol/openid-connect/auth
+      token_url: https://keycloak.shion1305.com/realms/ynufes-tech/protocol/openid-connect/token
+      api_url: https://keycloak.shion1305.com/realms/ynufes-tech/protocol/openid-connect/userinfo
       role_attribute_path: contains(groups[*], 'grafana-admin') && 'Admin' || contains(groups[*], 'grafana-editor') && 'Editor' || 'Viewer'
     security:
       admin_user: admin

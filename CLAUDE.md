@@ -80,7 +80,8 @@ PostgreSQL clusters are managed by Zalando Postgres Operator in the `postgres-cl
 
 ```bash
 # Grafana: http://<node-ip>:30080
-# Username: admin / Password: admin123
+# Admin credentials: see the `kube-prometheus-stack-grafana` Secret in the
+# `grafana` namespace (or the in-cluster Vault path the chart values reference).
 
 # Check Prometheus targets
 kubectl port-forward -n grafana svc/kube-prometheus-stack-prometheus 9090:9090
@@ -115,12 +116,14 @@ This cluster uses a layered secret management approach:
 ### Keycloak Setup
 
 - **Purpose**: Provides OIDC/SAML authentication and Docker Registry v2 auth
-- **URL**: <https://keycloak.shion1305.com> (legacy <https://keycloak.k.shion1305.com> 308-redirects to the new host)
-- **Admin credentials**: admin/admin123
+- **URL**: <https://keycloak.shion1305.com> (legacy <https://keycloak.k.shion1305.com> 301-redirects to the new host)
+- **Admin credentials**: stored in the `keycloak-admin-credentials` Secret in the `keycloak` namespace; never committed to this repo
 - **Realms**:
-  - `master`: Admin realm
-  - `registry`: Docker registry authentication
-- **GitHub Actions Integration**: Uses OIDC token exchange via `gha-exchanger` client
+  - `master`: Keycloak admin only (do not modify declaratively)
+  - `user`: central human-user pool (passkey-only); brokered into child realms
+  - `zot`: Docker registry auth (zot UI + GitHub Actions token-exchange)
+  - `ynufes-tech`: GitHub-OAuth realm for the cloudflare-grafana audience
+- **GitHub Actions Integration**: Uses OIDC token exchange via `gha-exchanger` client (in the `zot` realm)
 
 ## Storage
 
@@ -257,3 +260,11 @@ Renovate runs in-cluster (deployed via Helm chart in `renovate/`) and automatica
 - Most applications use `ServerSideApply=true` for better conflict resolution
 - Domain: All ingress resources use `*.k.shion1305.com` domain
 - Node labels and taints affect workload scheduling - check node status when troubleshooting pod placement
+
+## Repository Hygiene
+
+This is a **public** repository on GitHub.
+
+- Never commit real or example credentials, passwords, tokens, API keys, or admin secrets — including in docs, READMEs, comments, or example commands. Use `<placeholder-name>` style if a value must appear in an example.
+- Real secrets live in Vault and are materialized into Kubernetes Secrets via External Secrets Operator. Documentation should reference the Vault path (e.g. `vault kv get <svc>/<key>`), not the value.
+- For `KeycloakRealmImport` clients and IdPs, use the literal string `PLACEHOLDER_REPLACE_AFTER_REALM_IMPORT`. The Keycloak operator generates real values on first import; humans then write those values into Vault out-of-band.

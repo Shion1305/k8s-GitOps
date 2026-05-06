@@ -1,0 +1,157 @@
+# =============================================================================
+# Keycloak Realm Import: user
+# =============================================================================
+#
+# This file is reconciled by the Keycloak Operator (KeycloakRealmImport CRD).
+# It declares the `user` realm, which is the central human-user pool brokered
+# into other realms (today: `zot`) via Identity Brokering / OIDC.
+#
+# Authentication policy:
+#   - Passkey / WebAuthn only (NO password, NO IdP login).
+#   - Self-registration disabled.
+#   - "Forgot password" link disabled.
+#   - Users are created manually by an admin in the Keycloak admin UI; each
+#     user must enroll a passkey via the `webauthn-register-passwordless`
+#     required action on first login.
+#
+# -----------------------------------------------------------------------------
+# Manual post-import steps (one-time, after first successful sync):
+# -----------------------------------------------------------------------------
+# 1. In the Keycloak admin UI, switch realm `user` -> Authentication -> Flows
+#    and set the realm's "Browser" binding to a passwordless WebAuthn flow.
+#    The simplest reliable path is:
+#      a. Duplicate the built-in "Browser" flow as "WebAuthn Browser".
+#      b. Remove the "Username Password Form" execution.
+#      c. Replace it with the "WebAuthn Passwordless Authenticator" execution
+#         (Required).
+#      d. Bind that flow as the realm's Browser flow.
+#    The realm import below sets `webAuthnPolicyPasswordless*` and registers
+#    `webauthn-register-passwordless` as a default action so first-login
+#    enrollment works, but the Browser flow binding is not declarative on the
+#    realm CRD shape used here -- it is configured via the admin UI.
+#
+# 2. Create human users manually in realm `user` -> Users. Each user is then
+#    prompted to enroll a passkey on first login because of the default
+#    required action set below.
+#
+# 3. Retrieve the auto-generated client secret for each per-child-realm broker
+#    client (today: `zot-broker`) from the Keycloak admin UI:
+#      realm `user` -> Clients -> zot-broker -> Credentials -> "Client secret".
+#    Copy that value into the matching `keycloak-oidc` IdP config on the child
+#    realm side (e.g. realm `zot` -> Identity Providers -> user ->
+#    Client Secret). Do NOT commit the value to git.
+#
+# -----------------------------------------------------------------------------
+# Clients
+# -----------------------------------------------------------------------------
+# This realm is an authentication source, not a resource server. The clients
+# declared below are exclusively the brokers for child realms; one per child
+# realm that brokers through here.
+# =============================================================================
+apiVersion: k8s.keycloak.org/v2alpha1
+kind: KeycloakRealmImport
+metadata:
+  name: user
+  namespace: keycloak
+spec:
+  keycloakCRName: keycloak
+  realm:
+    realm: user
+    enabled: true
+
+    # No self-service: registration and forgot-password are both off, and the
+    # default login form is suppressed in favour of the WebAuthn flow that the
+    # admin wires up post-import (see header).
+    registrationAllowed: false
+    registrationEmailAsUsername: false
+    rememberMe: false
+    resetPasswordAllowed: false
+    loginWithEmailAllowed: true
+    duplicateEmailsAllowed: false
+    editUsernameAllowed: false
+    verifyEmail: false
+
+    # `external` = HTTPS required for any non-loopback request. Same rationale
+    # as the other realms: TLS is terminated at Envoy Gateway and the Keycloak
+    # CR is configured with `proxy.headers: xforwarded`.
+    sslRequired: external
+
+    # -------------------------------------------------------------------------
+    # WebAuthn / Passkey policy.
+    # The "passwordless" variant is what we want: a passkey is the FIRST factor,
+    # not a second factor on top of a password. `requireResidentKey: Yes` forces
+    # the authenticator to store a discoverable credential, which is what
+    # consumer-grade passkeys (iCloud Keychain, Google Password Manager, 1P,
+    # hardware keys) implement. `userVerificationRequirement: required` ensures
+    # the authenticator performs UV (PIN / biometric / device unlock).
+    # -------------------------------------------------------------------------
+    webAuthnPolicyPasswordlessRpEntityName: "Keycloak"
+    webAuthnPolicyPasswordlessSignatureAlgorithms:
+      - ES256
+      - RS256
+    webAuthnPolicyPasswordlessRpId: "keycloak.shion1305.com"
+    webAuthnPolicyPasswordlessAttestationConveyancePreference: "not specified"
+    webAuthnPolicyPasswordlessAuthenticatorAttachment: "not specified"
+    webAuthnPolicyPasswordlessRequireResidentKey: "Yes"
+    webAuthnPolicyPasswordlessUserVerificationRequirement: "required"
+    webAuthnPolicyPasswordlessCreateTimeout: 0
+    webAuthnPolicyPasswordlessAvoidSameAuthenticatorRegister: false
+
+    # -------------------------------------------------------------------------
+    # Required actions.
+    # Enable the WebAuthn passwordless registration action and mark it as a
+    # default, so any newly-created (or admin-reset) user is forced to enroll
+    # a passkey on first login. The non-passwordless `webauthn-register` action
+    # is left disabled to avoid offering a "second-factor passkey" option that
+    # would confuse the UX of a passwordless realm.
+    # -------------------------------------------------------------------------
+    requiredActions:
+      - alias: webauthn-register-passwordless
+        name: "Webauthn Register Passwordless"
+        providerId: webauthn-register-passwordless
+        enabled: true
+        defaultAction: true
+        priority: 70
+        config: {}
+      - alias: VERIFY_PROFILE
+        name: "Verify Profile"
+        providerId: VERIFY_PROFILE
+        enabled: true
+        defaultAction: false
+        priority: 90
+        config: {}
+      - alias: UPDATE_PROFILE
+        name: "Update Profile"
+        providerId: UPDATE_PROFILE
+        enabled: true
+        defaultAction: false
+        priority: 40
+        config: {}
+
+    # -------------------------------------------------------------------------
+    # Clients: per-child-realm broker clients.
+    # Each child realm that brokers through `user` (via a `keycloak-oidc` IdP)
+    # needs a confidential client here whose redirect URI matches the child
+    # realm's broker callback. The client secret is generated by Keycloak on
+    # import and must be copied (manually, post-import) into the child realm's
+    # IdP config -- see header step 3.
+    # -------------------------------------------------------------------------
+    clients:
+      - clientId: zot-broker
+        name: "zot realm broker"
+        description: "Broker client used by the `zot` realm to authenticate users via this realm."
+        protocol: openid-connect
+        publicClient: false
+        clientAuthenticatorType: client-secret
+        # NOTE: This placeholder is replaced by a Keycloak-generated secret on
+        # first import. Copy the real value from the admin UI into the `zot`
+        # realm's IdP config (Identity Providers -> user -> Client Secret).
+        # Do NOT commit the actual secret to git.
+        secret: PLACEHOLDER_REPLACE_AFTER_REALM_IMPORT
+        standardFlowEnabled: true
+        directAccessGrantsEnabled: false
+        serviceAccountsEnabled: false
+        redirectUris:
+          - https://keycloak.shion1305.com/realms/zot/broker/user/endpoint
+        webOrigins:
+          - https://keycloak.shion1305.com
