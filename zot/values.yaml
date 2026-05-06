@@ -43,7 +43,7 @@ configFiles:
                 "name": "oidc",
                 "issuer": "https://keycloak.shion1305.com/realms/zot",
                 "credentialsFile": "/etc/zot/secrets/keycloak-credentials.json",
-                "scopes": ["openid", "email", "groups"]
+                "scopes": ["openid", "email"]
               }
             }
           },
