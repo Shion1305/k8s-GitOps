@@ -31,12 +31,8 @@ resources:
     memory: 128Mi
 # Monitoring configuration
 serviceMonitor:
-  enabled: true
-  namespace: monitoring
-  interval: 60s
-  scrapeTimeout: 30s
-  labels:
-    release: kube-prometheus-stack
+  # We use the standalone ServiceMonitor in servicemonitor.yaml instead — chart-rendered SM has wrong selector.
+  enabled: false
 # Security context
 securityContext:
   runAsNonRoot: true
