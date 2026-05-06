@@ -3,6 +3,5 @@ kind: Kustomization
 resources:
   - cluster-secret-store.yaml
   - rbac-db-reader.yaml
-  - cluster-external-secret.yaml
   - github-app-clustersecretstore.yaml
   - github-app-clusterexternalsecret.yaml

@@ -30,28 +30,29 @@ Key configurations:
 
 ### Managing Secrets
 
-```bash
-# Add new shared secrets
-vault kv put secret/shared/database \
-  DB_HOST="postgres.internal" \
-  DB_PORT="5432"
+Each application has its own KV v2 mount. Enable the mount once, then write secrets under it:
 
-# Add environment-specific secrets
-vault kv put secret/prod/api-keys \
-  API_KEY="your-api-key"
+```bash
+# Enable a dedicated KV v2 mount for a service (one-time)
+vault secrets enable -path=<svc> kv-v2
+
+# Write a secret
+vault kv put <svc>/credentials \
+  API_KEY="your-api-key" \
+  API_SECRET="your-api-secret"
 
 # View existing secrets
-vault kv list secret/shared/
-vault kv get secret/shared/app
+vault kv list <svc>/
+vault kv get <svc>/credentials
 ```
 
 ### Secret Rotation
 
 ```bash
-# Update existing secret (ESO will sync automatically within 5m)
-vault kv put secret/shared/app \
-  DB_USER="appuser" \
-  DB_PASSWORD="new-rotated-password"
+# Update an existing secret (ESO syncs automatically within 5m)
+vault kv put <svc>/credentials \
+  API_KEY="rotated-key" \
+  API_SECRET="rotated-secret"
 ```
 
 ### Backup & Maintenance
@@ -91,10 +92,11 @@ Each namespace has its own Vault policy and Kubernetes auth role, scoped to only
 
 | Vault Role | Namespace | Allowed Paths |
 |------------|-----------|---------------|
-| `eso` | external-secrets | `secret/data/shared/app` |
 | `eso-atc` | atc | `atc/data/*` |
 
-> **Note**: DB credentials for langfuse, openwebui, and keycloak are synced directly from the postgres-operator via ESO's Kubernetes provider (not Vault). See `../external-secrets/README.md`.
+> **Note**: DB credentials for langfuse, openwebui, mlflow, and keycloak are synced directly from the postgres-operator via ESO's Kubernetes provider (not Vault). See `../external-secrets/README.md`.
+>
+> **Cleanup pending**: The `eso` role / `eso-shared` policy is currently unused and can be removed during a future Vault cleanup.
 
 To add a new namespace with Vault access, update `vault/scripts/setup-eso-policies.sh` and run it.
 
