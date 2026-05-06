@@ -119,6 +119,15 @@ extraVolumeMounts:
 strategy:
   type: RollingUpdate
 
+# Upstream zot publishes architecture-specific images
+# (`zot-linux-amd64` vs `zot-linux-arm64`) rather than a multi-arch manifest
+# list, and `image.repository` above is hard-pinned to amd64. Constrain
+# scheduling so the StatefulSet doesn't land on an arm64 node and crash with
+# `exec format error`. Switch to a multi-arch image and remove this if/when
+# the upstream chart starts publishing a manifest list.
+nodeSelector:
+  kubernetes.io/arch: amd64
+
 metrics:
   enabled: true
   serviceMonitor:
