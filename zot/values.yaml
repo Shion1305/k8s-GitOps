@@ -41,13 +41,12 @@ configFiles:
               "keycloak": {
                 "name": "keycloak",
                 "issuer": "https://keycloak.shion1305.com/realms/zot",
-                "clientid": "zot-registry",
-                "clientsecret": "/etc/zot/secrets/clientsecret",
+                "credentialsFile": "/etc/zot/secrets/keycloak-credentials.json",
                 "scopes": ["openid", "email", "groups"]
               }
             }
           },
-          "sessionKeysFile": "/etc/zot/secrets/session-keys"
+          "sessionKeysFile": "/etc/zot/secrets/session-keys.json"
         },
         "accessControl": {
           "repositories": {
