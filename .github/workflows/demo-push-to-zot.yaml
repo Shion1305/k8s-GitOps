@@ -22,17 +22,19 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      # Use the `docker` driver (host daemon) instead of the default
-      # `docker-container` driver. The container driver runs buildkit in a
-      # sidecar that does not see the runner's ~/.docker/config.json, so the
-      # bearer credentials we write below would be ignored at push time.
       - uses: docker/setup-buildx-action@v3
-        with:
-          driver: docker
 
-      # Mint a fresh OIDC token immediately before login. GHA OIDC tokens
-      # expire in ~10 min; fetching here keeps the full TTL available for
-      # the buildx push that follows.
+      # We don't use docker/login-action / docker push: zot v2.1.16's bearer-
+      # OIDC middleware does not issue a WWW-Authenticate challenge when
+      # unauthenticated, so docker (CLI / daemon / buildkit) never attaches
+      # the bearer token to its retry. crane sends Authorization: Bearer
+      # pre-emptively based on ~/.docker/config.json and works against the
+      # registry without needing the challenge.
+      - name: Install crane
+        uses: imjasonh/setup-crane@v0.4
+
+      # Mint a fresh OIDC token immediately before push. GHA OIDC tokens
+      # expire in ~10 min.
       - name: Get GitHub OIDC token
         id: oidc
         run: |
@@ -45,15 +47,7 @@ jobs:
           echo "::add-mask::$token"
           echo "token=$token" >> "$GITHUB_OUTPUT"
 
-      # Write docker auth config directly. We don't use docker/login-action
-      # because it does GET /v2/ first and expects `WWW-Authenticate: Bearer`
-      # in the 401 response. zot v2.1.16's bearer-OIDC middleware does NOT
-      # issue that challenge (see pkg/api/authn.go bearerAuthHandler — when
-      # only `Bearer.OIDC[]` is configured, an unauthenticated request gets a
-      # plain 401 with no WWW-Authenticate header). Pre-populating
-      # ~/.docker/config.json makes buildx send the bearer pre-emptively, which
-      # zot's OIDC authorizer then validates against GitHub JWKS.
-      - name: Configure docker auth
+      - name: Configure crane auth
         env:
           OIDC_TOKEN: ${{ steps.oidc.outputs.token }}
         run: |
@@ -63,11 +57,21 @@ jobs:
           jq -n --arg auth "$auth" '{auths: {"registry.shion1305.com": {auth: $auth}}}' \
             > ~/.docker/config.json
 
-      - uses: docker/build-push-action@v5
-        with:
-          context: ./zot/demo
-          platforms: linux/amd64
-          push: true
-          tags: |
+      # Build to OCI layout and push with crane. buildx --output=type=oci
+      # writes a tarball; crane push uploads it via direct bearer.
+      - name: Build OCI image
+        run: |
+          set -euo pipefail
+          docker buildx build \
+            --platform linux/amd64 \
+            --output type=oci,dest=/tmp/image.tar \
+            ./zot/demo
+
+      - name: Push with crane
+        run: |
+          set -euo pipefail
+          crane push /tmp/image.tar \
             registry.shion1305.com/shion1305/demo:${{ github.sha }}
-            registry.shion1305.com/shion1305/demo:latest
+          crane tag \
+            registry.shion1305.com/shion1305/demo:${{ github.sha }} \
+            latest
