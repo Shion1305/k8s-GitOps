@@ -3,10 +3,11 @@
 # for in-cluster CI/CD or trusted hosts that have WG connectivity, while the
 # public registry.shion1305.com URL handles GitHub Actions and external pulls.
 #
-# Same path-split pattern as the external Gateway: zot-registry-internal
-# handles Docker v2 protocol traffic (no OIDC, zot does its own bearer
-# challenge), zot-ui-internal handles the SPA + /v2/_zot/* extension XHRs and
-# carries the SecurityPolicy.oidc binding.
+# Same path-split pattern as the external Gateway, but NO OIDC is attached to
+# either route: the WireGuard tunnel is the access boundary, so the UI loads
+# without login for read access, and the v2 protocol relies on zot's own
+# bearer-OIDC middleware (anonymous reads via defaultPolicy, writes from CI
+# go through the public host).
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
