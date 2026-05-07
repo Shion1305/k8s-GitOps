@@ -1,12 +1,23 @@
 # Public registry URL — used by browsers (zot UI / OIDC code-flow login) and by
-# `docker push` from any host that can resolve the public DNS. No SecurityPolicy
-# is attached because the Docker registry v2 protocol negotiates its own bearer
-# tokens (zot delegates to Keycloak), which conflicts with gateway-level JWT
-# enforcement.
+# `docker push` from any host that can resolve the public DNS.
+#
+# Two HTTPRoutes share hostname registry.shion1305.com and split by path:
+#   - zot-registry-external: Docker Registry v2 protocol (/v2/...). No
+#     SecurityPolicy is attached because the Docker registry v2 protocol
+#     negotiates its own bearer tokens (zot delegates to Keycloak), which would
+#     conflict with gateway-level OIDC enforcement.
+#   - zot-ui-external: everything else, including the SPA, /zot/auth/*, and
+#     zot's own extension XHRs under /v2/_zot/*. A SecurityPolicy.oidc is
+#     attached to this route so browser traffic gets gateway-level SSO.
+#
+# Gateway API precedence (most-specific-path-wins, GEP-718) means /v2/_zot/...
+# requests are routed to zot-ui-external even though /v2/ on zot-registry-
+# external also matches — the longer prefix wins regardless of declaration
+# order or HTTPRoute boundary.
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
-  name: zot-external
+  name: zot-registry-external
   namespace: zot
 spec:
   parentRefs:
@@ -16,6 +27,34 @@ spec:
   hostnames:
     - registry.shion1305.com
   rules:
-    - backendRefs:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /v2/
+      backendRefs:
+        - name: zot
+          port: 5000
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: zot-ui-external
+  namespace: zot
+spec:
+  parentRefs:
+    - name: external
+      namespace: envoy-gateway-system
+      sectionName: https
+  hostnames:
+    - registry.shion1305.com
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+        - path:
+            type: PathPrefix
+            value: /v2/_zot/
+      backendRefs:
         - name: zot
           port: 5000

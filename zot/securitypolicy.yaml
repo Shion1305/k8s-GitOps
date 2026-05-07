@@ -1,0 +1,64 @@
+# Envoy Gateway-managed OIDC for the zot Web UI.
+#
+# This SecurityPolicy binds to the zot-ui HTTPRoutes (external + internal). When
+# a browser hits anything other than `/v2/<repo>/...`, Envoy intercepts the
+# request, runs the OIDC Authorization Code flow against Keycloak realm `zot`,
+# stores tokens in encrypted cookies, and forwards the resulting access token
+# upstream as `Authorization: Bearer <kc_at>`. zot's `http.auth.bearer.oidc[]`
+# (issuer = this Keycloak realm, audience = `zot-registry`) then validates the
+# same token, enforces ACLs by `groups` claim, and serves the response.
+#
+# The Docker Registry v2 protocol path (`/v2/<repo>/...`) lives on a separate
+# HTTPRoute that does NOT have this policy attached, so `docker login` /
+# `docker push` from CI keep their own bearer challenge with zot directly.
+#
+# `passThroughAuthHeader: true` lets requests that already carry a Bearer
+# header (e.g. someone scripting against the UI extension API with a Keycloak
+# token in hand) bypass the redirect dance.
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: SecurityPolicy
+metadata:
+  name: zot-ui-oidc
+  namespace: zot
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: zot-ui-external
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: zot-ui-internal
+  oidc:
+    provider:
+      issuer: https://keycloak.shion1305.com/realms/zot
+    clientIDRef:
+      name: zot-ui-oidc-credentials
+    clientSecret:
+      name: zot-ui-oidc-credentials
+    # redirectURL omitted on purpose: Envoy auto-derives it as
+    # https://<:authority>/oauth2/callback per request. This lets the same
+    # SecurityPolicy serve both registry.shion1305.com and
+    # registry.i.shion1305.com without a second policy. Keycloak's
+    # `zot-ui` client must list BOTH
+    # `https://registry.shion1305.com/oauth2/callback` and
+    # `https://registry.i.shion1305.com/oauth2/callback` in redirectUris —
+    # already declared in keycloak-operator/zot-realm.yaml.
+    logoutPath: /logout
+    # `openid` is auto-added by Envoy. `groups` is required for zot's
+    # accessControl, sourced from the Keycloak group-membership mapper on the
+    # `zot-ui` client (see keycloak-operator/zot-realm.yaml).
+    scopes:
+      - email
+      - profile
+      - groups
+    # cookieDomain unset → Envoy uses host-only cookies (per request
+    # :authority). This lets cookies on registry.shion1305.com and
+    # registry.i.shion1305.com remain isolated, which is the safer default.
+    cookieConfig:
+      sameSite: Lax
+    cookieNames:
+      accessToken: zot_at
+      idToken: zot_it
+    forwardAccessToken: true
+    refreshToken: true
+    passThroughAuthHeader: true
