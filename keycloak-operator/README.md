@@ -73,6 +73,69 @@ git commit -m "chore: update Keycloak operator to vX.Y.Z"
 
 ArgoCD will sync the changes automatically. The operator will then handle rolling updates of Keycloak pods.
 
+## Realm Configuration (KeycloakRealmImport)
+
+Realms are declared as `KeycloakRealmImport` CRs in this directory:
+
+| File | Realm | Purpose |
+|---|---|---|
+| `user-realm.yaml` | `user` | Central human-user pool (passkey-only); brokered into other realms |
+| `zot-realm.yaml` | `zot` | Docker registry auth (zot UI + GHA token-exchange) |
+| `ynufes-tech-realm.yaml` | `ynufes-tech` | GitHub-OAuth realm for the cloudflare-grafana audience |
+
+### Important: One-shot reconcile model
+
+The Keycloak Operator's `KeycloakRealmImport` is **NOT continuously reconciled**.
+It runs once when the realm does not exist. Once a realm exists, **subsequent
+edits to the YAML are silently ignored**. This has two practical consequences:
+
+1. **Drift is invisible.** Manual changes in the admin UI will not be flagged
+   by ArgoCD as out-of-sync, because the operator does not compare live state
+   against the YAML.
+
+2. **YAML edits don't take effect** unless the realm is recreated:
+   ```bash
+   # Delete the import CR and the realm itself, then let ArgoCD reapply.
+   # WARNING: this drops every user, federated identity, and group membership
+   # in that realm. Acceptable for `zot` (federated GHA users only) and
+   # `ynufes-tech` (regenerated easily). NEVER do this for `user` without
+   # exporting and re-importing user data first.
+   kubectl delete keycloakrealmimport <realm-name> -n keycloak
+   # Then in admin UI: realm → Realm Settings → Action → Delete
+   # ArgoCD will recreate the import CR; the operator will reimport.
+   ```
+
+### Operating principle
+
+To keep YAML and live state aligned, follow this rule:
+
+> **Any change applied via the admin UI MUST be backported to the YAML in this
+> directory in the same PR.** If a change is impossible to express in the YAML
+> (see "Known declarative limits" below), document it as a manual post-import
+> step in the YAML's header comment.
+
+### Known declarative limits (manual post-import steps required)
+
+These items cannot be expressed in the `KeycloakRealmImport` shape today and
+must be applied by hand after each realm (re)creation. Each is documented in
+the affected realm YAML's header comment:
+
+| Item | Where | Why declarative is impossible |
+|---|---|---|
+| Client secret values | All clients with `clientAuthenticatorType: client-secret` | Keycloak generates the secret on first import; we use the literal placeholder `PLACEHOLDER_REPLACE_AFTER_REALM_IMPORT` and retrieve the real value from the admin UI afterwards. Stored in Vault, synced via ESO. |
+| Browser-flow IdP redirector binding | `zot`, others using brokered login | The "Identity Provider Redirector" execution must be added to the Browser flow and bound as the realm's Browser flow. Not expressible on the v2alpha1 CRD. |
+| FGAP token-exchange permissions | `zot` (`gha-exchanger` ↔ `github-actions` IdP) | Stored under `realm-management.authorizationSettings`, all references are internal UUIDs unknown until import time. See [keycloak#33401](https://github.com/keycloak/keycloak/issues/33401), [keycloak#35790](https://github.com/keycloak/keycloak/issues/35790). |
+
+Each realm YAML's header comment lists the realm-specific manual steps in
+order. Always re-run those after realm recreation.
+
+### Future: continuous reconciliation
+
+Long-term we may move client/IdP/permission configuration to **Crossplane
+provider-keycloak**, which gives true GitOps reconcile + drift correction +
+native CRDs for FGAP token-exchange permissions. The realm shell (groups,
+roles, scopes) would stay in `KeycloakRealmImport`. Tracked but not scheduled.
+
 ## Admin Access
 
 Admin credentials are managed separately (not by the operator). Access the admin console at:

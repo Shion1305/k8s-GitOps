@@ -33,9 +33,13 @@
 # 3. Generate the zot UI session encryption key and store it in Vault:
 #      vault kv put zot/session-keys key=$(openssl rand -base64 64)
 #
-# 4. (Optional) Repeat step 1-2 for the `gha-exchanger` client if/when its
-#    secret is needed by GHA workflows for the token-exchange grant. Store at
-#    `zot/gha-exchanger-client` (key: `clientsecret`) if required.
+# 4. Repeat step 1-2 for the `gha-exchanger` client. The token-exchange
+#    grant requires the GHA workflow to present this client_secret. Store at
+#    `zot/gha-exchanger-client` (key: `clientsecret`) and also set the GitHub
+#    repo / org secret `KEYCLOAK_GHA_EXCHANGER_SECRET` to the same value:
+#      vault kv put zot/gha-exchanger-client clientsecret=<value>
+#      gh secret set KEYCLOAK_GHA_EXCHANGER_SECRET \
+#        --repo Shion1305/k8s-GitOps --body "<value>"
 #
 # 5. Bind the Browser authentication flow to "Identity Provider Redirector"
 #    pinned to alias `user`, so human web logins skip the choice screen and
@@ -44,6 +48,23 @@
 #      execution at the top, Required, with config
 #      `Default Identity Provider = user`. Bind that flow as the realm's
 #      Browser flow. This step is not declarative on the CRD shape used here.
+#
+# 6. Grant the `gha-exchanger` client permission to perform `token-exchange`
+#    against the `github-actions` IdP. Without this, GitHub Actions workflows
+#    receive `HTTP 403: Client not allowed to exchange` from the token
+#    endpoint, even though `serviceAccountsEnabled: true` is set on the
+#    client below. Token-exchange v1 in Keycloak 26 is gated by Fine-Grained
+#    Admin Permissions (FGAP) on the IdP, which references internal UUIDs of
+#    both the IdP and the client and therefore cannot be expressed in a
+#    realm import (see keycloak#33401, keycloak#35790). Configure via UI:
+#      a. Identity Providers -> github-actions -> Permissions tab
+#         -> "Permissions enabled" = ON
+#      b. Click the auto-generated `token-exchange` permission
+#         -> "Policies" -> add a new "Client" policy named e.g.
+#         `gha-exchanger-can-exchange`, Clients=[gha-exchanger],
+#         Logic=Positive -> Save.
+#      c. Back on the permission, attach the new policy -> Save.
+#    Reference: https://www.keycloak.org/securing-apps/token-exchange
 #
 # -----------------------------------------------------------------------------
 # Out of scope for this YAML:
