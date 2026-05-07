@@ -57,14 +57,15 @@ jobs:
           jq -n --arg auth "$auth" '{auths: {"registry.shion1305.com": {auth: $auth}}}' \
             > ~/.docker/config.json
 
-      # Build to OCI layout and push with crane. buildx --output=type=oci
-      # writes a tarball; crane push uploads it via direct bearer.
-      - name: Build OCI image
+      # Build to docker-archive format. crane push expects a tarball with
+      # manifest.json at the root (docker save format).
+      - name: Build image (docker tarball)
         run: |
           set -euo pipefail
           docker buildx build \
             --platform linux/amd64 \
-            --output type=oci,dest=/tmp/image.tar \
+            --tag registry.shion1305.com/shion1305/demo:${{ github.sha }} \
+            --output type=docker,dest=/tmp/image.tar \
             ./zot/demo
 
       - name: Push with crane
