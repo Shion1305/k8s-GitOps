@@ -39,13 +39,23 @@ jobs:
           echo "::add-mask::$token"
           echo "token=$token" >> "$GITHUB_OUTPUT"
 
-      # Username is ignored by zot's bearer-OIDC middleware (only the
-      # Authorization header is read) but docker login requires one.
-      - uses: docker/login-action@v3
-        with:
-          registry: registry.shion1305.com
-          username: oidc
-          password: ${{ steps.oidc.outputs.token }}
+      # Write docker auth config directly. We don't use docker/login-action
+      # because it does GET /v2/ first and expects `WWW-Authenticate: Bearer`
+      # in the 401 response. zot v2.1.16's bearer-OIDC middleware does NOT
+      # issue that challenge (see pkg/api/authn.go bearerAuthHandler — when
+      # only `Bearer.OIDC[]` is configured, an unauthenticated request gets a
+      # plain 401 with no WWW-Authenticate header). Pre-populating
+      # ~/.docker/config.json makes buildx send the bearer pre-emptively, which
+      # zot's OIDC authorizer then validates against GitHub JWKS.
+      - name: Configure docker auth
+        env:
+          OIDC_TOKEN: ${{ steps.oidc.outputs.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.docker
+          auth=$(printf 'oidc:%s' "$OIDC_TOKEN" | base64 -w0)
+          jq -n --arg auth "$auth" '{auths: {"registry.shion1305.com": {auth: $auth}}}' \
+            > ~/.docker/config.json
 
       - uses: docker/build-push-action@v5
         with:
