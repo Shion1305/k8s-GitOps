@@ -22,7 +22,13 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      # Use the `docker` driver (host daemon) instead of the default
+      # `docker-container` driver. The container driver runs buildkit in a
+      # sidecar that does not see the runner's ~/.docker/config.json, so the
+      # bearer credentials we write below would be ignored at push time.
       - uses: docker/setup-buildx-action@v3
+        with:
+          driver: docker
 
       # Mint a fresh OIDC token immediately before login. GHA OIDC tokens
       # expire in ~10 min; fetching here keeps the full TTL available for
