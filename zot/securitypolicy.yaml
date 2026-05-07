@@ -11,10 +11,6 @@
 # The Docker Registry v2 protocol path (`/v2/<repo>/...`) lives on a separate
 # HTTPRoute that does NOT have this policy attached, so `docker login` /
 # `docker push` from CI keep their own bearer challenge with zot directly.
-#
-# `passThroughAuthHeader: true` lets requests that already carry a Bearer
-# header (e.g. someone scripting against the UI extension API with a Keycloak
-# token in hand) bypass the redirect dance.
 apiVersion: gateway.envoyproxy.io/v1alpha1
 kind: SecurityPolicy
 metadata:
@@ -61,4 +57,3 @@ spec:
       idToken: zot_it
     forwardAccessToken: true
     refreshToken: true
-    passThroughAuthHeader: true
