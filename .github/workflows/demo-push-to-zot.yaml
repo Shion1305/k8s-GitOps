@@ -1,0 +1,66 @@
+name: demo - build & push to registry.shion1305.com
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "zot/demo/**"
+      - ".github/workflows/demo-push-to-zot.yaml"
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  build-push:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Get GitHub OIDC token (audience=zot-registry)
+        id: gh-oidc
+        run: |
+          token=$(curl -fsSL \
+            -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=zot-registry" | jq -r '.value')
+          echo "::add-mask::$token"
+          echo "token=$token" >> "$GITHUB_OUTPUT"
+
+      - name: Exchange for Keycloak access token
+        id: kc-exchange
+        run: |
+          response=$(curl -fsSL -X POST \
+            "https://keycloak.shion1305.com/realms/zot/protocol/openid-connect/token" \
+            -d "grant_type=urn:ietf:params:oauth:grant-type:token-exchange" \
+            -d "subject_token=${{ steps.gh-oidc.outputs.token }}" \
+            -d "subject_token_type=urn:ietf:params:oauth:token-type:id_token" \
+            -d "subject_issuer=github-actions" \
+            -d "audience=zot-registry" \
+            -d "requested_token_type=urn:ietf:params:oauth:token-type:access_token" \
+            -d "client_id=gha-exchanger" \
+            -d "client_secret=${{ secrets.KEYCLOAK_GHA_EXCHANGER_SECRET }}")
+          token=$(echo "$response" | jq -r '.access_token')
+          if [ "$token" = "null" ] || [ -z "$token" ]; then
+            echo "Token exchange failed:"
+            echo "$response"
+            exit 1
+          fi
+          echo "::add-mask::$token"
+          echo "token=$token" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/login-action@v3
+        with:
+          registry: registry.shion1305.com
+          username: oidc
+          password: ${{ steps.kc-exchange.outputs.token }}
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/build-push-action@v5
+        with:
+          context: ./zot/demo
+          push: true
+          tags: |
+            registry.shion1305.com/shion1305/demo:${{ github.sha }}
+            registry.shion1305.com/shion1305/demo:latest
