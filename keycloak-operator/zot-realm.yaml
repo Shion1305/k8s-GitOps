@@ -5,12 +5,18 @@
 # This file is reconciled by the Keycloak Operator (KeycloakRealmImport CRD).
 # It declares the `zot` realm used to authenticate human users to the zot
 # registry Web UI:
-#   - Browser login flow runs through `oauth2-proxy` (a sidecar in front of
-#     zot), which performs the Authorization Code flow against this realm and
-#     forwards the Keycloak access token upstream as `Authorization: Bearer`.
+#   - Browser login flow runs through Envoy Gateway's `SecurityPolicy.oidc`
+#     (zot/securitypolicy.yaml), which performs the Authorization Code flow
+#     against this realm using the `oauth2-proxy` confidential client below
+#     and forwards the Keycloak access token upstream as `Authorization:
+#     Bearer ...` (forwardAccessToken: true).
 #   - zot's `http.auth.bearer.oidc[]` validates that token (issuer =
 #     this realm, audience = `zot-registry`) and authorizes via the `groups`
 #     claim.
+#
+# A planned follow-up PR renames the `oauth2-proxy` client to `zot-ui` and
+# adds a `cluster-puller` service-account client for kubelet pulls. See
+# docs/zot-registry-deployment-plan.md.
 #
 # GitHub Actions does NOT pass through Keycloak. CI/CD workflows present
 # their own GitHub OIDC token directly to zot at `registry.shion1305.com`,
