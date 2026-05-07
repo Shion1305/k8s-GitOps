@@ -1,18 +1,12 @@
-# Envoy Gateway-managed OIDC for the zot Web UI on the PUBLIC host only.
+# Envoy Gateway-managed OIDC for the zot Web UI.
 #
-# This SecurityPolicy binds to zot-ui-external. When a browser hits anything
-# other than `/v2/<repo>/...` on registry.shion1305.com, Envoy intercepts the
+# This SecurityPolicy binds to the zot-ui HTTPRoutes (external + internal). When
+# a browser hits anything other than `/v2/<repo>/...`, Envoy intercepts the
 # request, runs the OIDC Authorization Code flow against Keycloak realm `zot`,
 # stores tokens in encrypted cookies, and forwards the resulting access token
 # upstream as `Authorization: Bearer <kc_at>`. zot's `http.auth.bearer.oidc[]`
 # (issuer = this Keycloak realm, audience = `zot-registry`) then validates the
 # same token, enforces ACLs by `groups` claim, and serves the response.
-#
-# The internal host (registry.i.shion1305.com, reachable only over WireGuard)
-# is intentionally NOT in targetRefs — the WG boundary is the access control,
-# and the UI is left unauthenticated for low-friction read access. UI writes
-# from this host don't work (zot's bearer-OIDC middleware has no token to
-# validate); pushes happen via CI against the external host.
 #
 # The Docker Registry v2 protocol path (`/v2/<repo>/...`) lives on a separate
 # HTTPRoute that does NOT have this policy attached, so `docker login` /
@@ -27,6 +21,9 @@ spec:
     - group: gateway.networking.k8s.io
       kind: HTTPRoute
       name: zot-ui-external
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: zot-ui-internal
   oidc:
     provider:
       issuer: https://keycloak.shion1305.com/realms/zot
