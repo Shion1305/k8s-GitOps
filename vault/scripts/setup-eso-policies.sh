@@ -129,6 +129,20 @@ path "cloudflare-grafana/metadata/*" {
 EOF
 echo "✓ Created policy: eso-cloudflare-grafana"
 
+# Policy for the cluster-wide zot-pull automation. Reads only the Keycloak
+# `cluster-puller` service-account credentials at zot/cluster-puller.
+# Consumed by the ClusterSecretStore `vault-zot-cluster-puller` (zot-pull/),
+# which feeds the ClusterGenerator that mints pull bearer tokens.
+vault policy write eso-cluster-puller - <<EOF
+path "zot/data/cluster-puller" {
+  capabilities = ["read"]
+}
+path "zot/metadata/cluster-puller" {
+  capabilities = ["read", "list"]
+}
+EOF
+echo "✓ Created policy: eso-cluster-puller"
+
 echo ""
 echo "=== Creating namespace-scoped Kubernetes auth roles ==="
 
@@ -212,6 +226,16 @@ vault write auth/kubernetes/role/eso-cloudflare-grafana \
   ttl=1h
 echo "✓ Created role: eso-cloudflare-grafana"
 
+# cluster-puller (cluster-scoped store; binds to the ESO operator SA so the
+# ClusterSecretStore `vault-zot-cluster-puller` can read zot/cluster-puller
+# from any namespace context the controller runs in).
+vault write auth/kubernetes/role/eso-cluster-puller \
+  bound_service_account_names=external-secrets \
+  bound_service_account_namespaces=external-secrets \
+  policies=eso-cluster-puller \
+  ttl=1h
+echo "✓ Created role: eso-cluster-puller"
+
 echo ""
 echo "=== Removing old broad policy ==="
 vault policy delete eso-policy 2>/dev/null && echo "✓ Deleted old policy: eso-policy" || echo "ⓘ Policy eso-policy not found (already removed)"
@@ -230,3 +254,4 @@ echo "  eso-cert-manager→ SA eso/cert-manager    → system/data/cert-manager"
 echo "  eso-zot         → SA eso/zot             → zot/data/*"
 echo "  eso-github-app  → SA external-secrets/external-secrets → github-app-shared/data/*"
 echo "  eso-cloudflare-grafana → SA eso/monitoring     → cloudflare-grafana/data/*"
+echo "  eso-cluster-puller → SA external-secrets/external-secrets → zot/data/cluster-puller"
