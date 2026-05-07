@@ -4,13 +4,21 @@
 #
 # This file is reconciled by the Keycloak Operator (KeycloakRealmImport CRD).
 # It declares the `zot` realm used to authenticate human users to the zot
-# registry Web UI:
-#   - Browser login flow runs through `oauth2-proxy` (a sidecar in front of
-#     zot), which performs the Authorization Code flow against this realm and
-#     forwards the Keycloak access token upstream as `Authorization: Bearer`.
-#   - zot's `http.auth.bearer.oidc[]` validates that token (issuer =
-#     this realm, audience = `zot-registry`) and authorizes via the `groups`
-#     claim.
+# registry Web UI and to mint pull tokens for in-cluster workloads:
+#   - Browser login flow runs through Envoy Gateway's `SecurityPolicy.oidc`
+#     (zot/securitypolicy.yaml), which performs the Authorization Code flow
+#     against this realm using the `zot-ui` confidential client below and
+#     forwards the Keycloak access token upstream as `Authorization:
+#     Bearer ...` (forwardAccessToken: true).
+#   - In-cluster image pulls (kubelet imagePullSecrets) and manual
+#     `docker login` from WireGuard hosts use the `cluster-puller`
+#     service-account client below (grant_type=client_credentials). ESO's
+#     ClusterGenerator (zot-pull/cluster-generator.yaml) calls Keycloak's
+#     token endpoint and templates a dockerconfigjson Secret named
+#     `zot-pull` into every namespace labelled `zot-pull/enabled=true`.
+#   - zot's `http.auth.bearer.oidc[]` validates the access tokens issued by
+#     this realm (audience = `zot-registry`) and authorizes via the
+#     `groups` claim.
 #
 # GitHub Actions does NOT pass through Keycloak. CI/CD workflows present
 # their own GitHub OIDC token directly to zot at `registry.shion1305.com`,
@@ -29,12 +37,13 @@
 #    overwritten by Keycloak on first import; subsequent reconciles do not
 #    re-apply the placeholder.
 #
-# 2. Repeat for `oauth2-proxy` and persist both into Vault:
-#      vault kv put zot/keycloak-client clientsecret=<zot-registry-secret>
-#      vault kv put oauth2-proxy/keycloak \
-#        client-id=oauth2-proxy \
-#        client-secret=<oauth2-proxy-secret> \
-#        cookie-secret=$(openssl rand -base64 32 | tr -- '+/' '-_' | head -c 32)
+# 2. Repeat for `zot-ui` and `cluster-puller`, then persist all three into
+#    Vault (the zot/cluster-puller path is read by ESO via the
+#    `eso-cluster-puller` Vault role; see vault/scripts/setup-eso-policies.sh):
+#      vault kv put zot/keycloak-client clientsecret=<zot-ui-secret>
+#      vault kv put zot/cluster-puller \
+#        client_id=cluster-puller \
+#        client_secret=<cluster-puller-secret>
 #
 # 3. Bind the Browser authentication flow to "Identity Provider Redirector"
 #    pinned to alias `user`, so human web logins skip the choice screen and go
@@ -315,10 +324,10 @@ spec:
     # -------------------------------------------------------------------------
     clients:
       # zot-registry: confidential client. Its sole purpose now is to be the
-      # `aud` audience that oauth2-proxy stamps onto the access_token (via the
-      # audience mapper below). zot's `bearer.oidc[].audiences=[zot-registry]`
-      # validates against this. The client is NOT used directly for any
-      # interactive login flow; oauth2-proxy is.
+      # `aud` audience that the `zot-ui` and `cluster-puller` clients stamp
+      # onto their access_tokens (via the audience mappers below). zot's
+      # `bearer.oidc[].audiences=[zot-registry]` validates against this.
+      # The client is NOT used directly for any interactive login flow.
       - clientId: zot-registry
         protocol: openid-connect
         publicClient: false
@@ -332,11 +341,12 @@ spec:
         attributes:
           access.token.lifespan: "3600"
 
-      # oauth2-proxy: confidential client used by the oauth2-proxy sidecar
-      # to run the human Authorization Code flow. Its access_token carries
-      # `aud=[oauth2-proxy, zot-registry]` (via the audience mapper) so zot
-      # accepts it under the bearer.oidc[Keycloak] entry.
-      - clientId: oauth2-proxy
+      # zot-ui: confidential client driven by Envoy Gateway's SecurityPolicy
+      # (zot/securitypolicy.yaml) to run the human Authorization Code flow.
+      # Its access_token carries `aud=[zot-ui, zot-registry]` (via the
+      # audience mapper) so zot accepts it under the bearer.oidc[Keycloak]
+      # entry.
+      - clientId: zot-ui
         protocol: openid-connect
         publicClient: false
         clientAuthenticatorType: client-secret
@@ -373,6 +383,52 @@ spec:
               included.client.audience: "zot-registry"
               id.token.claim: "false"
               access.token.claim: "true"
+
+      # cluster-puller: confidential client used by ESO's ClusterGenerator
+      # (zot-pull/cluster-generator.yaml) to mint short-lived access_tokens
+      # via grant_type=client_credentials. The materialized dockerconfigjson
+      # is fanned out to every namespace labelled `zot-pull/enabled=true`,
+      # so kubelet can `imagePullSecrets`-pull from the registry.
+      #
+      # Service-account flow only: no human-facing flow, no interactive
+      # login, no redirectUris. The hardcoded `groups` mapper carries both
+      # pusher group names so the cluster can pull from `shion1305/**` and
+      # `shion1305dev/**` regardless of how `defaultPolicy` evolves on
+      # individual repositories.
+      - clientId: cluster-puller
+        protocol: openid-connect
+        publicClient: false
+        clientAuthenticatorType: client-secret
+        secret: PLACEHOLDER_REPLACE_AFTER_REALM_IMPORT
+        standardFlowEnabled: false
+        directAccessGrantsEnabled: false
+        serviceAccountsEnabled: true
+        attributes:
+          access.token.lifespan: "3600"
+        protocolMappers:
+          # Audience mapper required because Keycloak service-account
+          # access_tokens default to `aud=account`.
+          - name: zot-registry-audience
+            protocolMapper: oidc-audience-mapper
+            protocol: openid-connect
+            config:
+              included.client.audience: "zot-registry"
+              id.token.claim: "false"
+              access.token.claim: "true"
+          # Static `groups` claim so zot's accessControl authorizes the
+          # service account against the pusher repos. Read on
+          # `**` is also permitted by `defaultPolicy: ["read"]`, but the
+          # explicit groups make the intent visible.
+          - name: groups-static
+            protocolMapper: oidc-hardcoded-claim-mapper
+            protocol: openid-connect
+            config:
+              claim.name: "groups"
+              claim.value: '["pusher-shion1305", "pusher-shion1305dev"]'
+              jsonType.label: "JSON"
+              id.token.claim: "false"
+              access.token.claim: "true"
+              userinfo.token.claim: "false"
 
     # -------------------------------------------------------------------------
     # Identity Providers
