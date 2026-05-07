@@ -47,14 +47,18 @@ jobs:
           echo "::add-mask::$token"
           echo "token=$token" >> "$GITHUB_OUTPUT"
 
+      # Use the `registrytoken` field so crane sends `Authorization: Bearer
+      # <token>` directly. The `auth` field would be sent as `Basic
+      # <base64(oidc:JWT)>`, which zot's bearer-OIDC regex (case-insensitive
+      # `bearer (.*)`) rejects with ErrInvalidBearerToken.
       - name: Configure crane auth
         env:
           OIDC_TOKEN: ${{ steps.oidc.outputs.token }}
         run: |
           set -euo pipefail
           mkdir -p ~/.docker
-          auth=$(printf 'oidc:%s' "$OIDC_TOKEN" | base64 -w0)
-          jq -n --arg auth "$auth" '{auths: {"registry.shion1305.com": {auth: $auth}}}' \
+          jq -n --arg t "$OIDC_TOKEN" \
+            '{auths: {"registry.shion1305.com": {registrytoken: $t}}}' \
             > ~/.docker/config.json
 
       # Build to docker-archive format. crane push expects a tarball with
