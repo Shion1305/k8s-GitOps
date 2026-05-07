@@ -61,21 +61,26 @@ jobs:
             '{auths: {"registry.shion1305.com": {registrytoken: $t}}}' \
             > ~/.docker/config.json
 
-      # Build to docker-archive format. crane push expects a tarball with
-      # manifest.json at the root (docker save format).
-      - name: Build image (docker tarball)
+      # Build to OCI layout (extracted dir). crane push supports OCI-layout
+      # tarballs/dirs and pushes manifests with the OCI media type, which zot
+      # accepts. (The docker-archive format pushes
+      # application/vnd.docker.distribution.manifest.v2+json which zot rejects
+      # with 415 / MANIFEST_INVALID.)
+      - name: Build OCI image
         run: |
           set -euo pipefail
           docker buildx build \
             --platform linux/amd64 \
-            --tag registry.shion1305.com/shion1305/demo:${{ github.sha }} \
-            --output type=docker,dest=/tmp/image.tar \
+            --output type=oci,dest=/tmp/image.tar \
             ./zot/demo
 
       - name: Push with crane
         run: |
           set -euo pipefail
-          crane push /tmp/image.tar \
+          # Extract OCI tarball so crane can read it as an OCI layout dir.
+          mkdir -p /tmp/oci
+          tar -xf /tmp/image.tar -C /tmp/oci
+          crane push /tmp/oci \
             registry.shion1305.com/shion1305/demo:${{ github.sha }}
           crane tag \
             registry.shion1305.com/shion1305/demo:${{ github.sha }} \
