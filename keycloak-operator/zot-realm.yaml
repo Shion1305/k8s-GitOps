@@ -341,8 +341,10 @@ spec:
         serviceAccountsEnabled: false
         redirectUris:
           - https://registry.shion1305.com/*
+          - https://registry.i.shion1305.com/*
         webOrigins:
           - https://registry.shion1305.com
+          - https://registry.i.shion1305.com
         attributes:
           # 1 hour access token lifespan — long enough for `docker push` of
           # large images without forcing mid-push re-auth.
