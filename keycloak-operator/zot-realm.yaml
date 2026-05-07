@@ -3,56 +3,61 @@
 # =============================================================================
 #
 # This file is reconciled by the Keycloak Operator (KeycloakRealmImport CRD).
-# It declares the `zot` realm used to authenticate:
-#   - Human users logging in to the zot UI at https://registry.shion1305.com
-#     via OIDC Authorization Code flow (client: `zot-registry`).
-#   - GitHub Actions workflows pushing images to the zot registry, via OIDC
-#     token exchange (client: `gha-exchanger`) using GitHub's OIDC issuer
-#     (https://token.actions.githubusercontent.com) as an Identity Provider.
+# It declares the `zot` realm used to authenticate human users to the zot
+# registry Web UI:
+#   - Browser login flow runs through `oauth2-proxy` (a sidecar in front of
+#     zot), which performs the Authorization Code flow against this realm and
+#     forwards the Keycloak access token upstream as `Authorization: Bearer`.
+#   - zot's `http.auth.bearer.oidc[]` validates that token (issuer =
+#     this realm, audience = `zot-registry`) and authorizes via the `groups`
+#     claim.
 #
-# Token exchange is enabled cluster-wide via `KC_FEATURES=token-exchange`
-# already set on the Keycloak CR (see `keycloak.yaml`). No realm-level toggle
-# is required.
+# GitHub Actions does NOT pass through Keycloak. CI/CD workflows present
+# their own GitHub OIDC token directly to zot at `registry.shion1305.com`,
+# which validates it via a second `bearer.oidc[]` entry trusting
+# `https://token.actions.githubusercontent.com`. Token-exchange and the
+# previous `gha-exchanger` client / `github-actions` IdP have been retired.
 #
 # -----------------------------------------------------------------------------
 # Manual post-import steps (one-time, after first successful sync):
 # -----------------------------------------------------------------------------
 # 1. Retrieve the auto-generated client secret for the `zot-registry` client
 #    from the Keycloak admin UI:
-#      https://keycloak.shion1305.com → realm `zot` → Clients → zot-registry
-#      → Credentials tab → "Client secret" (Regenerate if needed).
-#    The placeholder `PLACEHOLDER_REPLACE_AFTER_REALM_IMPORT` declared below
-#    is overwritten by Keycloak on first import; the realm import does NOT
-#    re-apply the placeholder on subsequent reconciles, so it is safe to let
-#    Keycloak own the value.
+#      https://keycloak.shion1305.com -> realm `zot` -> Clients -> zot-registry
+#      -> Credentials -> "Client secret".
+#    The placeholder `PLACEHOLDER_REPLACE_AFTER_REALM_IMPORT` declared below is
+#    overwritten by Keycloak on first import; subsequent reconciles do not
+#    re-apply the placeholder.
 #
-# 2. Push the actual client secret into Vault so ESO can sync it into the zot
-#    namespace (used by zot for OIDC code-flow token exchange):
-#      vault kv put zot/keycloak-client clientsecret=<value-from-keycloak-ui>
+# 2. Repeat for `oauth2-proxy` and persist both into Vault:
+#      vault kv put zot/keycloak-client clientsecret=<zot-registry-secret>
+#      vault kv put oauth2-proxy/keycloak \
+#        client-id=oauth2-proxy \
+#        client-secret=<oauth2-proxy-secret> \
+#        cookie-secret=$(openssl rand -base64 32 | tr -- '+/' '-_' | head -c 32)
 #
-# 3. Generate the zot UI session encryption key and store it in Vault:
-#      vault kv put zot/session-keys key=$(openssl rand -base64 64)
-#
-# 4. (Optional) Repeat step 1-2 for the `gha-exchanger` client if/when its
-#    secret is needed by GHA workflows for the token-exchange grant. Store at
-#    `zot/gha-exchanger-client` (key: `clientsecret`) if required.
-#
-# 5. Bind the Browser authentication flow to "Identity Provider Redirector"
-#    pinned to alias `user`, so human web logins skip the choice screen and
-#    go straight to the `user` realm (passkey-only):
+# 3. Bind the Browser authentication flow to "Identity Provider Redirector"
+#    pinned to alias `user`, so human web logins skip the choice screen and go
+#    straight to the `user` realm (passkey-only):
 #      Authentication -> Flows -> Browser -> add "Identity Provider Redirector"
 #      execution at the top, Required, with config
 #      `Default Identity Provider = user`. Bind that flow as the realm's
-#      Browser flow. This step is not declarative on the CRD shape used here.
+#      Browser flow. This step is not declarative on the v2alpha1 CRD.
+#
+# 4. Assign the `zot-admin` / `pusher-shion1305` / `pusher-shion1305dev`
+#    groups to the appropriate users (after first-broker-login from the `user`
+#    realm). This is per-user state and lives in Keycloak, not git.
 #
 # -----------------------------------------------------------------------------
-# Out of scope for this YAML:
+# Realm recreation (when YAML changes need to take effect):
 # -----------------------------------------------------------------------------
-# - Adding human users to the `zot-admin` group requires creating the user
-#   (in this `zot` realm or via brokering from the `master` realm) and then
-#   assigning group membership manually in the Keycloak admin UI.
-# - Vault-side policy / role setup (`eso-zot`) is documented in the deployment
-#   plan and tracked under `vault/scripts/setup-eso-policies.sh`.
+# `KeycloakRealmImport` is one-shot reconcile; subsequent edits are silently
+# ignored once the realm exists. To apply changes:
+#   kubectl delete keycloakrealmimport zot -n keycloak
+#   # admin UI: realm `zot` -> Realm Settings -> Action -> Delete
+# ArgoCD then recreates the import CR; the operator reimports.
+# WARNING: this drops federated-identity links and group memberships for
+# every brokered user; re-run step 4 above for each affected user.
 # =============================================================================
 apiVersion: k8s.keycloak.org/v2alpha1
 kind: KeycloakRealmImport
@@ -69,15 +74,12 @@ spec:
     # plaintext (Pod IP, ClusterIP) still satisfies this because traffic is TLS-
     # terminated at Envoy Gateway and the `xforwarded` proxy headers config on
     # the Keycloak CR makes Keycloak treat `X-Forwarded-Proto: https` requests
-    # as HTTPS. Net effect: every flow that traverses
-    # `*.shion1305.com` / `*.i.shion1305.com` (Gateway TLS) is HTTPS-enforced,
-    # while loopback health checks from the Keycloak operator remain unaffected.
+    # as HTTPS.
     sslRequired: external
 
     # -------------------------------------------------------------------------
-    # Realm roles (top-level, NOT client roles). These are the role names that
-    # zot's accessControl policy keys off of via the `groups` claim in the JWT
-    # (groups carry their associated realmRole into the claim).
+    # Realm roles. zot's accessControl policy keys off the `groups` claim in
+    # the JWT (groups carry their associated realmRole into the claim).
     # -------------------------------------------------------------------------
     roles:
       realm:
@@ -89,10 +91,9 @@ spec:
           description: Push/pull on shion1305dev/** repositories
 
     # -------------------------------------------------------------------------
-    # Groups mirror the realm roles. The `groups` OIDC claim is what zot's
-    # accessControl uses for authorization, so each group is granted its
-    # corresponding realmRole, and the group-membership mapper on each client
-    # ensures the group name lands in the JWT.
+    # Groups mirror the realm roles. The group-membership mapper on each
+    # client emits the group name into the JWT `groups` claim, which zot's
+    # accessControl uses for authorization.
     # -------------------------------------------------------------------------
     groups:
       - name: zot-admin
@@ -110,16 +111,9 @@ spec:
     # -------------------------------------------------------------------------
     # When a realm is imported with a non-empty `clientScopes` list, Keycloak
     # uses it as the COMPLETE set of scopes for the realm and skips the
-    # auto-seeded built-ins. So we have to declare every scope we want — both
+    # auto-seeded built-ins. So we have to declare every scope we want -- both
     # the OIDC built-ins (`profile`, `email`, `roles`, `web-origins`, `acr`,
-    # `basic`) and our custom `groups` — otherwise Keycloak rejects login
-    # requests carrying any of them as `invalid_scope`.
-    #
-    # Source for the built-in mapper configs: Keycloak 26.x
-    # `OIDCLoginProtocolFactory.addBuiltinMappers()` and the per-scope wiring
-    # in the same file. We mirror Keycloak's defaults so behavior matches a
-    # vanilla realm. Optional scopes (`offline_access`, `address`, `phone`,
-    # `microprofile-jwt`) are intentionally omitted — not used by zot.
+    # `basic`) and our custom `groups`.
     defaultDefaultClientScopes:
       - basic
       - profile
@@ -309,10 +303,6 @@ spec:
               access.token.claim: "true"
               introspection.token.claim: "true"
 
-      # `groups` is custom to this realm — used by zot's accessControl. The
-      # actual claim is produced by the per-client mapper on `zot-registry`
-      # and `gha-exchanger`; this scope just registers the name so it can be
-      # listed in the auth request.
       - name: groups
         description: Group memberships claim
         protocol: openid-connect
@@ -324,34 +314,46 @@ spec:
     # Clients
     # -------------------------------------------------------------------------
     clients:
-      # zot-registry: confidential client used by zot for both:
-      #   - the UI Authorization Code flow (human OIDC login)
-      #   - the audience of JWTs minted via gha-exchanger token exchange
+      # zot-registry: confidential client. Its sole purpose now is to be the
+      # `aud` audience that oauth2-proxy stamps onto the access_token (via the
+      # audience mapper below). zot's `bearer.oidc[].audiences=[zot-registry]`
+      # validates against this. The client is NOT used directly for any
+      # interactive login flow; oauth2-proxy is.
       - clientId: zot-registry
         protocol: openid-connect
         publicClient: false
         clientAuthenticatorType: client-secret
-        # NOTE: This placeholder is replaced by a Keycloak-generated secret on
-        # first import. The real value is retrieved from the admin UI and
-        # written to Vault at `zot/keycloak-client` (key: `clientsecret`).
-        # Do NOT commit the actual secret to git.
+        # Keycloak generates the real value on first import and never re-applies
+        # this placeholder. Do NOT commit the actual secret.
+        secret: PLACEHOLDER_REPLACE_AFTER_REALM_IMPORT
+        standardFlowEnabled: false
+        directAccessGrantsEnabled: false
+        serviceAccountsEnabled: false
+        attributes:
+          access.token.lifespan: "3600"
+
+      # oauth2-proxy: confidential client used by the oauth2-proxy sidecar
+      # to run the human Authorization Code flow. Its access_token carries
+      # `aud=[oauth2-proxy, zot-registry]` (via the audience mapper) so zot
+      # accepts it under the bearer.oidc[Keycloak] entry.
+      - clientId: oauth2-proxy
+        protocol: openid-connect
+        publicClient: false
+        clientAuthenticatorType: client-secret
         secret: PLACEHOLDER_REPLACE_AFTER_REALM_IMPORT
         standardFlowEnabled: true
         directAccessGrantsEnabled: false
         serviceAccountsEnabled: false
         redirectUris:
-          - https://registry.shion1305.com/*
-          - https://registry.i.shion1305.com/*
+          - https://registry.shion1305.com/oauth2/callback
+          - https://registry.i.shion1305.com/oauth2/callback
         webOrigins:
           - https://registry.shion1305.com
           - https://registry.i.shion1305.com
         attributes:
-          # 1 hour access token lifespan — long enough for `docker push` of
-          # large images without forcing mid-push re-auth.
           access.token.lifespan: "3600"
         protocolMappers:
-          # Emit `groups` claim in id_token, access_token and userinfo so that
-          # zot's accessControl can authorize human UI users by group membership.
+          # Emit `groups` claim so zot's accessControl can authorize.
           - name: groups
             protocolMapper: oidc-group-membership-mapper
             protocol: openid-connect
@@ -362,60 +364,23 @@ spec:
               id.token.claim: "true"
               access.token.claim: "true"
               userinfo.token.claim: "true"
-
-      # gha-exchanger: confidential client used by GitHub Actions to exchange
-      # GitHub OIDC id_tokens for zot-registry-audience JWTs via the
-      # urn:ietf:params:oauth:grant-type:token-exchange grant.
-      - clientId: gha-exchanger
-        protocol: openid-connect
-        publicClient: false
-        clientAuthenticatorType: client-secret
-        # NOTE: This placeholder is replaced by a Keycloak-generated secret on
-        # first import. The token-exchange grant requires the GHA workflow to
-        # present this client_secret; rotate it manually post-import and store
-        # in Vault (e.g. `zot/gha-exchanger-client` key `clientsecret`) if it
-        # ever needs to be consumed via ESO.
-        secret: PLACEHOLDER_REPLACE_AFTER_REALM_IMPORT
-        standardFlowEnabled: false
-        directAccessGrantsEnabled: false
-        # serviceAccountsEnabled is required for the token-exchange flow so
-        # that the client itself can act as the requester.
-        serviceAccountsEnabled: true
-        attributes:
-          oauth2.device.authorization.grant.enabled: "false"
-        protocolMappers:
-          # Same group-membership mapper as zot-registry: the JWT minted via
-          # token exchange must carry the assigned `pusher-*` group in the
-          # `groups` claim so zot's accessControl can authorize the push.
-          - name: groups
-            protocolMapper: oidc-group-membership-mapper
+          # Add `zot-registry` to the access_token's `aud` so zot's
+          # bearer.oidc[].audiences=[zot-registry] check passes.
+          - name: zot-registry-audience
+            protocolMapper: oidc-audience-mapper
             protocol: openid-connect
-            consentRequired: false
             config:
-              claim.name: "groups"
-              full.path: "false"
-              id.token.claim: "true"
+              included.client.audience: "zot-registry"
+              id.token.claim: "false"
               access.token.claim: "true"
-              userinfo.token.claim: "true"
 
     # -------------------------------------------------------------------------
     # Identity Providers
     # -------------------------------------------------------------------------
-    # NOTE on Browser flow: human web logins to the zot UI should auto-redirect
-    # through the `user` IdP (passkey-only) without showing a choice screen.
-    # This is wired in the admin UI as a manual post-import step:
-    #   Authentication -> Flows -> Browser -> add "Identity Provider Redirector"
-    #   execution at the top, set Required, with config
-    #   `Default Identity Provider = user`. Bind that flow as the realm's
-    #   Browser flow.
-    # Token-exchange via the `gha-exchanger` client is unaffected -- it does
-    # not traverse the Browser flow.
+    # Browser-flow IdP redirector binding (manual step #3 in the header) routes
+    # human web logins through the `user` realm (passkey-only) without showing
+    # a choice screen.
     identityProviders:
-      # user: brokered OIDC IdP pointing at the central `user` realm. This is
-      # the human-login path for the zot UI; users authenticate with a passkey
-      # in the `user` realm and are then provisioned into this `zot` realm
-      # via first-broker-login. Group membership (zot-admin, pusher-*) is
-      # assigned in this realm post-provisioning by an admin.
       - alias: user
         displayName: "Sign in with passkey"
         providerId: keycloak-oidc
@@ -425,10 +390,6 @@ spec:
         trustEmail: true
         firstBrokerLoginFlowAlias: "first broker login"
         config:
-          # OIDC discovery against the `user` realm running on the same
-          # Keycloak server. Using the public hostname (rather than an
-          # in-cluster Service URL) keeps the redirect / token issuer aligned
-          # with the front-channel browser flow.
           issuer: "https://keycloak.shion1305.com/realms/user"
           authorizationUrl: "https://keycloak.shion1305.com/realms/user/protocol/openid-connect/auth"
           tokenUrl: "https://keycloak.shion1305.com/realms/user/protocol/openid-connect/token"
@@ -437,68 +398,8 @@ spec:
           jwksUrl: "https://keycloak.shion1305.com/realms/user/protocol/openid-connect/certs"
           useJwksUrl: "true"
           validateSignature: "true"
-          # Brokering this realm into `user` does not require a confidential
-          # client on the `user` side because PKCE-protected public clients
-          # are sufficient for this flow; keep the auth method explicit.
           clientAuthMethod: "client_secret_post"
-          # Public OIDC client created automatically by the broker; the
-          # secret placeholder is the standard pattern.
           clientId: "zot-broker"
           clientSecret: PLACEHOLDER_REPLACE_AFTER_REALM_IMPORT
           defaultScope: "openid profile email"
           syncMode: IMPORT
-
-      # GitHub Actions OIDC issuer. Used as the source of truth for verifying
-      # GitHub OIDC id_tokens presented to the gha-exchanger client during
-      # token exchange.
-      - alias: github-actions
-        providerId: oidc
-        enabled: true
-        storeToken: false
-        addReadTokenRoleOnCreate: false
-        trustEmail: false
-        firstBrokerLoginFlowAlias: "first broker login"
-        config:
-          issuer: "https://token.actions.githubusercontent.com"
-          # GitHub's OIDC issuer does not implement a classical token endpoint,
-          # but Keycloak's OIDC IdP requires the field. Set it to the canonical
-          # token URL; it is unused by the token-exchange flow itself.
-          tokenUrl: "https://token.actions.githubusercontent.com/token"
-          jwksUrl: "https://token.actions.githubusercontent.com/.well-known/jwks"
-          useJwksUrl: "true"
-          validateSignature: "true"
-          clientAuthMethod: "client_secret_post"
-          # The audience the GHA workflow must request when fetching the
-          # GitHub OIDC token (this is what GitHub embeds in the `aud` claim).
-          clientId: "zot-registry"
-          defaultScope: "openid"
-          prompt: ""
-          # GitHub OIDC has no userinfo endpoint; skip it to avoid 404s.
-          disableUserInfo: "true"
-
-    # -------------------------------------------------------------------------
-    # Identity Provider Mappers
-    # -------------------------------------------------------------------------
-    # Use `oidc-advanced-group-idp-mapper` to conditionally assign a group
-    # based on the `repository_owner` claim from the GitHub OIDC token. This
-    # is the standard mapper for value-conditional group assignment when
-    # brokering OIDC; the `claims` config takes a JSON array of {key,value}
-    # pairs that must all match for the mapping to fire.
-    identityProviderMappers:
-      - name: gha-shion1305-pusher
-        identityProviderAlias: github-actions
-        identityProviderMapper: oidc-advanced-group-idp-mapper
-        config:
-          syncMode: FORCE
-          claims: '[{"key":"repository_owner","value":"Shion1305"}]'
-          are.claim.values.regex: "false"
-          group: "/pusher-shion1305"
-
-      - name: gha-shion1305dev-pusher
-        identityProviderAlias: github-actions
-        identityProviderMapper: oidc-advanced-group-idp-mapper
-        config:
-          syncMode: FORCE
-          claims: '[{"key":"repository_owner","value":"Shion1305Dev"}]'
-          are.claim.values.regex: "false"
-          group: "/pusher-shion1305dev"
