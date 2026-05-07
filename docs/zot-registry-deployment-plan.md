@@ -354,7 +354,7 @@ Update the realm table to include `cluster-puller` and rename
 
 ## 6. Rollout sequence
 
-1. **PR #278 (the bigger one)** — everything except realm rename + cluster-puller client:
+1. **PR #278** — everything except realm rename + cluster-puller client:
    - `zot/values.yaml` switches to bearer-only
    - `zot/httproute-*.yaml` split
    - `zot/securitypolicy.yaml` new
@@ -363,7 +363,7 @@ Update the realm table to include `cluster-puller` and rename
    - `zot/kustomization.yaml` updated
    - `zot/README.md` new
    - Updated docs
-   - GHA demo workflow rewrite (already on the branch)
+   - GHA demo workflow rewrite
 
    Result after merge:
    - Browser UI login still works because the existing `oauth2-proxy`
@@ -375,17 +375,32 @@ Update the realm table to include `cluster-puller` and rename
    - Cluster pull does NOT yet work; namespaces still need to use external
      pull paths if they pull from this registry.
 
-2. **PR (next) — realm rename + cluster-puller client + zot-pull/ + Vault role**:
+2. **PR (this one) — realm rename + cluster-puller client + zot-pull/ + Vault role**.
+   Stacked on PR #278's branch (`fix/demo-push-error-handling`) until #278
+   merges, then rebased on `main`.
    - `keycloak-operator/zot-realm.yaml` renames `oauth2-proxy` → `zot-ui`,
      adds `cluster-puller`.
    - `zot/external-secret.yaml` updates `client-id: oauth2-proxy` →
      `client-id: zot-ui`.
-   - `zot-pull/` directory + `apps/zot-pull-app.yaml`.
+   - `zot-pull/` directory (5 files: ClusterSecretStore, credentials
+     ExternalSecret, ClusterGenerator, ClusterExternalSecret, kustomization)
+     + `apps/zot-pull-app.yaml`.
    - `vault/scripts/setup-eso-policies.sh` adds eso-cluster-puller policy + role.
-   - Manual realm recreate after merge.
-   - Manual Vault writes for new secrets.
+   - Manual steps required AFTER merge (realm recreate is destructive):
+     a. `kubectl delete keycloakrealmimport zot -n keycloak`
+     b. Admin UI: realm `zot` → Realm Settings → Action → Delete (drops
+        federated-identity links — small impact, user count is small)
+     c. ArgoCD recreates the import CR; operator reimports the realm.
+     d. Admin UI: pull generated secrets for `zot-ui` and `cluster-puller`.
+     e. `vault kv put zot/keycloak-client clientsecret=<zot-ui-secret>`
+     f. `vault kv put zot/cluster-puller client_id=cluster-puller client_secret=<cluster-puller-secret>`
+     g. Run `bash vault/scripts/setup-eso-policies.sh` to apply the new
+        Vault policy + role.
+     h. Re-broker passkey users on first login.
+     i. Re-assign group memberships (`zot-admin`, `pusher-shion1305`,
+        `pusher-shion1305dev`) to the appropriate users.
 
-   Result after merge:
+   Result after merge + manual steps:
    - All four trust paths in §2.2 are live.
    - Existing namespaces opt in by labeling and adding `imagePullSecrets`.
 

@@ -49,8 +49,6 @@ flow with zot.
 
 ## Onboarding a namespace to cluster pull
 
-> Available after the second-PR `zot-pull/` rollout lands.
-
 ```yaml
 apiVersion: v1
 kind: Namespace
@@ -124,7 +122,7 @@ ArgoCD recreates the CR and the operator reimports. Then:
   for OIDC discovery errors.
 - Confirm the `zot-ui-oidc-credentials` Secret exists in the `zot` namespace
   and contains non-empty `client-id` and `client-secret` keys.
-- The Keycloak `oauth2-proxy` client (post-rename: `zot-ui`) must list both
+- The Keycloak `zot-ui` client must list both
   `https://registry.shion1305.com/oauth2/callback` and
   `https://registry.i.shion1305.com/oauth2/callback` in `redirectUris`.
 

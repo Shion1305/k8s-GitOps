@@ -38,8 +38,8 @@ spec:
     # redirectURL omitted on purpose: Envoy auto-derives it as
     # https://<:authority>/oauth2/callback per request. This lets the same
     # SecurityPolicy serve both registry.shion1305.com and
-    # registry.i.shion1305.com without a second policy. Keycloak's
-    # `oauth2-proxy` (post-rename: `zot-ui`) client must list BOTH
+    # registry.i.shion1305.com without a second policy. Keycloak's `zot-ui`
+    # client must list BOTH
     # `https://registry.shion1305.com/oauth2/callback` and
     # `https://registry.i.shion1305.com/oauth2/callback` in redirectUris —
     # already declared in keycloak-operator/zot-realm.yaml.
