@@ -1,0 +1,76 @@
+# Rewrites `Authorization: Basic base64("oidc:<jwt>")` into
+# `Authorization: Bearer <jwt>` so kubelet/containerd image pulls work against
+# zot's bearer-OIDC middleware, which only accepts JWT bearer tokens.
+#
+# Why this exists:
+#   zot v2.1.16's `http.auth.bearer.oidc[]` short-circuits all auth handling to
+#   the bearer path (pkg/api/authn.go:65-67) and never falls through to Basic
+#   auth. Containerd, on the other hand, reads dockerconfigjson and sends the
+#   `auth` field verbatim as `Authorization: Basic <auth>`. ESO templates the
+#   secret as `auth: base64("oidc:<jwt>")`, so without a rewrite zot sees
+#   `Basic …` and 401s.
+#
+# GitHub Actions push uses `crane` with `registrytoken`, which emits
+# `Authorization: Bearer …` directly. Those requests fail the `^Basic ` match
+# below and pass through untouched.
+#
+# Scope: only the `/v2/` registry HTTPRoutes (external + internal). The UI
+# routes (zot-ui-external / zot-ui-internal) handle browser/OIDC traffic and
+# must not be molested.
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: EnvoyExtensionPolicy
+metadata:
+  name: zot-basic-to-bearer
+  namespace: zot
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: zot-registry-external
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: zot-registry-internal
+  lua:
+    - type: Inline
+      inline: |
+        -- Pure-Lua RFC 4648 base64 decoder. Envoy's Lua filter API exposes
+        -- `base64Escape` (encode) but not a decoder, so we ship one inline.
+        local b64chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+        local b64lookup = {}
+        for i = 1, #b64chars do
+          b64lookup[string.byte(b64chars, i)] = i - 1
+        end
+
+        local function b64decode(input)
+          input = string.gsub(input, "[^A-Za-z0-9+/=]", "")
+          local out = {}
+          local buf, bits = 0, 0
+          for i = 1, #input do
+            local c = string.byte(input, i)
+            if c == 61 then break end -- '='
+            local v = b64lookup[c]
+            if v == nil then return nil end
+            buf = buf * 64 + v
+            bits = bits + 6
+            if bits >= 8 then
+              bits = bits - 8
+              local byte = math.floor(buf / (2 ^ bits))
+              buf = buf - byte * (2 ^ bits)
+              out[#out + 1] = string.char(byte)
+            end
+          end
+          return table.concat(out)
+        end
+
+        function envoy_on_request(request_handle)
+          local headers = request_handle:headers()
+          local auth = headers:get("authorization")
+          if not auth then return end
+          local b64 = string.match(auth, "^[Bb]asic%s+(.+)$")
+          if not b64 then return end -- already Bearer (push) or other scheme
+          local decoded = b64decode(b64)
+          if not decoded then return end
+          local jwt = string.match(decoded, "^oidc:(.+)$")
+          if not jwt then return end
+          headers:replace("authorization", "Bearer " .. jwt)
+        end
