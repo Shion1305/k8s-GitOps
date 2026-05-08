@@ -1,0 +1,43 @@
+# Smoketest Job that proves the zot-pull automation works end-to-end.
+#
+# Pull image:
+#   registry.i.shion1305.com/shion1305/demo:latest
+# This is the artifact built and pushed by .github/workflows/demo-push-to-zot.yaml
+# (Dockerfile: zot/demo/Dockerfile). It's a 6 MB alpine image whose only purpose
+# is to print a single line and exit.
+#
+# How auth works here:
+#   1. zot-pull's ClusterExternalSecret materialises a Secret `zot-pull` of type
+#      kubernetes.io/dockerconfigjson in this namespace (selected by the
+#      `zot-pull/enabled=true` label on the Namespace).
+#   2. The Secret's auth value is `oidc:<keycloak-access-token>` base64-encoded,
+#      where the token is minted by the ClusterGenerator hitting Keycloak's
+#      token endpoint with the `cluster-puller` confidential client.
+#   3. kubelet sends `Authorization: Basic base64(oidc:<token>)` on pull; zot's
+#      bearer-OIDC middleware extracts the JWT after the literal `oidc:` prefix
+#      and validates it against the Keycloak issuer.
+#
+# The Job runs once and exits 0 if the image runs. Argo reports Healthy when
+# the Job's `Complete` condition is true. If pull fails (token expired, RBAC
+# misconfigured, registry unreachable), the Pod stays in ImagePullBackOff and
+# the Job never completes — Argo flags Degraded, surfacing the regression.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: zot-pull-smoketest
+  namespace: zot-pull-smoketest
+spec:
+  backoffLimit: 2
+  ttlSecondsAfterFinished: 86400
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: zot-pull-smoketest
+    spec:
+      restartPolicy: Never
+      imagePullSecrets:
+        - name: zot-pull
+      containers:
+        - name: smoketest
+          image: registry.i.shion1305.com/shion1305/demo:latest
+          imagePullPolicy: Always
