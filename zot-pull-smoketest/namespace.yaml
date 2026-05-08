@@ -1,0 +1,18 @@
+# Smoketest namespace for the zot-pull cluster-wide imagePullSecret automation.
+#
+# The label `zot-pull/enabled=true` is what selects this namespace into the two
+# ClusterExternalSecrets in zot-pull/:
+#   - zot-cluster-puller-credentials → fans the Keycloak client_id/client_secret
+#     here so the ClusterGenerator's webhook can resolve secretRef in this ns.
+#   - zot-pull → renders a kubernetes.io/dockerconfigjson Secret named `zot-pull`
+#     containing a fresh Keycloak access_token, refreshed every 15m.
+#
+# The smoketest Job in this namespace pulls a private image from
+# registry.i.shion1305.com using imagePullSecret=zot-pull, proving end-to-end:
+#   Keycloak client_credentials → bearer token → zot pull authentication.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: zot-pull-smoketest
+  labels:
+    zot-pull/enabled: "true"
