@@ -1,33 +1,27 @@
 # Smoketest Job that proves the cluster-wide zot-pull automation works
 # end-to-end with no manual setup in the consumer namespace.
 #
-# Pull image:
-#   registry.i.shion1305.com/shion1305/demo:latest
-# This is the artifact built and pushed by .github/workflows/demo-push-to-zot.yaml
-# (Dockerfile: zot/demo/Dockerfile). It's a small alpine image whose only
-# purpose is to print a single line and exit.
+# Pull image: registry.i.shion1305.com/shion1305/demo:latest — built and pushed
+# by .github/workflows/demo-push-to-zot.yaml (Dockerfile zot/demo/Dockerfile),
+# a small alpine image that prints a line and exits.
 #
-# Note that this Job does NOT declare `imagePullSecrets`. The whole point of
-# the smoketest is to verify that Kyverno's `zot-pull-injection` ClusterPolicy
-# (kyverno-policies/zot-pull-injection.yaml) injects the imagePullSecret at
-# admission and clones the Secret into this namespace. If you see
-# `imagePullSecrets: [{name: zot-pull}]` on the running Pod, the policy did
-# its job.
+# `imagePullSecrets` is intentionally omitted: Kyverno's `zot-pull-injection`
+# ClusterPolicy injects it at admission and clones the source Secret into this
+# namespace. Seeing `imagePullSecrets: [{name: zot-pull}]` on the running Pod
+# confirms the policy fired.
 #
-# How auth itself works once the Secret is in place:
-#   - Source Secret `zot-pull-source/zot-pull` is a kubernetes.io/dockerconfigjson
-#     where the `auth` value is base64("oidc:<keycloak-access-token>").
+# Auth chain once the Secret is in place:
+#   - Source Secret `zot-pull-source/zot-pull` (kubernetes.io/dockerconfigjson)
+#     carries `auth = base64("oidc:<keycloak-access-token>")`.
 #   - The token is minted by ESO's ClusterGenerator hitting Keycloak's token
 #     endpoint with the `cluster-puller` confidential client.
-#   - kubelet sends `Authorization: Basic base64(oidc:<token>)` on pull; zot's
+#   - kubelet sends `Authorization: Basic base64(oidc:<token>)`; zot's
 #     bearer-OIDC middleware extracts the JWT after the literal `oidc:` prefix
 #     and validates it against the Keycloak issuer.
 #
-# The Job runs once and exits 0 if the image runs. Argo reports Healthy when
-# the Job's `Complete` condition is true. If the pull fails (token expired,
-# RBAC misconfigured, registry unreachable, Kyverno not running), the Pod
-# stays in ImagePullBackOff and the Job never completes — Argo flags
-# Degraded, surfacing the regression.
+# Argo reports Healthy when the Job's Complete condition is true. ImagePullBackOff
+# (token expired, RBAC drift, registry unreachable, Kyverno not running) keeps
+# the Job incomplete and Argo flags Degraded — surfacing the regression.
 apiVersion: batch/v1
 kind: Job
 metadata:

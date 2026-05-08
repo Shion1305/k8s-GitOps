@@ -1,24 +1,18 @@
 # Source namespace for the cluster-wide zot-pull credential.
 #
-# This namespace holds the *single* canonical Secret named `zot-pull` (a
-# kubernetes.io/dockerconfigjson) that ESO materialises from a Keycloak
-# access_token. Two ClusterExternalSecrets in `zot-pull/` target this
-# namespace exclusively (selector `kubernetes.io/metadata.name=zot-pull-source`,
-# which Kubernetes auto-applies to every Namespace, so no extra label is
-# needed here).
+# Holds the canonical Secret `zot-pull` (kubernetes.io/dockerconfigjson) that
+# ESO materialises from a Keycloak access_token. Two ClusterExternalSecrets
+# in `zot-pull/` target this namespace exclusively via the auto-applied
+# `kubernetes.io/metadata.name` label, so no extra labels are needed here.
 #
-# Distribution to consumer namespaces is delegated to Kyverno: see
-# kyverno-policies/zot-pull-injection.yaml. When a Pod is admitted whose
-# container/initContainer image references `registry.i.shion1305.com/*`, the
-# generate rule clones this Secret into the Pod's namespace and the mutate
-# rule adds it to the Pod's imagePullSecrets.
+# Kyverno (kyverno-policies/zot-pull-injection.yaml) clones this Secret into
+# consumer namespaces on Pod admission and adds it to imagePullSecrets.
 #
-# Why a dedicated source namespace (instead of e.g. `external-secrets`):
-#   The ClusterGenerator's Webhook provider hard-codes ClusterScoped=false
-#   in ESO v0.19.0, so secretRef lookups always resolve against the
-#   ExternalSecret's own namespace. Co-locating both the puller credentials
-#   Secret and the ExternalSecret that consumes it here keeps that lookup
-#   working without granting wider privileges to other namespaces.
+# Dedicated source namespace because ESO v0.19.0 hard-codes
+# ClusterScoped=false on Webhook generators, so secretRef lookups always
+# resolve against the ExternalSecret's own namespace. Co-locating the puller
+# credentials Secret and its consumer ExternalSecret here keeps that lookup
+# working without widening Vault access to other namespaces.
 apiVersion: v1
 kind: Namespace
 metadata:

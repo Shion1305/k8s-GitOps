@@ -1,24 +1,18 @@
-# Smoketest namespace for the cluster-wide zot-pull automation.
+# Smoketest namespace for the cluster-wide zot-pull automation. Intentionally
+# bare so a Healthy state proves an arbitrary namespace can pull images from
+# the in-cluster zot registry without manual preparation.
 #
-# This namespace is intentionally bare — no `zot-pull/enabled=true` label,
-# no opt-in mechanism. The point of the smoketest is to prove that an
-# arbitrary namespace, with no special preparation, can pull images from the
-# in-cluster zot registry.
+# Expected sequence at sync time:
+#   1. The Job creates a Pod with an image at `registry.i.shion1305.com/...`.
+#   2. Kyverno `zot-pull-injection` fires: mutate appends `zot-pull` to
+#      spec.imagePullSecrets, generate clones the Secret from zot-pull-source.
+#   3. kubelet authenticates with the bearer-OIDC dockerconfigjson and pulls.
+#      Job completes; Argo reports Healthy.
 #
-# What's expected to happen at sync time:
-#   1. The Job in this namespace creates a Pod whose container image is
-#      `registry.i.shion1305.com/...`.
-#   2. Kyverno's `zot-pull-injection` ClusterPolicy fires:
-#        - mutate appends `zot-pull` to the Pod's spec.imagePullSecrets
-#        - generate clones Secret `zot-pull-source/zot-pull` into this ns
-#   3. kubelet authenticates to zot using the bearer-OIDC dockerconfigjson
-#      and pulls the image. Job completes; Argo reports Healthy.
-#
-# If the Pod is stuck in ImagePullBackOff, check (in order):
-#   - kubectl get clusterpolicy zot-pull-injection -o yaml  (rule status)
-#   - kubectl get secret -n zot-pull-source zot-pull  (source materialised?)
-#   - kubectl get pod -n zot-pull-smoketest -o yaml | grep imagePullSecrets
-#     (Kyverno mutate ran?)
+# Debugging ImagePullBackOff (in order):
+#   kubectl get clusterpolicy zot-pull-injection -o yaml      # rule status
+#   kubectl get secret -n zot-pull-source zot-pull            # source materialised?
+#   kubectl get pod -n zot-pull-smoketest -o yaml | grep imagePullSecrets
 apiVersion: v1
 kind: Namespace
 metadata:
