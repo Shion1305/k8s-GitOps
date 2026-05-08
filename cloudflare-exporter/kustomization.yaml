@@ -3,7 +3,8 @@ kind: Kustomization
 resources:
   - namespace.yaml
   - servicemonitor.yaml
-  - grafana-ingress.yaml
+  - reference-grant.yaml
+  - grafana-httproute.yaml
   - grafana.yaml
   - grafana-datasource.yaml
   - grafana-folder.yaml

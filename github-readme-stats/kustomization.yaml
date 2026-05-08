@@ -6,4 +6,5 @@ resources:
   - external-secret.yaml
   - deployment.yaml
   - service.yaml
-  - ingress.yaml
+  - reference-grant.yaml
+  - httproute-external.yaml

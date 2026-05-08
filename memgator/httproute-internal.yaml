@@ -1,0 +1,18 @@
+# Internal Gateway only serves *.i.shion1305.com so the legacy
+# memgator.k.shion1305.com hostname must be retired with this migration.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: memgator-internal
+  namespace: memgator
+spec:
+  parentRefs:
+    - name: internal
+      namespace: envoy-gateway-system
+      sectionName: https
+  hostnames:
+    - memgator.i.shion1305.com
+  rules:
+    - backendRefs:
+        - name: memgator
+          port: 1208

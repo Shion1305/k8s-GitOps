@@ -1,0 +1,18 @@
+# Internal Gateway only serves *.i.shion1305.com so the legacy
+# freqtrade.k.shion1305.com hostname must be retired with this migration.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: freqtrade-internal
+  namespace: freqtrade
+spec:
+  parentRefs:
+    - name: internal
+      namespace: envoy-gateway-system
+      sectionName: https
+  hostnames:
+    - freqtrade.i.shion1305.com
+  rules:
+    - backendRefs:
+        - name: freqtrade
+          port: 8080

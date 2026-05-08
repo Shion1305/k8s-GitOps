@@ -119,8 +119,10 @@ configs:
   # Reference to existing secrets
   secret:
     createSecret: false # We'll keep existing argocd-secret
-  # Parameters (empty as per current config)
-  params: {}
+  # Run argocd-server in HTTP-only mode so envoy-gateway terminates TLS
+  # without having to dial the upstream over (self-signed) HTTPS.
+  params:
+    server.insecure: true
 # Server configuration
 server:
   # Disable default ingress since we have a custom one

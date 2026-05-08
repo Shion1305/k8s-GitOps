@@ -7,15 +7,17 @@ resources:
   - ws-stream-deployment.yaml
   - mcp-connector.yaml
   - network-policy-mcp-to-postgres.yaml
+  - reference-grant.yaml
   - grafana-config.yaml
   - grafana-deployment.yaml
   - grafana-service.yaml
-  - grafana-ingress.yaml
+  - grafana-httproute.yaml
   - prometheus.yaml
+  - prometheus-httproute.yaml
   - vault-secret-store.yaml
   - external-secret.yaml
   - deployment-gmocoin-exec-alert.yaml
   - seaweedfs-external-secret.yaml
   - seaweedfs-statefulset.yaml
   - seaweedfs-service.yaml
-  - seaweedfs-ingress.yaml
+  - seaweedfs-httproute.yaml
