@@ -1,13 +1,20 @@
 # Bridges containerd's Docker Registry v2 auth flow with zot's bearer-OIDC
 # middleware on the `/v2/` HTTPRoutes (external + internal). Two halves:
 #
-#   envoy_on_response — when zot returns 401 without a `WWW-Authenticate`
-#     header, inject `WWW-Authenticate: Basic realm="<host>"`. zot's bearer-
-#     OIDC path emits no challenge of its own (verified empirically — bare
-#     `curl /v2/...` returns 401 with no auth header), so containerd treats
-#     the response as "no scheme advertised" and never retries with creds.
-#     A Basic challenge convinces containerd to retry with the dockerconfig
-#     `auth` value loaded from the imagePullSecret.
+#   envoy_on_response — when zot returns 401 to a containerd-class client
+#     without a `WWW-Authenticate` header, inject
+#     `WWW-Authenticate: Basic realm="zot"`. zot's bearer-OIDC path emits no
+#     challenge of its own (verified empirically — bare `curl /v2/...`
+#     returns 401 with no auth header), so containerd treats the response
+#     as "no scheme advertised" and never retries with creds. A Basic
+#     challenge convinces containerd to retry with the dockerconfig `auth`
+#     value loaded from the imagePullSecret.
+#
+#     The challenge is only injected when the request was from containerd
+#     (User-Agent stash via dynamic metadata). Browsers also hit /v2/* —
+#     the SPA calls /v2/_catalog and /v2/ during boot — and a Basic
+#     challenge there would trigger the browser's native Basic-auth popup
+#     before the user can even click "Sign in with OIDC".
 #
 #   envoy_on_request — on the retry, the Authorization header is
 #     `Basic base64("oidc:<jwt>")` because ESO templates the dockerconfigjson
@@ -67,8 +74,24 @@ spec:
           return table.concat(out)
         end
 
+        -- Filter namespace for stashing per-request hints into dynamic metadata
+        -- so envoy_on_response can read what envoy_on_request observed.
+        local FILTER_NS = "zot.basic_to_bearer"
+
+        local function is_containerd_ua(ua)
+          if not ua then return false end
+          return string.find(ua, "^containerd/") ~= nil
+              or string.find(ua, "^docker/") ~= nil
+              or string.find(ua, "^Go%-http%-client") ~= nil
+        end
+
         function envoy_on_request(request_handle)
           local headers = request_handle:headers()
+          local ua = headers:get("user-agent")
+          if is_containerd_ua(ua) then
+            request_handle:streamInfo():dynamicMetadata():set(
+              FILTER_NS, "wants_basic_challenge", "true")
+          end
           local auth = headers:get("authorization")
           if not auth then return end
           local b64 = string.match(auth, "^[Bb]asic%s+(.+)$")
@@ -84,5 +107,7 @@ spec:
           local headers = response_handle:headers()
           if headers:get(":status") ~= "401" then return end
           if headers:get("www-authenticate") then return end -- don't override
+          local meta = response_handle:streamInfo():dynamicMetadata():get(FILTER_NS)
+          if not meta or meta["wants_basic_challenge"] ~= "true" then return end
           headers:add("www-authenticate", 'Basic realm="zot"')
         end

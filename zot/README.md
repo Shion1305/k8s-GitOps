@@ -45,10 +45,12 @@ containerd reads the dockerconfigjson Secret materialised by ESO (see `../zot-pu
 
 `envoy-extension-policy.yaml` ships a Lua filter on the two `/v2/` HTTPRoutes that fixes both halves:
 
-- `envoy_on_response` adds `WWW-Authenticate: Basic realm="zot"` to any 401 from zot that lacks the header. containerd then retries with the credential from the imagePullSecret.
-- `envoy_on_request` decodes the retry's Basic credential, strips the `oidc:` prefix, and rewrites the header to `Bearer <jwt>` before it reaches zot. The JWT is then validated by `http.auth.bearer.oidc[keycloak]` (audience `zot-registry`, hardcoded `groups` mapper on the Keycloak `cluster-puller` client).
+- `envoy_on_request` flags requests from containerd-class User-Agents (`containerd/*`, `docker/*`, `Go-http-client/*` — covers kubelet, the Docker daemon, and `crane`) by stashing `zot.basic_to_bearer/wants_basic_challenge=true` in dynamic metadata. It also decodes any incoming `Basic base64("oidc:<jwt>")` and rewrites it to `Bearer <jwt>` before it reaches zot.
+- `envoy_on_response` reads the metadata flag. On a 401 from a flagged request that lacks `WWW-Authenticate`, it injects `Basic realm="zot"`. containerd then retries with the credential from the imagePullSecret. The retry's JWT is validated by `http.auth.bearer.oidc[keycloak]` (audience `zot-registry`, hardcoded `groups` mapper on the Keycloak `cluster-puller` client).
 
-Bearer push traffic from GHA fails the `^[Bb]asic ` match and passes through untouched. The response-side injection is also a no-op for push because crane sends Bearer pre-emptively and never receives a 401.
+Browsers are deliberately excluded from the response-side injection: the SPA hits `/v2/` and `/v2/_catalog` during boot and 401s on those endpoints. Without the User-Agent gate, the browser would pop up its native Basic-auth dialog before the user could click "Sign in with OIDC".
+
+GHA push traffic from `crane` matches the `Go-http-client` UA so the metadata flag is set, but `crane` sends `Bearer` pre-emptively (`registrytoken`) and never receives a 401, so the response-side injection is a no-op for push.
 
 ### 3. Browser UI (cookie session)
 
