@@ -5,11 +5,17 @@
 # param against this exact string and refuses to use the request `:authority`
 # at runtime, so the same policy cannot serve two hostnames.
 #
-# Each policy targets two HTTPRoutes:
+# Each policy targets three HTTPRoutes:
 #   - zot-ui-* (SPA bundle, /zot/auth/*, /v2/_zot/*)
 #   - zot-catalog-probe-* (just `/v2/` and `/v2/_catalog` exact-match — NOT
 #     the broad /v2/ PathPrefix used by docker push/pull, which lives on the
 #     separate zot-registry-* route)
+#   - zot-registry-spa-* (the broad /v2/ PathPrefix, but only when the
+#     `X-Zot-Api-Client: zot-ui` header is set — i.e. SPA-initiated writes
+#     like image-delete `DELETE /v2/<repo>/manifests/<digest>`. containerd
+#     and crane don't set the header, so their /v2/ traffic falls to the
+#     SecurityPolicy-free `zot-registry-*` route, where the Lua filter
+#     handles their auth flow without OIDC interference.)
 #
 # Why the split: Docker Registry v2 protocol (push/pull) negotiates its own
 # bearer challenge with zot. If the OIDC policy fired on /v2/<repo>/blobs/...
@@ -52,6 +58,9 @@ spec:
     - group: gateway.networking.k8s.io
       kind: HTTPRoute
       name: zot-catalog-probe-external
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: zot-registry-spa-external
   oidc:
     provider:
       issuer: https://keycloak.shion1305.com/realms/zot
@@ -103,6 +112,9 @@ spec:
     - group: gateway.networking.k8s.io
       kind: HTTPRoute
       name: zot-catalog-probe-internal
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: zot-registry-spa-internal
   oidc:
     provider:
       issuer: https://keycloak.shion1305.com/realms/zot

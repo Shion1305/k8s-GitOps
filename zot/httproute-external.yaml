@@ -1,7 +1,7 @@
 # Public registry URL — used by browsers (zot UI / OIDC code-flow login) and by
 # `docker push` from any host that can resolve the public DNS.
 #
-# Three HTTPRoutes, all on hostname registry.shion1305.com, split by purpose:
+# Four HTTPRoutes, all on hostname registry.shion1305.com, split by purpose:
 #
 #   zot-catalog-probe-external — exact `/v2/` and `/v2/_catalog`. The SPA pings
 #     these at /login boot. Targeted by the OIDC SecurityPolicy
@@ -10,6 +10,18 @@
 #     `Authorization`, zot's bearer-OIDC middleware would 401, and the SPA's
 #     "Continue as guest" hint would be wrong (silently logged at
 #     SignIn.jsx:189; not user-visible, but architecturally cleaner this way).
+#
+#   zot-registry-spa-external — `/v2/` PathPrefix matched only when the
+#     `X-Zot-Api-Client: zot-ui` request header is present. Targeted by the OIDC
+#     SecurityPolicy so SPA-initiated writes (image-delete hits
+#     `DELETE /v2/<repo>/manifests/<digest>`, etc.) carry the Envoy-injected
+#     Bearer to zot. Without this route the SPA's writes would fall to the
+#     bare /v2/ PathPrefix below, arrive at zot without an Authorization
+#     header, and 401 — the Axios interceptor would then redirect to /login,
+#     bouncing the user off the home page. zui's Axios always stamps this
+#     header (zui src/api.js sets `X-Zot-Api-Client: zot-ui`), so the gate is
+#     reliable. containerd/crane do not set this header, so registry-protocol
+#     traffic falls through to zot-registry-external below.
 #
 #   zot-registry-external — broad `/v2/` PathPrefix, all repository traffic
 #     (push/pull/blobs/manifests). NOT covered by SecurityPolicy: containerd
@@ -25,11 +37,14 @@
 #
 # Gateway API GEP-718 most-specific-path-wins routes /v2/_zot/... to
 # zot-ui-external (longer prefix beats /v2/) regardless of HTTPRoute order.
-# Across the two registry routes the exact matches in zot-catalog-probe-external
+# Across the registry routes the exact matches in zot-catalog-probe-external
 # beat the `/v2/` PathPrefix in zot-registry-external for the same two paths,
 # so the SPA's two probe paths land on the SecurityPolicy-attached route.
+# Header-matched matches in zot-registry-spa-external are more specific than
+# the bare PathPrefix in zot-registry-external (GEP-1742: header matches
+# raise specificity), so SPA-tagged traffic is preferred there.
 #
-# Why three routes instead of one with named rules: HTTPRouteRule.name is a
+# Why separate routes instead of one with named rules: HTTPRouteRule.name is a
 # Gateway API v1.2+ field. The cluster CRD accepts it, but ArgoCD v3.4's
 # structured-merge-diff library has an older embedded OpenAPI schema and
 # rejects the field at diff time ("field not declared in schema"). Splitting
@@ -55,6 +70,30 @@ spec:
         - path:
             type: Exact
             value: /v2/_catalog
+      backendRefs:
+        - name: zot
+          port: 5000
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: zot-registry-spa-external
+  namespace: zot
+spec:
+  parentRefs:
+    - name: external
+      namespace: envoy-gateway-system
+      sectionName: https
+  hostnames:
+    - registry.shion1305.com
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /v2/
+          headers:
+            - name: X-Zot-Api-Client
+              value: zot-ui
       backendRefs:
         - name: zot
           port: 5000
