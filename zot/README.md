@@ -38,11 +38,17 @@ Three distinct caller types reach zot. zot itself does no Envoy-level OIDC media
 
 ### 2. Kubelet/containerd pull (`Authorization: Basic base64("oidc:<jwt>")`)
 
-containerd reads the dockerconfigjson Secret materialised by ESO (see `../zot-pull/`) and sends the `auth` field verbatim as `Authorization: Basic ...`. zot's bearer middleware short-circuits at `pkg/api/authn.go:65-67` and never falls through to Basic auth, so the request would 401 without an envoy-side rewrite.
+containerd reads the dockerconfigjson Secret materialised by ESO (see `../zot-pull/`) and goes through the standard Docker Registry v2 challenge/retry handshake. zot's bearer-OIDC middleware short-circuits at `pkg/api/authn.go:65-67`, so two things break end-to-end without help:
 
-`envoy-extension-policy.yaml` ships a Lua filter on the two `/v2/` HTTPRoutes that decodes the Basic credential, strips the `oidc:` prefix, and rewrites the header to `Bearer <jwt>` before it reaches zot. After rewrite, the JWT is validated by `http.auth.bearer.oidc[keycloak]` (audience `zot-registry`, hardcoded `groups` mapper on the Keycloak `cluster-puller` client).
+1. zot returns 401 to the unauthenticated probe with **no `WWW-Authenticate` header**. containerd interprets this as "no scheme advertised" and never retries with credentials.
+2. Even if containerd retries, the dockerconfig `auth` field is sent verbatim as `Authorization: Basic ...`, which zot's bearer middleware refuses to parse.
 
-The filter only fires on `^[Bb]asic ` — Bearer push traffic from GHA passes through untouched.
+`envoy-extension-policy.yaml` ships a Lua filter on the two `/v2/` HTTPRoutes that fixes both halves:
+
+- `envoy_on_response` adds `WWW-Authenticate: Basic realm="zot"` to any 401 from zot that lacks the header. containerd then retries with the credential from the imagePullSecret.
+- `envoy_on_request` decodes the retry's Basic credential, strips the `oidc:` prefix, and rewrites the header to `Bearer <jwt>` before it reaches zot. The JWT is then validated by `http.auth.bearer.oidc[keycloak]` (audience `zot-registry`, hardcoded `groups` mapper on the Keycloak `cluster-puller` client).
+
+Bearer push traffic from GHA fails the `^[Bb]asic ` match and passes through untouched. The response-side injection is also a no-op for push because crane sends Bearer pre-emptively and never receives a 401.
 
 ### 3. Browser UI (cookie session)
 
