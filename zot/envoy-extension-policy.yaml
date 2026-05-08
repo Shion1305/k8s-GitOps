@@ -227,8 +227,10 @@ spec:
           if not meta or meta["active"] ~= "true" then return end
           local headers = response_handle:headers()
           if headers:get(":status") ~= "200" then return end
-          local ct = headers:get("content-type") or ""
-          if not string.find(ct, "application/json") then return end
+          -- zot v2.1.16 mislabels the mgmt response as `text/plain` even
+          -- though the body is JSON (verified empirically). Don't gate on
+          -- content-type; the active=true metadata flag from
+          -- envoy_on_request already restricts us to /v2/_zot/ext/mgmt.
 
           local body = response_handle:body()
           local body_str = tostring(body:getBytes(0, body:length()))
@@ -236,4 +238,5 @@ spec:
           if rewritten == body_str then return end
           body:setBytes(rewritten)
           headers:replace("content-length", tostring(#rewritten))
+          headers:replace("content-type", "application/json")
         end
