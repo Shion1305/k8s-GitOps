@@ -23,6 +23,22 @@ admissionController:
       memory: 128Mi
     limits:
       memory: 384Mi
+  # Required so Kyverno's policy validation webhook can confirm the
+  # background controller will have permission to perform the
+  # `generate.clone` action in our `zot-pull-injection` ClusterPolicy.
+  # Without this the policy itself is rejected at apply time with
+  # "requires permissions list,get for resource v1/Secret in namespace ...".
+  rbac:
+    clusterRole:
+      extraResources:
+        - apiGroups:
+            - ""
+          resources:
+            - secrets
+          verbs:
+            - get
+            - list
+            - watch
 
 backgroundController:
   replicas: 1
@@ -34,6 +50,26 @@ backgroundController:
       memory: 64Mi
     limits:
       memory: 256Mi
+  # The default chart RBAC does not grant the background controller any
+  # permission on Secrets. Our `zot-pull-injection` ClusterPolicy uses
+  # `generate.clone` to copy the source dockerconfigjson Secret from
+  # `zot-pull-source` into every consumer namespace, which requires the
+  # background controller SA to read the source and write the target.
+  rbac:
+    clusterRole:
+      extraResources:
+        - apiGroups:
+            - ""
+          resources:
+            - secrets
+          verbs:
+            - get
+            - list
+            - watch
+            - create
+            - update
+            - patch
+            - delete
 
 reportsController:
   replicas: 1
