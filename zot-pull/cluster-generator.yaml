@@ -23,8 +23,11 @@ spec:
       body: 'grant_type=client_credentials&client_id={{ .creds.client_id }}&client_secret={{ .creds.client_secret }}'
       result:
         jsonPath: '$'
+      # ESO v0.19.0 resolves `secretRef.name` against the consumer namespace
+      # (where the ClusterExternalSecret materialises its target). The
+      # credentials Secret is fanned out to every selected namespace by
+      # zot-cluster-puller-credentials (credentials-cluster-external-secret.yaml).
       secrets:
         - name: creds
           secretRef:
             name: zot-cluster-puller-credentials
-            namespace: external-secrets
