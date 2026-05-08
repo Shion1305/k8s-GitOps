@@ -1,0 +1,115 @@
+# Cluster-wide zot-pull credential injection.
+#
+# Replaces the previous opt-in label model (`zot-pull/enabled=true` on each
+# consumer namespace + ESO fan-out) with on-demand, Kyverno-driven injection
+# triggered by Pod admission. The flow is:
+#
+#   1. ESO materialises Secret `zot-pull` into the source namespace
+#      `zot-pull-source` (see zot-pull/cluster-external-secret.yaml).
+#   2. Pod is admitted in any namespace, with at least one container or
+#      initContainer image referencing `registry.i.shion1305.com/*`.
+#   3. Rule `generate-zot-pull-secret` clones `zot-pull-source/zot-pull` into
+#      the Pod's namespace, with synchronize=true so token rotations propagate.
+#   4. Rule `add-zot-pull-imagepullsecret` mutates the Pod to append `zot-pull`
+#      to spec.imagePullSecrets.
+#
+# Race window on first-ever Pod in a namespace:
+#   Mutate runs synchronously at admission, so the Pod object lands with
+#   imagePullSecrets pointing at `zot-pull`. Generate runs asynchronously after
+#   admission, so the Secret may not yet exist when kubelet first attempts the
+#   pull. kubelet retries on ImagePullBackOff with exponential backoff; the
+#   Secret is typically created within ~1s, so the second pull attempt
+#   succeeds. Subsequent Pods in the same namespace see the Secret already
+#   present and pull without retry.
+#
+# Why failurePolicy: Ignore at the webhook level:
+#   A Kyverno outage must not block Pod admission cluster-wide. With Ignore,
+#   Pods admitted during an outage will simply not get the imagePullSecret
+#   injected and will sit in ImagePullBackOff until Kyverno recovers and
+#   selfHeal/restart re-admits them. This is strictly better than a hard fail
+#   that would prevent unrelated workloads (which don't use registry.i.*) from
+#   scheduling.
+#
+# Why mutateExistingOnPolicyUpdate is left at its default (false):
+#   We only want admission-time mutation. Retroactively patching every
+#   existing Pod across the cluster on each policy reconcile is unnecessary
+#   churn; existing Pods with stale imagePullSecrets will be replaced on the
+#   next deploy or rollout.
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: zot-pull-injection
+  annotations:
+    policies.kyverno.io/title: Inject zot-pull imagePullSecret
+    policies.kyverno.io/category: Image Pull Credentials
+    policies.kyverno.io/subject: Pod, Secret
+    policies.kyverno.io/description: >-
+      For Pods referencing the in-cluster zot registry
+      (registry.i.shion1305.com), clones the dockerconfigjson Secret from
+      zot-pull-source into the Pod's namespace and adds it to the Pod's
+      imagePullSecrets.
+spec:
+  # Ignore so a Kyverno outage does not block unrelated Pod admission.
+  # Pods that *do* need the secret will degrade gracefully to ImagePullBackOff
+  # and self-heal once Kyverno is back.
+  webhookConfiguration:
+    failurePolicy: Ignore
+  rules:
+    # ---------------------------------------------------------------------
+    # Rule 1 — mutate: append `zot-pull` to spec.imagePullSecrets when at
+    # least one container or initContainer image references the in-cluster
+    # zot registry hostname.
+    # ---------------------------------------------------------------------
+    - name: add-zot-pull-imagepullsecret
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+      preconditions:
+        # OR semantics: fire if the registry appears in EITHER list.
+        # images.containers.*.registry / images.initContainers.*.registry
+        # are Kyverno's parsed image variables (just the hostname, no
+        # scheme). The JMESPath `|| ` + backtick-quoted empty array `[]`
+        # supplies a fallback so Pods without initContainers don't make
+        # AnyIn evaluate against null.
+        any:
+          - key: registry.i.shion1305.com
+            operator: AnyIn
+            value: "{{ images.containers.*.registry || `[]` }}"
+          - key: registry.i.shion1305.com
+            operator: AnyIn
+            value: "{{ images.initContainers.*.registry || `[]` }}"
+      mutate:
+        patchStrategicMerge:
+          spec:
+            imagePullSecrets:
+              - name: zot-pull
+    # ---------------------------------------------------------------------
+    # Rule 2 — generate: clone Secret `zot-pull-source/zot-pull` into the
+    # Pod's namespace. synchronize=true means subsequent rotations of the
+    # source Secret (every 15m via ESO) propagate to all clones.
+    # ---------------------------------------------------------------------
+    - name: generate-zot-pull-secret
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+      preconditions:
+        any:
+          - key: registry.i.shion1305.com
+            operator: AnyIn
+            value: "{{ images.containers.*.registry || `[]` }}"
+          - key: registry.i.shion1305.com
+            operator: AnyIn
+            value: "{{ images.initContainers.*.registry || `[]` }}"
+      generate:
+        apiVersion: v1
+        kind: Secret
+        name: zot-pull
+        namespace: "{{ request.namespace }}"
+        synchronize: true
+        clone:
+          namespace: zot-pull-source
+          name: zot-pull

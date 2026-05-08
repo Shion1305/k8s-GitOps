@@ -1,18 +1,25 @@
-# Smoketest namespace for the zot-pull cluster-wide imagePullSecret automation.
+# Smoketest namespace for the cluster-wide zot-pull automation.
 #
-# The label `zot-pull/enabled=true` is what selects this namespace into the two
-# ClusterExternalSecrets in zot-pull/:
-#   - zot-cluster-puller-credentials → fans the Keycloak client_id/client_secret
-#     here so the ClusterGenerator's webhook can resolve secretRef in this ns.
-#   - zot-pull → renders a kubernetes.io/dockerconfigjson Secret named `zot-pull`
-#     containing a fresh Keycloak access_token, refreshed every 15m.
+# This namespace is intentionally bare — no `zot-pull/enabled=true` label,
+# no opt-in mechanism. The point of the smoketest is to prove that an
+# arbitrary namespace, with no special preparation, can pull images from the
+# in-cluster zot registry.
 #
-# The smoketest Job in this namespace pulls a private image from
-# registry.i.shion1305.com using imagePullSecret=zot-pull, proving end-to-end:
-#   Keycloak client_credentials → bearer token → zot pull authentication.
+# What's expected to happen at sync time:
+#   1. The Job in this namespace creates a Pod whose container image is
+#      `registry.i.shion1305.com/...`.
+#   2. Kyverno's `zot-pull-injection` ClusterPolicy fires:
+#        - mutate appends `zot-pull` to the Pod's spec.imagePullSecrets
+#        - generate clones Secret `zot-pull-source/zot-pull` into this ns
+#   3. kubelet authenticates to zot using the bearer-OIDC dockerconfigjson
+#      and pulls the image. Job completes; Argo reports Healthy.
+#
+# If the Pod is stuck in ImagePullBackOff, check (in order):
+#   - kubectl get clusterpolicy zot-pull-injection -o yaml  (rule status)
+#   - kubectl get secret -n zot-pull-source zot-pull  (source materialised?)
+#   - kubectl get pod -n zot-pull-smoketest -o yaml | grep imagePullSecrets
+#     (Kyverno mutate ran?)
 apiVersion: v1
 kind: Namespace
 metadata:
   name: zot-pull-smoketest
-  labels:
-    zot-pull/enabled: "true"
