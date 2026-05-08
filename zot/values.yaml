@@ -20,20 +20,22 @@ startupProbe:
   periodSeconds: 10
   failureThreshold: 6
 
-# zot uses `http.auth.bearer.oidc[]` (zot >= v2.1.14) so the registry can
-# directly validate two upstream OIDC issuers without going through Keycloak
-# token-exchange (deprecated in Keycloak 26+):
+# zot authenticates three distinct caller types directly, with no Envoy-side
+# OIDC mediation. The split is by `Authorization` header / cookie:
 #
-#   1. token.actions.githubusercontent.com — GitHub Actions OIDC tokens are
-#      pushed straight to /v2 by docker login + buildx. CEL claim mapping
-#      derives the username (claims.repository) and assigns the right
-#      pusher group based on `repository_owner`.
-#   2. keycloak.shion1305.com/realms/zot — used for the Web UI. Envoy
-#      Gateway runs the OIDC code flow via SecurityPolicy.oidc and injects
-#      the Keycloak access_token as `Authorization: Bearer ...` upstream
-#      (forwardAccessToken: true), so zot validates it like any other OIDC
-#      token. Cluster pull and manual `docker login` use the same issuer
-#      via the `cluster-puller` service-account client.
+#   1. `Authorization: Bearer <gh-oidc>` from GitHub Actions on /v2/...
+#      → validated by `http.auth.bearer.oidc[token.actions...]`. CEL claim
+#      mapping derives the username (claims.repository) and assigns the
+#      right pusher group based on `repository_owner`.
+#   2. `Authorization: Bearer <kc-cluster-puller>` from kubelet imagePull
+#      service-account on /v2/... → validated by
+#      `http.auth.bearer.oidc[keycloak]`. Audience `zot-registry`, hardcoded
+#      `groups` mapper on the cluster-puller client emits the pusher groups.
+#   3. Browser users hitting / and /zot/auth/* → validated by zot's native
+#      `http.auth.openid.providers.keycloak`. zot itself runs the
+#      Authorization Code flow against the same Keycloak realm, then mints
+#      a session cookie. SPA routes /zot/auth/login/keycloak →
+#      /zot/auth/callback/keycloak → / on success.
 #
 # The accessControl block is unchanged: groups (`pusher-shion1305`,
 # `pusher-shion1305dev`, `zot-admin`) gate the read/write actions.
@@ -54,6 +56,7 @@ configFiles:
         "externalUrl": "https://registry.shion1305.com",
         "realm": "zot",
         "auth": {
+          "sessionKeysFile": "/secrets/session/sessionKeys.json",
           "bearer": {
             "realm": "zot",
             "service": "registry.shion1305.com",
@@ -84,6 +87,23 @@ configFiles:
                 }
               }
             ]
+          },
+          "openid": {
+            "callbackAllowOrigins": [
+              "https://registry.shion1305.com",
+              "https://registry.i.shion1305.com"
+            ],
+            "providers": {
+              "keycloak": {
+                "name": "Keycloak",
+                "issuer": "https://keycloak.shion1305.com/realms/zot",
+                "credentialsFile": "/secrets/openid/keycloak-credentials.json",
+                "scopes": ["openid", "profile", "email", "groups"],
+                "claimMapping": {
+                  "username": "preferred_username"
+                }
+              }
+            }
           }
         },
         "accessControl": {
@@ -135,10 +155,17 @@ configFiles:
       }
     }
 
-# zot fetches issuer JWKS over HTTPS at request time; no on-disk client secret
-# or session-encryption key is needed. The ExternalSecret in
-# zot/external-secret.yaml feeds Envoy Gateway's SecurityPolicy, not zot.
-externalSecrets: []
+# Native `http.auth.openid` requires two on-disk artefacts:
+#   - keycloak-credentials.json (the zot-ui client_id + client_secret)
+#   - sessionKeys.json (gorilla session HMAC + AES-CTR keys)
+# Both are populated by ExternalSecrets (zot/external-secret.yaml) reading
+# from Vault paths zot/openid-credentials and zot/session-keys, then mounted
+# into the zot Pod as files via the chart's externalSecrets[] hook.
+externalSecrets:
+  - secretName: zot-openid-credentials
+    mountPath: /secrets/openid
+  - secretName: zot-session-keys
+    mountPath: /secrets/session
 mountSecret: false
 
 persistence: true
