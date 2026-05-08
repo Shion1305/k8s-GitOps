@@ -1,0 +1,27 @@
+# ClusterPolicy resources are cluster-scoped, so the destination namespace is
+# only used for Argo's bookkeeping. We point at `kyverno` for symmetry with
+# the chart Application; the policies themselves are not namespaced.
+#
+# No syncwave annotation is needed — if Kyverno's CRDs aren't installed yet,
+# Argo retries with backoff until they are. Once `apps/kyverno-app.yaml` has
+# applied the chart, the next reconcile of this app succeeds.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kyverno-policies
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/Shion1305/k8s-GitOps.git
+    targetRevision: HEAD
+    path: kyverno-policies
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kyverno
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - ServerSideApply=true

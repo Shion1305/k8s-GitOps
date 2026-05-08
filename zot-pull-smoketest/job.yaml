@@ -1,26 +1,27 @@
-# Smoketest Job that proves the zot-pull automation works end-to-end.
+# Smoketest Job that proves the cluster-wide zot-pull automation works
+# end-to-end with no manual setup in the consumer namespace.
 #
-# Pull image:
-#   registry.i.shion1305.com/shion1305/demo:latest
-# This is the artifact built and pushed by .github/workflows/demo-push-to-zot.yaml
-# (Dockerfile: zot/demo/Dockerfile). It's a 6 MB alpine image whose only purpose
-# is to print a single line and exit.
+# Pull image: registry.i.shion1305.com/shion1305/demo:latest — built and pushed
+# by .github/workflows/demo-push-to-zot.yaml (Dockerfile zot/demo/Dockerfile),
+# a small alpine image that prints a line and exits.
 #
-# How auth works here:
-#   1. zot-pull's ClusterExternalSecret materialises a Secret `zot-pull` of type
-#      kubernetes.io/dockerconfigjson in this namespace (selected by the
-#      `zot-pull/enabled=true` label on the Namespace).
-#   2. The Secret's auth value is `oidc:<keycloak-access-token>` base64-encoded,
-#      where the token is minted by the ClusterGenerator hitting Keycloak's
-#      token endpoint with the `cluster-puller` confidential client.
-#   3. kubelet sends `Authorization: Basic base64(oidc:<token>)` on pull; zot's
-#      bearer-OIDC middleware extracts the JWT after the literal `oidc:` prefix
-#      and validates it against the Keycloak issuer.
+# `imagePullSecrets` is intentionally omitted: Kyverno's `zot-pull-injection`
+# ClusterPolicy injects it at admission and clones the source Secret into this
+# namespace. Seeing `imagePullSecrets: [{name: zot-pull}]` on the running Pod
+# confirms the policy fired.
 #
-# The Job runs once and exits 0 if the image runs. Argo reports Healthy when
-# the Job's `Complete` condition is true. If pull fails (token expired, RBAC
-# misconfigured, registry unreachable), the Pod stays in ImagePullBackOff and
-# the Job never completes — Argo flags Degraded, surfacing the regression.
+# Auth chain once the Secret is in place:
+#   - Source Secret `zot-pull-source/zot-pull` (kubernetes.io/dockerconfigjson)
+#     carries `auth = base64("oidc:<keycloak-access-token>")`.
+#   - The token is minted by ESO's ClusterGenerator hitting Keycloak's token
+#     endpoint with the `cluster-puller` confidential client.
+#   - kubelet sends `Authorization: Basic base64(oidc:<token>)`; zot's
+#     bearer-OIDC middleware extracts the JWT after the literal `oidc:` prefix
+#     and validates it against the Keycloak issuer.
+#
+# Argo reports Healthy when the Job's Complete condition is true. ImagePullBackOff
+# (token expired, RBAC drift, registry unreachable, Kyverno not running) keeps
+# the Job incomplete and Argo flags Degraded — surfacing the regression.
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -35,8 +36,6 @@ spec:
         app.kubernetes.io/name: zot-pull-smoketest
     spec:
       restartPolicy: Never
-      imagePullSecrets:
-        - name: zot-pull
       containers:
         - name: smoketest
           image: registry.i.shion1305.com/shion1305/demo:latest
