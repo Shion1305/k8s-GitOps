@@ -5,20 +5,21 @@
 # param against this exact string and refuses to use the request `:authority`
 # at runtime, so the same policy cannot serve two hostnames.
 #
-# Each policy targets:
-#   - the entire zot-ui-* HTTPRoute (SPA bundle, /zot/auth/*, /v2/_zot/*)
-#   - the `catalog-probe` rule on zot-registry-* (sectionName-scoped, just
-#     `/v2/` and `/v2/_catalog` exact-match — NOT the broad /v2/ PathPrefix
-#     used by docker push/pull)
+# Each policy targets two HTTPRoutes:
+#   - zot-ui-* (SPA bundle, /zot/auth/*, /v2/_zot/*)
+#   - zot-catalog-probe-* (just `/v2/` and `/v2/_catalog` exact-match — NOT
+#     the broad /v2/ PathPrefix used by docker push/pull, which lives on the
+#     separate zot-registry-* route)
 #
 # Why the split: Docker Registry v2 protocol (push/pull) negotiates its own
 # bearer challenge with zot. If the OIDC policy fired on /v2/<repo>/blobs/...
 # the gateway would 302 unauthenticated containerd to Keycloak, which can't
 # follow the authcode flow and would break every kubelet pull. The
-# catalog-probe rule isolates the only two /v2/ paths the SPA actually hits at
-# load (SignIn.jsx:183), so the policy can attach there without touching push
-# traffic. SectionName precedence is route-rule > route > listener > gateway
-# (Envoy Gateway SecurityPolicy concepts).
+# zot-catalog-probe-* route isolates the only two /v2/ paths the SPA actually
+# hits at load (SignIn.jsx:183), so the policy can attach there without
+# touching push traffic. Per-rule sectionName targeting would be cleaner but
+# requires HTTPRouteRule.name (Gateway API v1.2+), which ArgoCD v3.4's
+# embedded OpenAPI schema rejects at diff time.
 #
 # Browser ↔ machine differentiation:
 #   - denyRedirect on Sec-Fetch-Mode/Sec-Fetch-Dest matches XHR/fetch from the
@@ -50,8 +51,7 @@ spec:
       name: zot-ui-external
     - group: gateway.networking.k8s.io
       kind: HTTPRoute
-      name: zot-registry-external
-      sectionName: catalog-probe
+      name: zot-catalog-probe-external
   oidc:
     provider:
       issuer: https://keycloak.shion1305.com/realms/zot
@@ -102,8 +102,7 @@ spec:
       name: zot-ui-internal
     - group: gateway.networking.k8s.io
       kind: HTTPRoute
-      name: zot-registry-internal
-      sectionName: catalog-probe
+      name: zot-catalog-probe-internal
   oidc:
     provider:
       issuer: https://keycloak.shion1305.com/realms/zot

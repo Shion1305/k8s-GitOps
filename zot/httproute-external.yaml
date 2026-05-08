@@ -1,36 +1,64 @@
 # Public registry URL — used by browsers (zot UI / OIDC code-flow login) and by
 # `docker push` from any host that can resolve the public DNS.
 #
-# Three rule groups, split by purpose, share hostname registry.shion1305.com:
+# Three HTTPRoutes, all on hostname registry.shion1305.com, split by purpose:
 #
-#   zot-registry-external (Docker Registry v2 protocol):
-#     - rule `catalog-probe` — exact `/v2/` and `/v2/_catalog`. The SPA pings
-#       these at /login boot to detect "guest browse" availability. Routed to
-#       zot via the same backend, but ALSO targeted by the OIDC SecurityPolicy
-#       (sectionName: catalog-probe) so an authenticated browser hits zot with
-#       the kc_at injected. Without this targeting the probe would arrive
-#       without `Authorization`, zot's bearer-OIDC middleware would 401, and
-#       the SPA's "Continue as guest" hint would be wrong (silently logged at
-#       SignIn.jsx:189; not user-visible, but architecturally cleaner this
-#       way).
-#     - rule `registry-protocol` — broad `/v2/` PathPrefix, all repository
-#       traffic (push/pull/blobs/manifests). NOT covered by SecurityPolicy:
-#       containerd and crane do their own bearer challenge and would break if
-#       the gateway tried to redirect them through Keycloak's authcode flow.
-#       The Lua filter (zot/envoy-extension-policy.yaml) bridges containerd
-#       Basic ↔ zot bearer for kubelet pulls.
+#   zot-catalog-probe-external — exact `/v2/` and `/v2/_catalog`. The SPA pings
+#     these at /login boot. Targeted by the OIDC SecurityPolicy
+#     (zot/securitypolicy.yaml) so an authenticated browser hits zot with the
+#     kc_at injected. Without this targeting the probe would arrive without
+#     `Authorization`, zot's bearer-OIDC middleware would 401, and the SPA's
+#     "Continue as guest" hint would be wrong (silently logged at
+#     SignIn.jsx:189; not user-visible, but architecturally cleaner this way).
 #
-#   zot-ui-external:
-#     - rule `ui` — `/` and `/v2/_zot/*`. The SPA bundle, /zot/auth/*, and
-#       zot's extension XHRs (mgmt, search). Fully covered by SecurityPolicy
-#       (whole-route targeting); cookie session is set on /, then attached to
-#       every same-host request the browser issues.
+#   zot-registry-external — broad `/v2/` PathPrefix, all repository traffic
+#     (push/pull/blobs/manifests). NOT covered by SecurityPolicy: containerd
+#     and crane do their own bearer challenge and would break if the gateway
+#     tried to redirect them through Keycloak's authcode flow. The Lua filter
+#     (zot/envoy-extension-policy.yaml) bridges containerd Basic ↔ zot bearer
+#     for kubelet pulls.
+#
+#   zot-ui-external — `/` and `/v2/_zot/*`. The SPA bundle, /zot/auth/*, and
+#     zot's extension XHRs (mgmt, search). Fully covered by SecurityPolicy;
+#     cookie session is set on /, then attached to every same-host request the
+#     browser issues.
 #
 # Gateway API GEP-718 most-specific-path-wins routes /v2/_zot/... to
 # zot-ui-external (longer prefix beats /v2/) regardless of HTTPRoute order.
-# Within zot-registry-external, the exact matches in `catalog-probe` beat the
-# `/v2/` PathPrefix in `registry-protocol`, so the SPA's two probe paths are
-# isolated cleanly.
+# Across the two registry routes the exact matches in zot-catalog-probe-external
+# beat the `/v2/` PathPrefix in zot-registry-external for the same two paths,
+# so the SPA's two probe paths land on the SecurityPolicy-attached route.
+#
+# Why three routes instead of one with named rules: HTTPRouteRule.name is a
+# Gateway API v1.2+ field. The cluster CRD accepts it, but ArgoCD v3.4's
+# structured-merge-diff library has an older embedded OpenAPI schema and
+# rejects the field at diff time ("field not declared in schema"). Splitting
+# into separate HTTPRoutes lets SecurityPolicy.targetRefs reach each by route
+# name — no rule-level sectionName needed — and keeps the manifest portable.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: zot-catalog-probe-external
+  namespace: zot
+spec:
+  parentRefs:
+    - name: external
+      namespace: envoy-gateway-system
+      sectionName: https
+  hostnames:
+    - registry.shion1305.com
+  rules:
+    - matches:
+        - path:
+            type: Exact
+            value: /v2/
+        - path:
+            type: Exact
+            value: /v2/_catalog
+      backendRefs:
+        - name: zot
+          port: 5000
+---
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
@@ -44,19 +72,7 @@ spec:
   hostnames:
     - registry.shion1305.com
   rules:
-    - name: catalog-probe
-      matches:
-        - path:
-            type: Exact
-            value: /v2/
-        - path:
-            type: Exact
-            value: /v2/_catalog
-      backendRefs:
-        - name: zot
-          port: 5000
-    - name: registry-protocol
-      matches:
+    - matches:
         - path:
             type: PathPrefix
             value: /v2/
@@ -77,8 +93,7 @@ spec:
   hostnames:
     - registry.shion1305.com
   rules:
-    - name: ui
-      matches:
+    - matches:
         - path:
             type: PathPrefix
             value: /
