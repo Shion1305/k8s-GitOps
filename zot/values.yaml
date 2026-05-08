@@ -20,26 +20,31 @@ startupProbe:
   periodSeconds: 10
   failureThreshold: 6
 
-# zot authenticates three distinct caller types directly, with no Envoy-side
-# OIDC mediation. The split is by `Authorization` header / cookie:
+# zot authenticates two distinct caller types directly via `bearer.oidc[]`.
+# Browser UI auth is NOT done by zot — Envoy Gateway's SecurityPolicy.oidc
+# (zot/securitypolicy.yaml) runs the Authorization Code flow, sets a
+# session cookie, and forwards the Keycloak access_token upstream as
+# `Authorization: Bearer <kc_at>`. zot's bearer.oidc[] then validates it.
 #
 #   1. `Authorization: Bearer <gh-oidc>` from GitHub Actions on /v2/...
-#      → validated by `http.auth.bearer.oidc[token.actions...]`. CEL claim
-#      mapping derives the username (claims.repository) and assigns the
-#      right pusher group based on `repository_owner`.
-#   2. `Authorization: Bearer <kc-cluster-puller>` from kubelet imagePull
-#      service-account on /v2/... → validated by
-#      `http.auth.bearer.oidc[keycloak]`. Audience `zot-registry`, hardcoded
-#      `groups` mapper on the cluster-puller client emits the pusher groups.
-#   3. Browser users hitting / and /zot/auth/* → validated by zot's native
-#      `http.auth.openid.providers.oidc`. zot itself runs the Authorization
-#      Code flow against the same Keycloak realm (provider key must be the
-#      generic `oidc` — zot's validator only accepts google/gitlab/oidc for
-#      OpenID and github for OAuth2), then mints a session cookie. SPA
-#      routes /zot/auth/login/oidc → /zot/auth/callback/oidc → / on success.
+#      → validated by `bearer.oidc[token.actions...]`. CEL claim mapping
+#      derives the username (claims.repository) and assigns the right
+#      pusher group based on `repository_owner`.
+#   2. `Authorization: Bearer <kc-jwt>` from kubelet imagePull and from
+#      browser UI XHRs (Envoy-injected) → validated by
+#      `bearer.oidc[keycloak]`. Audience `zot-registry`. The `groups` claim
+#      (cluster-puller hardcoded; zot-ui group-membership mapper) drives
+#      the accessControl block.
 #
-# The accessControl block is unchanged: groups (`pusher-shion1305`,
-# `pusher-shion1305dev`, `zot-admin`) gate the read/write actions.
+# Why no `http.auth.openid` here: zot's AuthHandler short-circuits to the
+# bearer middleware whenever `bearer.oidc[]` is configured (pkg/api/authn.go
+# lines 65-67), so the openid LoginPath handler never gets RelyingParties
+# initialised and 400s with a nil-map miss. Upstream issue project-zot/zot#4033;
+# maintainer-confirmed intended behaviour. The SPA is steered around its own
+# login flow by the EnvoyExtensionPolicy filter (envoy-extension-policy.yaml)
+# which rewrites the /v2/_zot/ext/mgmt response body to drop `http.auth`,
+# making the SPA take its "no auth configured" branch and treat the user as
+# already-authenticated by the upstream gateway.
 mountConfig: true
 configFiles:
   config.json: |-
@@ -57,7 +62,6 @@ configFiles:
         "externalUrl": "https://registry.shion1305.com",
         "realm": "zot",
         "auth": {
-          "sessionKeysFile": "/secrets/session/sessionKeys.json",
           "bearer": {
             "realm": "zot",
             "service": "registry.shion1305.com",
@@ -88,23 +92,6 @@ configFiles:
                 }
               }
             ]
-          },
-          "openid": {
-            "callbackAllowOrigins": [
-              "https://registry.shion1305.com",
-              "https://registry.i.shion1305.com"
-            ],
-            "providers": {
-              "oidc": {
-                "name": "Keycloak",
-                "issuer": "https://keycloak.shion1305.com/realms/zot",
-                "credentialsFile": "/secrets/openid/keycloak-credentials.json",
-                "scopes": ["openid", "profile", "email", "groups"],
-                "claimMapping": {
-                  "username": "preferred_username"
-                }
-              }
-            }
           }
         },
         "accessControl": {
@@ -156,17 +143,11 @@ configFiles:
       }
     }
 
-# Native `http.auth.openid` requires two on-disk artefacts:
-#   - keycloak-credentials.json (the zot-ui client_id + client_secret)
-#   - sessionKeys.json (gorilla session HMAC + AES-CTR keys)
-# Both are populated by ExternalSecrets (zot/external-secret.yaml) reading
-# from Vault paths zot/openid-credentials and zot/session-keys, then mounted
-# into the zot Pod as files via the chart's externalSecrets[] hook.
-externalSecrets:
-  - secretName: zot-openid-credentials
-    mountPath: /secrets/openid
-  - secretName: zot-session-keys
-    mountPath: /secrets/session
+# zot fetches issuer JWKS over HTTPS at request time; no on-disk client secret
+# or session-encryption key is needed. The OIDC client_id/client_secret used by
+# Envoy's SecurityPolicy lives in the zot-ui-oidc-credentials Secret
+# (zot/external-secret.yaml), which the policy references directly.
+externalSecrets: []
 mountSecret: false
 
 persistence: true

@@ -1,19 +1,36 @@
-# Public registry URL — used by browsers (zot UI / OIDC login) and by
+# Public registry URL — used by browsers (zot UI / OIDC code-flow login) and by
 # `docker push` from any host that can resolve the public DNS.
 #
-# Two HTTPRoutes share hostname registry.shion1305.com and split by path:
-#   - zot-registry-external: Docker Registry v2 protocol (/v2/...). zot
-#     handles its own bearer-OIDC challenges directly with the upstream
-#     issuer (GitHub Actions / Keycloak realm zot).
-#   - zot-ui-external: everything else, including the SPA, /zot/auth/*, and
-#     zot's own extension XHRs under /v2/_zot/*. zot's native
-#     `http.auth.openid` provider runs the Authorization Code Flow and mints
-#     a session cookie; no Envoy-level OIDC layering.
+# Three rule groups, split by purpose, share hostname registry.shion1305.com:
 #
-# Gateway API precedence (most-specific-path-wins, GEP-718) means /v2/_zot/...
-# requests are routed to zot-ui-external even though /v2/ on zot-registry-
-# external also matches — the longer prefix wins regardless of declaration
-# order or HTTPRoute boundary.
+#   zot-registry-external (Docker Registry v2 protocol):
+#     - rule `catalog-probe` — exact `/v2/` and `/v2/_catalog`. The SPA pings
+#       these at /login boot to detect "guest browse" availability. Routed to
+#       zot via the same backend, but ALSO targeted by the OIDC SecurityPolicy
+#       (sectionName: catalog-probe) so an authenticated browser hits zot with
+#       the kc_at injected. Without this targeting the probe would arrive
+#       without `Authorization`, zot's bearer-OIDC middleware would 401, and
+#       the SPA's "Continue as guest" hint would be wrong (silently logged at
+#       SignIn.jsx:189; not user-visible, but architecturally cleaner this
+#       way).
+#     - rule `registry-protocol` — broad `/v2/` PathPrefix, all repository
+#       traffic (push/pull/blobs/manifests). NOT covered by SecurityPolicy:
+#       containerd and crane do their own bearer challenge and would break if
+#       the gateway tried to redirect them through Keycloak's authcode flow.
+#       The Lua filter (zot/envoy-extension-policy.yaml) bridges containerd
+#       Basic ↔ zot bearer for kubelet pulls.
+#
+#   zot-ui-external:
+#     - rule `ui` — `/` and `/v2/_zot/*`. The SPA bundle, /zot/auth/*, and
+#       zot's extension XHRs (mgmt, search). Fully covered by SecurityPolicy
+#       (whole-route targeting); cookie session is set on /, then attached to
+#       every same-host request the browser issues.
+#
+# Gateway API GEP-718 most-specific-path-wins routes /v2/_zot/... to
+# zot-ui-external (longer prefix beats /v2/) regardless of HTTPRoute order.
+# Within zot-registry-external, the exact matches in `catalog-probe` beat the
+# `/v2/` PathPrefix in `registry-protocol`, so the SPA's two probe paths are
+# isolated cleanly.
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
@@ -27,7 +44,19 @@ spec:
   hostnames:
     - registry.shion1305.com
   rules:
-    - matches:
+    - name: catalog-probe
+      matches:
+        - path:
+            type: Exact
+            value: /v2/
+        - path:
+            type: Exact
+            value: /v2/_catalog
+      backendRefs:
+        - name: zot
+          port: 5000
+    - name: registry-protocol
+      matches:
         - path:
             type: PathPrefix
             value: /v2/
@@ -48,7 +77,8 @@ spec:
   hostnames:
     - registry.shion1305.com
   rules:
-    - matches:
+    - name: ui
+      matches:
         - path:
             type: PathPrefix
             value: /

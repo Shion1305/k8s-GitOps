@@ -1,0 +1,136 @@
+# Envoy Gateway-managed OIDC for the zot Web UI.
+#
+# Two SecurityPolicy resources, one per hostname (external + internal). They
+# differ only in `redirectURL` — Envoy validates the OIDC `redirect_uri` query
+# param against this exact string and refuses to use the request `:authority`
+# at runtime, so the same policy cannot serve two hostnames.
+#
+# Each policy targets:
+#   - the entire zot-ui-* HTTPRoute (SPA bundle, /zot/auth/*, /v2/_zot/*)
+#   - the `catalog-probe` rule on zot-registry-* (sectionName-scoped, just
+#     `/v2/` and `/v2/_catalog` exact-match — NOT the broad /v2/ PathPrefix
+#     used by docker push/pull)
+#
+# Why the split: Docker Registry v2 protocol (push/pull) negotiates its own
+# bearer challenge with zot. If the OIDC policy fired on /v2/<repo>/blobs/...
+# the gateway would 302 unauthenticated containerd to Keycloak, which can't
+# follow the authcode flow and would break every kubelet pull. The
+# catalog-probe rule isolates the only two /v2/ paths the SPA actually hits at
+# load (SignIn.jsx:183), so the policy can attach there without touching push
+# traffic. SectionName precedence is route-rule > route > listener > gateway
+# (Envoy Gateway SecurityPolicy concepts).
+#
+# Browser ↔ machine differentiation:
+#   - denyRedirect on Sec-Fetch-Mode/Sec-Fetch-Dest matches XHR/fetch from the
+#     SPA so a missing/expired session cookie returns 401 (the Axios
+#     interceptor in zui will redirect to /login) instead of 302 to Keycloak
+#     (which fetch can't follow cross-origin).
+#   - The catalog-probe rule sees both XHR and top-level navigation; the
+#     denyRedirect matchers cover XHR cases and let navigations through.
+#
+# forwardAccessToken: true projects the Keycloak access_token onto the
+# upstream request as `Authorization: Bearer <kc_at>`. zot's
+# `bearer.oidc[keycloak]` (zot/values.yaml) then validates the same token,
+# enforces accessControl by the `groups` claim, and serves the response.
+#
+# The SPA is steered around its own login flow by an Envoy Lua filter
+# (envoy-extension-policy.yaml) that rewrites the /v2/_zot/ext/mgmt response
+# body to drop `http.auth`. With a stripped auth block the SPA takes its "no
+# auth configured" branch (zui SignIn.jsx:173) and treats the user as
+# already-authenticated — which they are, thanks to this policy.
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: SecurityPolicy
+metadata:
+  name: zot-ui-oidc-external
+  namespace: zot
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: zot-ui-external
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: zot-registry-external
+      sectionName: catalog-probe
+  oidc:
+    provider:
+      issuer: https://keycloak.shion1305.com/realms/zot
+    clientIDRef:
+      name: zot-ui-oidc-credentials
+    clientSecret:
+      name: zot-ui-oidc-credentials
+    redirectURL: https://registry.shion1305.com/oauth2/callback
+    logoutPath: /logout
+    # `openid` is auto-added by Envoy. `groups` is required for zot's
+    # accessControl, sourced from the group-membership mapper on the
+    # Keycloak `zot-ui` client (see keycloak-operator/zot-realm.yaml).
+    scopes:
+      - email
+      - profile
+      - groups
+    forwardAccessToken: true
+    cookieConfig:
+      sameSite: Lax
+    cookieNames:
+      accessToken: zot_at
+      idToken: zot_it
+    # AJAX/fetch from the SPA can't follow a 302 to Keycloak (cross-origin,
+    # opaque response). Force 401 for those requests so the Axios interceptor
+    # at zui src/api.js:21-26 redirects to /login, which IS a top-level
+    # navigation and CAN follow the redirect to Keycloak.
+    denyRedirect:
+      headers:
+        - name: Sec-Fetch-Mode
+          type: Exact
+          value: cors
+        - name: Sec-Fetch-Dest
+          type: Exact
+          value: empty
+        - name: X-Requested-With
+          type: Exact
+          value: XMLHttpRequest
+---
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: SecurityPolicy
+metadata:
+  name: zot-ui-oidc-internal
+  namespace: zot
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: zot-ui-internal
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: zot-registry-internal
+      sectionName: catalog-probe
+  oidc:
+    provider:
+      issuer: https://keycloak.shion1305.com/realms/zot
+    clientIDRef:
+      name: zot-ui-oidc-credentials
+    clientSecret:
+      name: zot-ui-oidc-credentials
+    redirectURL: https://registry.i.shion1305.com/oauth2/callback
+    logoutPath: /logout
+    scopes:
+      - email
+      - profile
+      - groups
+    forwardAccessToken: true
+    cookieConfig:
+      sameSite: Lax
+    cookieNames:
+      accessToken: zot_at
+      idToken: zot_it
+    denyRedirect:
+      headers:
+        - name: Sec-Fetch-Mode
+          type: Exact
+          value: cors
+        - name: Sec-Fetch-Dest
+          type: Exact
+          value: empty
+        - name: X-Requested-With
+          type: Exact
+          value: XMLHttpRequest
