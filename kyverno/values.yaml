@@ -1,0 +1,68 @@
+# Kyverno is deployed cluster-wide as a generic admission policy engine.
+# Individual ClusterPolicies live in the separate `kyverno-policies` ArgoCD
+# Application (under `kyverno-policies/`), so chart upgrades and policy edits
+# can be reviewed in independent PRs.
+#
+# Sub-controller layout (see kyverno chart 3.8.0 / app v1.18.0):
+#   admissionController – mutating/validating webhook (always required).
+#   backgroundController – periodic reconciliation of mutate/generate rules
+#                          against existing resources. Required for our
+#                          generate-on-Pod-create flow (zot-pull Secret clone).
+#   reportsController   – aggregates PolicyReport CRs. Useful for observability.
+#   cleanupController   – CleanupPolicy CRD support; enabled by default.
+#
+# Resource limits intentionally conservative. Bump if metrics show throttling.
+
+admissionController:
+  replicas: 2
+  serviceMonitor:
+    enabled: true
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      memory: 384Mi
+
+backgroundController:
+  replicas: 1
+  serviceMonitor:
+    enabled: true
+  resources:
+    requests:
+      cpu: 100m
+      memory: 64Mi
+    limits:
+      memory: 256Mi
+
+reportsController:
+  replicas: 1
+  serviceMonitor:
+    enabled: true
+  resources:
+    requests:
+      cpu: 100m
+      memory: 64Mi
+    limits:
+      memory: 256Mi
+
+cleanupController:
+  replicas: 1
+  serviceMonitor:
+    enabled: true
+  resources:
+    requests:
+      cpu: 100m
+      memory: 64Mi
+    limits:
+      memory: 128Mi
+
+# We don't use the bundled grafana subchart — kube-prometheus-stack already
+# provides Grafana cluster-wide.
+grafana:
+  enabled: false
+
+# Reports server is an alternative storage backend for PolicyReports; default
+# (etcd) is fine for our scale.
+reportsServer:
+  enabled: false
