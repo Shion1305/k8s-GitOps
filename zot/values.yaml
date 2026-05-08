@@ -32,10 +32,11 @@ startupProbe:
 #      `http.auth.bearer.oidc[keycloak]`. Audience `zot-registry`, hardcoded
 #      `groups` mapper on the cluster-puller client emits the pusher groups.
 #   3. Browser users hitting / and /zot/auth/* → validated by zot's native
-#      `http.auth.openid.providers.keycloak`. zot itself runs the
-#      Authorization Code flow against the same Keycloak realm, then mints
-#      a session cookie. SPA routes /zot/auth/login/keycloak →
-#      /zot/auth/callback/keycloak → / on success.
+#      `http.auth.openid.providers.oidc`. zot itself runs the Authorization
+#      Code flow against the same Keycloak realm (provider key must be the
+#      generic `oidc` — zot's validator only accepts google/gitlab/oidc for
+#      OpenID and github for OAuth2), then mints a session cookie. SPA
+#      routes /zot/auth/login/oidc → /zot/auth/callback/oidc → / on success.
 #
 # The accessControl block is unchanged: groups (`pusher-shion1305`,
 # `pusher-shion1305dev`, `zot-admin`) gate the read/write actions.
@@ -94,7 +95,7 @@ configFiles:
               "https://registry.i.shion1305.com"
             ],
             "providers": {
-              "keycloak": {
+              "oidc": {
                 "name": "Keycloak",
                 "issuer": "https://keycloak.shion1305.com/realms/zot",
                 "credentialsFile": "/secrets/openid/keycloak-credentials.json",

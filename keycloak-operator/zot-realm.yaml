@@ -364,8 +364,8 @@ spec:
         directAccessGrantsEnabled: false
         serviceAccountsEnabled: false
         redirectUris:
-          - https://registry.shion1305.com/zot/auth/callback/keycloak
-          - https://registry.i.shion1305.com/zot/auth/callback/keycloak
+          - https://registry.shion1305.com/zot/auth/callback/oidc
+          - https://registry.i.shion1305.com/zot/auth/callback/oidc
         webOrigins:
           - https://registry.shion1305.com
           - https://registry.i.shion1305.com
