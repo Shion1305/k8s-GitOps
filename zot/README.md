@@ -4,18 +4,19 @@ Project-zot v2 deployed cluster-wide as the canonical container image registry f
 
 ## Hostnames and routing
 
-Two hostnames front the same `zot` Service. Each has the same three HTTPRoutes:
+Two hostnames front the same `zot` Service. Each has the same four HTTPRoutes:
 
-| Hostname | Gateway | Catalog-probe HTTPRoute | Registry HTTPRoute | UI HTTPRoute |
-| --- | --- | --- | --- | --- |
-| `registry.shion1305.com` | `external` (public) | `zot-catalog-probe-external` | `zot-registry-external` | `zot-ui-external` |
-| `registry.i.shion1305.com` | `internal` (WG-only) | `zot-catalog-probe-internal` | `zot-registry-internal` | `zot-ui-internal` |
+| Hostname | Gateway | Catalog-probe | Registry (containerd) | Registry (SPA writes) | UI |
+| --- | --- | --- | --- | --- | --- |
+| `registry.shion1305.com` | `external` (public) | `zot-catalog-probe-external` | `zot-registry-external` | `zot-registry-spa-external` | `zot-ui-external` |
+| `registry.i.shion1305.com` | `internal` (WG-only) | `zot-catalog-probe-internal` | `zot-registry-internal` | `zot-registry-spa-internal` | `zot-ui-internal` |
 
 - `zot-catalog-probe-*` — exact `/v2/` and `/v2/_catalog`. The SPA pings these at `/login` boot. Targeted by the OIDC `SecurityPolicy` so the browser request arrives at zot with the kc_at injected.
-- `zot-registry-*` — the broad `/v2/` PathPrefix that handles every push/pull. **Not** behind the OIDC policy — containerd negotiates its own bearer challenge with zot, and a 302 to Keycloak would break every kubelet pull.
+- `zot-registry-*` — the broad `/v2/` PathPrefix that handles every containerd/crane push/pull. **Not** behind the OIDC policy — containerd negotiates its own bearer challenge with zot, and a 302 to Keycloak would break every kubelet pull.
+- `zot-registry-spa-*` — the same broad `/v2/` PathPrefix, but matched only when the `X-Zot-Api-Client: zot-ui` request header is present. Targeted by the OIDC `SecurityPolicy` so SPA-initiated writes (image-delete: `DELETE /v2/<repo>/manifests/<digest>`) carry the Envoy-injected Bearer to zot. zui's Axios always stamps the header (zui `src/api.js`); containerd/crane do not, so registry-protocol traffic falls through to `zot-registry-*`.
 - `zot-ui-*` — `/` and `/v2/_zot/*` (SPA bundle, `/zot/auth/*`, zot's extension XHRs). Fully behind the OIDC `SecurityPolicy`.
 
-Gateway API GEP-718 most-specific-path-wins keeps `/v2/_zot/...` on `zot-ui-*` and routes `/v2/` and `/v2/_catalog` exact matches to `zot-catalog-probe-*` over the bare `/v2/` PathPrefix on `zot-registry-*`. Per-rule `sectionName` targeting would be cleaner but requires `HTTPRouteRule.name` (Gateway API v1.2+) which ArgoCD v3.4's embedded OpenAPI schema rejects at diff time, so the rules are split into separate HTTPRoutes instead.
+Gateway API GEP-718 most-specific-path-wins keeps `/v2/_zot/...` on `zot-ui-*`, routes `/v2/` and `/v2/_catalog` exact matches to `zot-catalog-probe-*` over the bare `/v2/` PathPrefix on `zot-registry-*`, and prefers `zot-registry-spa-*` (path + header match) over `zot-registry-*` (path-only) for SPA-tagged traffic. Per-rule `sectionName` targeting would be cleaner but requires `HTTPRouteRule.name` (Gateway API v1.2+) which ArgoCD v3.4's embedded OpenAPI schema rejects at diff time, so the rules are split into separate HTTPRoutes instead.
 
 ## Auth callers
 
@@ -26,13 +27,14 @@ Three distinct caller types reach zot. Browser UI auth is mediated by Envoy Gate
                     │                        envoy-gateway                       │
                     │                                                            │
   GHA crane push ───┼─→ /v2/* ─────────────────────────────────────────────────┐ │
-  (Bearer JWT)      │                                                          │ │
+  (Bearer JWT)      │   (no X-Zot-Api-Client header)                           │ │
                     │                                                          ▼ │
   kubelet pull ─────┼─→ /v2/* ─→ [Lua: Basic(oidc:JWT)→Bearer JWT] ──────────→ zot
-  (Basic JWT)       │                                                          ▲ │
+  (Basic JWT)       │   (no X-Zot-Api-Client header)                           ▲ │
                     │                                                          │ │
   Browser UI ───────┼─→ /, /v2/_zot/* ─→ [SecurityPolicy.oidc → Keycloak] ─────┤ │
   (cookie / OIDC)   │      and /v2/, /v2/_catalog (catalog-probe rule)         │ │
+                    │      and /v2/* with X-Zot-Api-Client: zot-ui (SPA writes)│ │
                     │      [Lua: rewrite /v2/_zot/ext/mgmt response]           │ │
                     └────────────────────────────────────────────────────────────┘
 ```
@@ -59,7 +61,7 @@ GHA push traffic from `crane` matches the `Go-http-client` UA so the metadata fl
 
 ### 3. Browser UI (Envoy SecurityPolicy.oidc, cookie session)
 
-Browsers hit `/`, `/v2/_zot/*`, and the SPA's two boot probes (`/v2/`, `/v2/_catalog`). All four are covered by `securitypolicy.yaml`'s OIDC policy (whole-route attachment for `zot-ui-*`, `sectionName`-scoped attachment for `zot-registry-*` `catalog-probe`).
+Browsers hit `/`, `/v2/_zot/*`, the SPA's two boot probes (`/v2/`, `/v2/_catalog`), and SPA-tagged `/v2/*` writes (image-delete `DELETE /v2/<repo>/manifests/<digest>`, etc.). All are covered by `securitypolicy.yaml`'s OIDC policy: whole-route attachment for `zot-ui-*`, route attachment for `zot-catalog-probe-*` (boot probes), and route attachment for `zot-registry-spa-*` (header-matched on `X-Zot-Api-Client: zot-ui`, set unconditionally by zui's Axios). containerd/crane traffic on the same `/v2/` paths lacks the header, falls through to the OIDC-free `zot-registry-*` route, and uses the Lua filter for its bearer challenge.
 
 On first load, Envoy runs the Authorization Code flow against the Keycloak `zot` realm using the `zot-ui` confidential client. After the callback at `/oauth2/callback`, Envoy sets an encrypted session cookie (`zot_at` / `zot_it`) and forwards the Keycloak access_token upstream as `Authorization: Bearer <kc_at>`. zot's `bearer.oidc[keycloak]` validates the same token (audience `zot-registry`) and authorizes by the `groups` claim from the `zot-ui` client's group-membership mapper.
 

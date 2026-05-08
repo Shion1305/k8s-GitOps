@@ -3,11 +3,14 @@
 # for in-cluster CI/CD or trusted hosts that have WG connectivity, while the
 # public registry.shion1305.com URL handles GitHub Actions and external pulls.
 #
-# Same three-route split as the external Gateway (see httproute-external.yaml
-# for the rationale): zot-catalog-probe-internal carries the SPA boot probes and
-# is targeted by the OIDC SecurityPolicy, zot-registry-internal carries
-# unauthenticated v2 traffic that the Lua filter bridges, and zot-ui-internal
-# carries the SPA + extension XHRs and is fully behind the SecurityPolicy.
+# Same four-route split as the external Gateway (see httproute-external.yaml
+# for the rationale): zot-catalog-probe-internal carries the SPA boot probes
+# and is targeted by the OIDC SecurityPolicy, zot-registry-spa-internal carries
+# SPA-tagged /v2/ writes (matched by `X-Zot-Api-Client: zot-ui` header) and is
+# also under the SecurityPolicy so the Bearer is injected, zot-registry-internal
+# carries unauthenticated v2 traffic that the Lua filter bridges for
+# containerd/crane, and zot-ui-internal carries the SPA + extension XHRs and is
+# fully behind the SecurityPolicy.
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
@@ -28,6 +31,30 @@ spec:
         - path:
             type: Exact
             value: /v2/_catalog
+      backendRefs:
+        - name: zot
+          port: 5000
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: zot-registry-spa-internal
+  namespace: zot
+spec:
+  parentRefs:
+    - name: internal
+      namespace: envoy-gateway-system
+      sectionName: https
+  hostnames:
+    - registry.i.shion1305.com
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /v2/
+          headers:
+            - name: X-Zot-Api-Client
+              value: zot-ui
       backendRefs:
         - name: zot
           port: 5000
