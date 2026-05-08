@@ -5,11 +5,14 @@
 # This file is reconciled by the Keycloak Operator (KeycloakRealmImport CRD).
 # It declares the `zot` realm used to authenticate human users to the zot
 # registry Web UI and to mint pull tokens for in-cluster workloads:
-#   - Browser login flow is handled by zot's native `http.auth.openid`
-#     provider (zot/values.yaml), which performs the Authorization Code
-#     flow against this realm using the `zot-ui` confidential client below
-#     and mints its own session cookie. Envoy Gateway no longer mediates
-#     OIDC for the UI; routing is plain HTTPRoute pass-through.
+#   - Browser login flow is handled by Envoy Gateway's SecurityPolicy.oidc
+#     (zot/securitypolicy.yaml). Envoy runs the Authorization Code flow
+#     against this realm using the `zot-ui` confidential client below and
+#     forwards the resulting access_token upstream as
+#     `Authorization: Bearer <kc_at>`. zot's `bearer.oidc[keycloak]` then
+#     validates the same token. zot itself does NOT run a native openid
+#     provider — `http.auth.openid` is incompatible with `bearer.oidc[]` in
+#     zot v2.1.16 (upstream issue project-zot/zot#4033, intended behaviour).
 #   - In-cluster image pulls (kubelet imagePullSecrets) and manual
 #     `docker login` from WireGuard hosts use the `cluster-puller`
 #     service-account client below (grant_type=client_credentials). ESO's
@@ -37,9 +40,10 @@
 #    overwritten by Keycloak on first import; subsequent reconciles do not
 #    re-apply the placeholder.
 #
-# 2. Repeat for `zot-ui` and `cluster-puller`, then persist all three into
-#    Vault. The zot UI client secret now lives at zot/openid-credentials as
-#    a JSON blob that zot's `http.auth.openid` mounts via ExternalSecret
+# 2. Repeat for `zot-ui` and `cluster-puller`, then persist into Vault. The
+#    zot-ui client_id/client_secret are read by ESO from
+#    zot/openid-credentials (the historical path; shape unchanged) and
+#    projected onto a Secret consumed by Envoy's SecurityPolicy
 #    (zot/external-secret.yaml). cluster-puller is read by ESO via the
 #    `eso-cluster-puller` Vault role (see vault/scripts/setup-eso-policies.sh):
 #      vault kv put zot/openid-credentials \
@@ -47,9 +51,8 @@
 #      vault kv put zot/cluster-puller \
 #        client_id=cluster-puller \
 #        client_secret=<cluster-puller-secret>
-#    Also seed the session encryption keys consumed by zot's openid filter:
-#      vault kv put zot/session-keys \
-#        sessionKeys.json='{"hashKey":"<base64 64B>","encryptKey":"<base64 32B>"}'
+#    Session encryption keys are no longer needed — Envoy generates its own
+#    cookie HMAC/AES key. Drop the legacy zot/session-keys Vault entry.
 #
 # 3. Bind the Browser authentication flow to "Identity Provider Redirector"
 #    pinned to alias `user`, so human web logins skip the choice screen and go
@@ -347,14 +350,17 @@ spec:
         attributes:
           access.token.lifespan: "3600"
 
-      # zot-ui: confidential client driven by zot's native `http.auth.openid`
-      # provider (zot/values.yaml) to run the human Authorization Code flow.
-      # zot mints its own session cookie after exchanging the code; no
-      # `Authorization: Bearer` header reaches the registry HTTP layer for
-      # browser users, so the audience mapper that previously forced
-      # `aud=[zot-registry]` is no longer needed for UI flows. Audience is
-      # still emitted for parity with any other OAuth-aware client that
-      # might call this client_id.
+      # zot-ui: confidential client driven by Envoy Gateway's SecurityPolicy.oidc
+      # (zot/securitypolicy.yaml). Envoy runs the Authorization Code flow,
+      # mints its own encrypted session cookie, and forwards the access_token
+      # upstream as `Authorization: Bearer <kc_at>`. zot's
+      # `bearer.oidc[keycloak]` validates that token (audience=[zot-registry])
+      # and authorizes by the `groups` claim — same mappers, same accessControl.
+      #
+      # The redirect_uri Envoy uses is `https://<host>/oauth2/callback` (its
+      # default for the OAuth2 filter). One redirect URI per hostname is
+      # listed below; webOrigins also covers both so the realm validates
+      # cross-origin where needed.
       - clientId: zot-ui
         protocol: openid-connect
         publicClient: false
@@ -364,8 +370,8 @@ spec:
         directAccessGrantsEnabled: false
         serviceAccountsEnabled: false
         redirectUris:
-          - https://registry.shion1305.com/zot/auth/callback/oidc
-          - https://registry.i.shion1305.com/zot/auth/callback/oidc
+          - https://registry.shion1305.com/oauth2/callback
+          - https://registry.i.shion1305.com/oauth2/callback
         webOrigins:
           - https://registry.shion1305.com
           - https://registry.i.shion1305.com

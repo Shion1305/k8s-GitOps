@@ -3,13 +3,12 @@
 # for in-cluster CI/CD or trusted hosts that have WG connectivity, while the
 # public registry.shion1305.com URL handles GitHub Actions and external pulls.
 #
-# Same path-split pattern as the external Gateway: zot-registry-internal
-# handles Docker v2 protocol traffic (zot does its own bearer challenge against
-# the upstream OIDC issuers), zot-ui-internal handles the SPA + /v2/_zot/*
-# extension XHRs. zot's native `http.auth.openid` provider runs the
-# Authorization Code Flow against Keycloak for browser users; no Envoy-level
-# OIDC layering. The internal hostname registry.i.shion1305.com is one of the
-# allowed callback origins, so the same Keycloak `zot-ui` client works here.
+# Same three-rule split as the external Gateway (see httproute-external.yaml
+# for the rationale): `catalog-probe` rule on zot-registry-internal carries
+# the SPA boot probes and is targeted by the OIDC SecurityPolicy via
+# sectionName, while `registry-protocol` carries unauthenticated v2 traffic
+# that the Lua filter bridges. zot-ui-internal carries the SPA + extension
+# XHRs and is fully behind the SecurityPolicy.
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
@@ -23,7 +22,19 @@ spec:
   hostnames:
     - registry.i.shion1305.com
   rules:
-    - matches:
+    - name: catalog-probe
+      matches:
+        - path:
+            type: Exact
+            value: /v2/
+        - path:
+            type: Exact
+            value: /v2/_catalog
+      backendRefs:
+        - name: zot
+          port: 5000
+    - name: registry-protocol
+      matches:
         - path:
             type: PathPrefix
             value: /v2/
@@ -44,7 +55,8 @@ spec:
   hostnames:
     - registry.i.shion1305.com
   rules:
-    - matches:
+    - name: ui
+      matches:
         - path:
             type: PathPrefix
             value: /
