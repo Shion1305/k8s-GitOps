@@ -1,14 +1,14 @@
-# Public registry URL — used by browsers (zot UI / OIDC code-flow login) and by
+# Public registry URL — used by browsers (zot UI / OIDC login) and by
 # `docker push` from any host that can resolve the public DNS.
 #
 # Two HTTPRoutes share hostname registry.shion1305.com and split by path:
-#   - zot-registry-external: Docker Registry v2 protocol (/v2/...). No
-#     SecurityPolicy is attached because the Docker registry v2 protocol
-#     negotiates its own bearer tokens (zot delegates to Keycloak), which would
-#     conflict with gateway-level OIDC enforcement.
+#   - zot-registry-external: Docker Registry v2 protocol (/v2/...). zot
+#     handles its own bearer-OIDC challenges directly with the upstream
+#     issuer (GitHub Actions / Keycloak realm zot).
 #   - zot-ui-external: everything else, including the SPA, /zot/auth/*, and
-#     zot's own extension XHRs under /v2/_zot/*. A SecurityPolicy.oidc is
-#     attached to this route so browser traffic gets gateway-level SSO.
+#     zot's own extension XHRs under /v2/_zot/*. zot's native
+#     `http.auth.openid` provider runs the Authorization Code Flow and mints
+#     a session cookie; no Envoy-level OIDC layering.
 #
 # Gateway API precedence (most-specific-path-wins, GEP-718) means /v2/_zot/...
 # requests are routed to zot-ui-external even though /v2/ on zot-registry-
