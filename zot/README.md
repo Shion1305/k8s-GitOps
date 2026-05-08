@@ -4,19 +4,18 @@ Project-zot v2 deployed cluster-wide as the canonical container image registry f
 
 ## Hostnames and routing
 
-Two hostnames front the same `zot` Service. Each has the same three-rule split:
+Two hostnames front the same `zot` Service. Each has the same three HTTPRoutes:
 
-| Hostname | Gateway | Registry HTTPRoute | UI HTTPRoute |
-| --- | --- | --- | --- |
-| `registry.shion1305.com` | `external` (public) | `zot-registry-external` | `zot-ui-external` |
-| `registry.i.shion1305.com` | `internal` (WireGuard-only) | `zot-registry-internal` | `zot-ui-internal` |
+| Hostname | Gateway | Catalog-probe HTTPRoute | Registry HTTPRoute | UI HTTPRoute |
+| --- | --- | --- | --- | --- |
+| `registry.shion1305.com` | `external` (public) | `zot-catalog-probe-external` | `zot-registry-external` | `zot-ui-external` |
+| `registry.i.shion1305.com` | `internal` (WG-only) | `zot-catalog-probe-internal` | `zot-registry-internal` | `zot-ui-internal` |
 
-`zot-registry-*` carries Docker Registry v2 protocol traffic and is split into two named rules:
+- `zot-catalog-probe-*` — exact `/v2/` and `/v2/_catalog`. The SPA pings these at `/login` boot. Targeted by the OIDC `SecurityPolicy` so the browser request arrives at zot with the kc_at injected.
+- `zot-registry-*` — the broad `/v2/` PathPrefix that handles every push/pull. **Not** behind the OIDC policy — containerd negotiates its own bearer challenge with zot, and a 302 to Keycloak would break every kubelet pull.
+- `zot-ui-*` — `/` and `/v2/_zot/*` (SPA bundle, `/zot/auth/*`, zot's extension XHRs). Fully behind the OIDC `SecurityPolicy`.
 
-- `catalog-probe` — exact `/v2/` and `/v2/_catalog`. The SPA pings these at `/login` boot. Targeted by the OIDC `SecurityPolicy` via `sectionName: catalog-probe`.
-- `registry-protocol` — the broad `/v2/` PathPrefix that handles every push/pull. **Not** behind the OIDC policy — containerd negotiates its own bearer challenge with zot.
-
-`zot-ui-*` carries `/` and `/v2/_zot/*` (SPA bundle, `/zot/auth/*`, zot's extension XHRs). Fully behind the OIDC `SecurityPolicy`. Gateway API GEP-718 most-specific-path-wins routes `/v2/_zot/...` to `zot-ui-*` even though `/v2/` matches both routes.
+Gateway API GEP-718 most-specific-path-wins keeps `/v2/_zot/...` on `zot-ui-*` and routes `/v2/` and `/v2/_catalog` exact matches to `zot-catalog-probe-*` over the bare `/v2/` PathPrefix on `zot-registry-*`. Per-rule `sectionName` targeting would be cleaner but requires `HTTPRouteRule.name` (Gateway API v1.2+) which ArgoCD v3.4's embedded OpenAPI schema rejects at diff time, so the rules are split into separate HTTPRoutes instead.
 
 ## Auth callers
 

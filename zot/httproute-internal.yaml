@@ -3,12 +3,35 @@
 # for in-cluster CI/CD or trusted hosts that have WG connectivity, while the
 # public registry.shion1305.com URL handles GitHub Actions and external pulls.
 #
-# Same three-rule split as the external Gateway (see httproute-external.yaml
-# for the rationale): `catalog-probe` rule on zot-registry-internal carries
-# the SPA boot probes and is targeted by the OIDC SecurityPolicy via
-# sectionName, while `registry-protocol` carries unauthenticated v2 traffic
-# that the Lua filter bridges. zot-ui-internal carries the SPA + extension
-# XHRs and is fully behind the SecurityPolicy.
+# Same three-route split as the external Gateway (see httproute-external.yaml
+# for the rationale): zot-catalog-probe-internal carries the SPA boot probes and
+# is targeted by the OIDC SecurityPolicy, zot-registry-internal carries
+# unauthenticated v2 traffic that the Lua filter bridges, and zot-ui-internal
+# carries the SPA + extension XHRs and is fully behind the SecurityPolicy.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: zot-catalog-probe-internal
+  namespace: zot
+spec:
+  parentRefs:
+    - name: internal
+      namespace: envoy-gateway-system
+      sectionName: https
+  hostnames:
+    - registry.i.shion1305.com
+  rules:
+    - matches:
+        - path:
+            type: Exact
+            value: /v2/
+        - path:
+            type: Exact
+            value: /v2/_catalog
+      backendRefs:
+        - name: zot
+          port: 5000
+---
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
@@ -22,19 +45,7 @@ spec:
   hostnames:
     - registry.i.shion1305.com
   rules:
-    - name: catalog-probe
-      matches:
-        - path:
-            type: Exact
-            value: /v2/
-        - path:
-            type: Exact
-            value: /v2/_catalog
-      backendRefs:
-        - name: zot
-          port: 5000
-    - name: registry-protocol
-      matches:
+    - matches:
         - path:
             type: PathPrefix
             value: /v2/
@@ -55,8 +66,7 @@ spec:
   hostnames:
     - registry.i.shion1305.com
   rules:
-    - name: ui
-      matches:
+    - matches:
         - path:
             type: PathPrefix
             value: /
