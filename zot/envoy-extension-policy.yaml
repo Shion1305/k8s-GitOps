@@ -1,18 +1,23 @@
-# Rewrites `Authorization: Basic base64("oidc:<jwt>")` into
-# `Authorization: Bearer <jwt>` so kubelet/containerd image pulls work against
-# zot's bearer-OIDC middleware, which only accepts JWT bearer tokens.
+# Bridges containerd's Docker Registry v2 auth flow with zot's bearer-OIDC
+# middleware on the `/v2/` HTTPRoutes (external + internal). Two halves:
 #
-# Why this exists:
-#   zot v2.1.16's `http.auth.bearer.oidc[]` short-circuits all auth handling to
-#   the bearer path (pkg/api/authn.go:65-67) and never falls through to Basic
-#   auth. Containerd, on the other hand, reads dockerconfigjson and sends the
-#   `auth` field verbatim as `Authorization: Basic <auth>`. ESO templates the
-#   secret as `auth: base64("oidc:<jwt>")`, so without a rewrite zot sees
-#   `Basic …` and 401s.
+#   envoy_on_response — when zot returns 401 without a `WWW-Authenticate`
+#     header, inject `WWW-Authenticate: Basic realm="<host>"`. zot's bearer-
+#     OIDC path emits no challenge of its own (verified empirically — bare
+#     `curl /v2/...` returns 401 with no auth header), so containerd treats
+#     the response as "no scheme advertised" and never retries with creds.
+#     A Basic challenge convinces containerd to retry with the dockerconfig
+#     `auth` value loaded from the imagePullSecret.
 #
-# GitHub Actions push uses `crane` with `registrytoken`, which emits
-# `Authorization: Bearer …` directly. Those requests fail the `^Basic ` match
-# below and pass through untouched.
+#   envoy_on_request — on the retry, the Authorization header is
+#     `Basic base64("oidc:<jwt>")` because ESO templates the dockerconfigjson
+#     as `auth: base64("oidc:<jwt>")` and containerd forwards it verbatim.
+#     zot's bearer middleware short-circuits at pkg/api/authn.go:65-67 and
+#     does not parse Basic, so we decode here, strip the `oidc:` prefix, and
+#     rewrite to `Bearer <jwt>`. zot's OIDC verifier then validates the JWT.
+#
+# GitHub Actions push uses `crane` with `registrytoken`, which sends Bearer
+# pre-emptively and never sees the 401 — so neither half affects push.
 #
 # Scope: only the `/v2/` registry HTTPRoutes (external + internal). The UI
 # routes (zot-ui-external / zot-ui-internal) handle browser/OIDC traffic and
@@ -73,4 +78,11 @@ spec:
           local jwt = string.match(decoded, "^oidc:(.+)$")
           if not jwt then return end
           headers:replace("authorization", "Bearer " .. jwt)
+        end
+
+        function envoy_on_response(response_handle)
+          local headers = response_handle:headers()
+          if headers:get(":status") ~= "401" then return end
+          if headers:get("www-authenticate") then return end -- don't override
+          headers:add("www-authenticate", 'Basic realm="zot"')
         end
