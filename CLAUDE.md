@@ -117,7 +117,7 @@ This cluster uses a layered secret management approach:
 
 - **Purpose**: Provides OIDC/SAML authentication and Docker Registry v2 auth
 - **URL**: <https://keycloak.shion1305.com> (legacy <https://keycloak.k.shion1305.com> 301-redirects to the new host)
-- **Admin credentials**: stored in the `keycloak-admin-credentials` Secret in the `keycloak` namespace; never committed to this repo
+- **Admin access**: master realm admin is `shion1305` (passkey-only). The Keycloak Operator's bootstrap mechanism (`KC_BOOTSTRAP_ADMIN_USERNAME`/`KC_BOOTSTRAP_ADMIN_PASSWORD` and the `keycloak-initial-admin` Secret it generates) only fires on the very first server start when the DB has no admin; it is **not** re-evaluated on subsequent restarts. After a real admin exists, that Secret is intentionally absent. To recover from a lost admin: scale the StatefulSet to 0 and run `kc.sh bootstrap-admin user --username <name>` in a one-shot Pod that reuses the StatefulSet env/volumes.
 - **Realms**:
   - `master`: Keycloak admin only (do not modify declaratively)
   - `user`: central human-user pool (passkey-only); brokered into child realms
