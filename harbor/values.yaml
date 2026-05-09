@@ -116,6 +116,9 @@ database:
 # -----------------------------------------------------------------------------
 redis:
   type: internal
+  internal:
+    nodeSelector:
+      kubernetes.io/arch: amd64
 
 # -----------------------------------------------------------------------------
 # Harbor admin password — sourced from Vault via ESO
@@ -145,6 +148,13 @@ existingSecretSecretKey: harbor-secret-key
 internalTLS:
   enabled: false
 
+# nginx is rendered by the chart even though we don't route through it
+# (HTTPRoutes target harbor-core/harbor-portal Services directly). Pin it to
+# amd64 because goharbor/nginx-photon is also amd64-only.
+nginx:
+  nodeSelector:
+    kubernetes.io/arch: amd64
+
 # -----------------------------------------------------------------------------
 # core / portal / registry / jobservice / trivy / exporter
 # -----------------------------------------------------------------------------
@@ -163,12 +173,22 @@ internalTLS:
 # post-sync Job in harbor/configure-oidc-job.yaml, which authenticates as the
 # built-in `admin` user and PUTs the full payload. The Job is idempotent and
 # re-runs on every ArgoCD sync.
+#
+# nodeSelector on every component pins Harbor to amd64 nodes. Upstream
+# (goharbor/harbor) only publishes linux/amd64 images on Docker Hub — see
+# https://github.com/goharbor/harbor/issues/22491 (target/2.15.0, still open).
+# Without this, pods scheduled to arm64 nodes CrashLoopBackOff with
+# `exec /harbor/entrypoint.sh: exec format error`.
 core:
   replicas: 1
   existingSecret: harbor-core-secret
+  nodeSelector:
+    kubernetes.io/arch: amd64
 
 portal:
   replicas: 1
+  nodeSelector:
+    kubernetes.io/arch: amd64
 
 registry:
   # If you see absolute http:// (not https://) URLs in pushed manifests'
@@ -176,13 +196,23 @@ registry:
   # lets the gateway resolve scheme/host. Not currently needed because Harbor
   # uses externalURL for those, and externalURL is https://.
   relativeurls: false
+  nodeSelector:
+    kubernetes.io/arch: amd64
+
+jobservice:
+  nodeSelector:
+    kubernetes.io/arch: amd64
 
 trivy:
   enabled: true
   replicas: 1
+  nodeSelector:
+    kubernetes.io/arch: amd64
 
 exporter:
   enabled: true
+  nodeSelector:
+    kubernetes.io/arch: amd64
 
 # -----------------------------------------------------------------------------
 # metrics — Prometheus /metrics + ServiceMonitor (kube-prometheus-stack)
