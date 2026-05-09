@@ -76,18 +76,20 @@ jobs:
 
       - uses: docker/setup-buildx-action@v3
 
-      # cosign signs the image (keyless via Fulcio + Rekor) and attaches the
-      # syft-generated SBOM as a signed CycloneDX attestation.
+      # cosign signs the image keyless via Fulcio + Rekor. SBOM generation
+      # is intentionally NOT done in CI — Harbor v2.15's UI does not surface
+      # client-attached SBOM accessories (verified empirically: both
+      # `cosign attach sbom` and `cosign attest --type cyclonedx` produce
+      # accessory artifacts that Harbor stores but doesn't display in the
+      # SBOM column). Worse, those accessories appear as standalone rows
+      # that the "GENERATE SBOM" button can mis-target, causing Trivy to
+      # fail with "invalid tar header" while trying to extract a manifest
+      # JSON as if it were an image layer. So: signing only here; SBOM is
+      # produced by Harbor's own Trivy via the GENERATE SBOM action on the
+      # image artifact.
       - uses: sigstore/cosign-installer@v3
         with:
           cosign-release: v2.4.1
-
-      # syft generates the SBOM in CycloneDX JSON. We only need the syft
-      # binary on PATH; the action's "download-syft" mode does that without
-      # running a scan implicitly.
-      - uses: anchore/sbom-action/download-syft@v0
-        with:
-          syft-version: v1.18.1
 
       # crane is installed via aqua so the local toolchain (aqua.yaml) and CI
       # use the exact same pinned version. Matches the zot demo workflow.
@@ -108,7 +110,7 @@ jobs:
             --output type=oci,dest=/tmp/image.tar \
             ./harbor/demo
 
-      - name: Push, sign, and attest SBOM
+      - name: Push and sign
         env:
           HARBOR_ROBOT_USER: ${{ secrets.HARBOR_ROBOT_USER }}
           HARBOR_ROBOT_TOKEN: ${{ secrets.HARBOR_ROBOT_TOKEN }}
@@ -146,36 +148,10 @@ jobs:
           # reference for sign/attest by design.
           DIGEST=$(crane digest "${IMAGE}:${SHA_TAG}")
           REF="${IMAGE}@${DIGEST}"
-          echo "Signing and attesting ${REF}"
+          echo "Signing ${REF}"
 
           # Keyless cosign sign — no key material on disk, the signature
           # certificate is bound to this workflow's OIDC identity. Harbor
           # v2.15 detects the resulting cosign artifact via the OCI 1.1
           # referrers API and shows a "Signed" badge in the UI.
           cosign sign "${REF}"
-
-          # Generate CycloneDX SBOM from the (already-pushed) image. syft
-          # walks the layers in the registry to enumerate packages — no need
-          # to reload the local OCI tarball.
-          syft "${REF}" -o cyclonedx-json=/tmp/sbom.cdx.json
-
-          # Two SBOM artifacts get attached, intentionally:
-          #
-          # (1) `cosign attach sbom` — Harbor v2.15's UI auto-detects the
-          #     resulting `sbom.cosign` accessory and populates the "SBOM"
-          #     column / artifact tab. This path is deprecated upstream but
-          #     remains the only form Harbor renders today; the deprecation
-          #     warning is harmless.
-          # (2) `cosign attest --type cyclonedx` — wraps the same SBOM in a
-          #     signed in-toto attestation, which is what supply-chain
-          #     verifiers (admission controllers etc.) expect. Not currently
-          #     surfaced by Harbor UI, but stored as a referrer and
-          #     verifiable via `cosign verify-attestation`.
-          cosign attach sbom \
-            --sbom /tmp/sbom.cdx.json \
-            --type cyclonedx \
-            "${REF}"
-          cosign attest \
-            --type cyclonedx \
-            --predicate /tmp/sbom.cdx.json \
-            "${REF}"
