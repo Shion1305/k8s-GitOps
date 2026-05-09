@@ -148,50 +148,24 @@ internalTLS:
 # -----------------------------------------------------------------------------
 # core / portal / registry / jobservice / trivy / exporter
 # -----------------------------------------------------------------------------
-# `configureUserSettings` is rendered into the `CONFIG_OVERWRITE_JSON` env on
-# the core Deployment. Harbor reads it on EVERY startup and overwrites matching
-# keys in the `properties` table — so this is a true seed-and-pin mechanism,
-# not first-boot-only. Value MUST be a JSON STRING — Harbor parses it with
-# `encoding/json` directly. There is NO `$VAR` interpolation: anything looking
-# like an env reference would be stored verbatim in the DB.
+# IMPORTANT — `configureUserSettings` is INTENTIONALLY NOT SET.
 #
-# That is why `oidc_client_secret` is intentionally absent from this JSON: a
-# secret value cannot live in committed YAML. The OIDC client secret is set
-# AFTER first sync by the post-sync Job in harbor/configure-oidc-job.yaml,
-# which calls Harbor's `PUT /api/v2.0/configurations` with the value mounted
-# from the `harbor-oidc-credentials` Secret. All other OIDC settings here are
-# safe in git and serve as the seed-and-pin source of truth.
+# That field is rendered into the `CONFIG_OVERWRITE_JSON` env var on the core
+# Deployment. When that env var is set, Harbor v2.15 unconditionally flips a
+# package-level `readOnlyForAll = true` flag (see
+# src/controller/config/controller.go) and rejects EVERY subsequent
+# `PUT /api/v2.0/configurations` call with 403 FORBIDDEN — the lock is global,
+# not per-key. That makes a hybrid "seed non-secret keys via env var, inject
+# `oidc_client_secret` via API" design impossible: the API path is locked the
+# moment the env var is in play.
 #
-# OIDC settings (declarative, seeded on every core start):
-#   - oidc_endpoint:  Keycloak realm `harbor` issuer
-#   - oidc_client_id: `harbor-ui` (matches the client in keycloak-operator/harbor-realm.yaml)
-#   - oidc_groups_claim=groups — Harbor reads project-level RBAC from the
-#       `groups` claim emitted by the harbor-ui client's group-membership
-#       protocol mapper.
-#   - oidc_admin_group=harbor-admin — members of this Keycloak group get
-#       Harbor admin privileges automatically on first login.
-#   - oidc_auto_onboard=true — first-time OIDC users are created in Harbor
-#       without an explicit admin invite. Trust boundary is the Keycloak
-#       `user` realm (passkey-only).
-#   - oidc_user_claim=preferred_username — uses Keycloak's username (matches
-#       user-realm passkey-bound usernames brokered through the user IdP).
+# Instead, ALL OIDC settings (including the non-secret ones) are pushed by the
+# post-sync Job in harbor/configure-oidc-job.yaml, which authenticates as the
+# built-in `admin` user and PUTs the full payload. The Job is idempotent and
+# re-runs on every ArgoCD sync.
 core:
   replicas: 1
   existingSecret: harbor-core-secret
-  configureUserSettings: |
-    {
-      "auth_mode": "oidc_auth",
-      "oidc_name": "keycloak",
-      "oidc_endpoint": "https://keycloak.shion1305.com/realms/harbor",
-      "oidc_client_id": "harbor-ui",
-      "oidc_scope": "openid,profile,email,groups",
-      "oidc_verify_cert": "true",
-      "oidc_auto_onboard": "true",
-      "oidc_user_claim": "preferred_username",
-      "oidc_groups_claim": "groups",
-      "oidc_admin_group": "harbor-admin",
-      "oidc_extra_redirect_parms": "{}"
-    }
 
 portal:
   replicas: 1

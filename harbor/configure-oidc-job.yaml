@@ -1,28 +1,32 @@
-# Post-sync Job that injects the OIDC client secret into Harbor.
+# Post-sync Job that pushes ALL Harbor OIDC settings (including the secret)
+# via Harbor's REST API.
 #
 # WHY THIS JOB EXISTS
 # -------------------
-# The Harbor chart's `core.configureUserSettings` value is rendered into the
-# `CONFIG_OVERWRITE_JSON` env var on the core Deployment and is parsed by
-# Harbor as plain JSON — there is NO `$VAR` interpolation. Anything that looks
-# like an env reference (e.g. `$HARBOR_OIDC_CLIENT_SECRET`) would be stored
-# verbatim in the DB. Therefore the OIDC client secret cannot live in
-# committed values.yaml.
+# Harbor v2.15 has two ways to set user-scope config (auth_mode, oidc_*, …):
 #
-# Instead:
-#   1. values.yaml seeds every OIDC setting EXCEPT `oidc_client_secret` via
-#      `configureUserSettings`. Harbor reapplies these on every core start
-#      (seed-and-pin).
-#   2. After first sync, this Job authenticates as the built-in `admin` user
-#      (the `harbor-admin-password` Secret) and PUTs `oidc_client_secret`
-#      from the `harbor-oidc-credentials` Secret to Harbor's
-#      `/api/v2.0/configurations` endpoint. Harbor encrypts the value with
-#      its AES key (`harbor-secret-key`) and stores it in the `properties`
-#      table.
-#   3. The Job is annotated `argocd.argoproj.io/hook: PostSync` so ArgoCD
-#      runs it after the rest of the application materialises. It is
-#      idempotent — re-running it just re-PUTs the same value, which is a
-#      no-op for Harbor.
+#   (a) `CONFIG_OVERWRITE_JSON` env var on harbor-core (rendered by the chart
+#       from `core.configureUserSettings`). When this env var is set, Harbor
+#       sets a package-level `readOnlyForAll = true` flag and rejects EVERY
+#       `PUT /api/v2.0/configurations` call with 403 FORBIDDEN — the lock is
+#       global, not per-key (src/controller/config/controller.go).
+#   (b) Authenticate as `admin` and `PUT /api/v2.0/configurations`.
+#
+# We need (b) because `oidc_client_secret` is sensitive and must be sourced
+# from Vault at runtime, not committed to values.yaml. Mixing (a) for
+# non-secret keys and (b) for the secret is impossible because (a) locks (b).
+# So we drop (a) entirely and push everything via (b) here.
+#
+# This Job:
+#   1. Runs at PostSync (after harbor-core is healthy).
+#   2. Authenticates as the built-in `admin` user, using the password
+#      materialised from Vault path `harbor/admin-password` via ESO.
+#   3. PUTs the full OIDC config — non-secret keys are inlined verbatim in
+#      this manifest, `oidc_client_secret` comes from the
+#      `harbor-oidc-credentials` Secret (Vault `harbor/openid-credentials`).
+#   4. Idempotent: re-PUTs the same payload on every ArgoCD sync. Harbor
+#      stores the values in the `properties` table; the AES key
+#      `harbor-secret-key` encrypts the secret value at rest.
 #
 # ROTATION
 # --------
@@ -30,6 +34,9 @@
 # wait for ESO refresh (5m), then delete this Job (`kubectl delete job
 # -n harbor harbor-configure-oidc`) so ArgoCD re-runs it on next sync.
 # Or trigger an out-of-band re-sync of the harbor-app to force the hook.
+#
+# To change a non-secret OIDC setting (e.g. admin group, scope): edit the
+# `OIDC_*` env values below, commit, and let ArgoCD re-run the Job.
 apiVersion: v1
 kind: ServiceAccount
 metadata:
@@ -102,6 +109,28 @@ spec:
                 secretKeyRef:
                   name: harbor-admin-password
                   key: HARBOR_ADMIN_PASSWORD
+            # Non-secret OIDC settings — declarative source of truth lives
+            # here. Edit + commit to change.
+            - name: OIDC_NAME
+              value: keycloak
+            - name: OIDC_ENDPOINT
+              value: https://keycloak.shion1305.com/realms/harbor
+            - name: OIDC_CLIENT_ID
+              value: harbor-ui
+            - name: OIDC_SCOPE
+              value: openid,profile,email,groups
+            - name: OIDC_VERIFY_CERT
+              value: "true"
+            - name: OIDC_AUTO_ONBOARD
+              value: "true"
+            - name: OIDC_USER_CLAIM
+              value: preferred_username
+            - name: OIDC_GROUPS_CLAIM
+              value: groups
+            - name: OIDC_ADMIN_GROUP
+              value: harbor-admin
+            # Secret value — comes from Vault `harbor/openid-credentials`
+            # via ESO.
             - name: OIDC_CLIENT_SECRET
               valueFrom:
                 secretKeyRef:
@@ -133,46 +162,114 @@ spec:
                 sleep 5
               done
 
-              # PUT only the OIDC client secret. Every other OIDC setting is
-              # already managed by `core.configureUserSettings` (seeded on
-              # each core start), so we touch the absolute minimum here.
+              # PUT the full OIDC config in one request. Every key here is a
+              # `Scope: UserScope` setting in
+              # src/lib/config/metadata/metadatalist.go; Harbor's PUT handler
+              # accepts a partial body and only updates the keys present
+              # (verified against v2.15.0 src/pkg/config/store/store.go:132).
               #
-              # Body is built with `printf` into a temp file rather than an
-              # inline heredoc — sh heredoc terminators must sit at column 0,
-              # and YAML's literal-block indent makes that error-prone. Using
-              # a temp file is also more robust to special characters in the
-              # secret (Keycloak client secrets are normally [A-Za-z0-9_-]+,
-              # but we avoid relying on that assumption).
-              echo "Setting oidc_client_secret via Harbor API..."
+              # auth_mode is left out of the body deliberately: it is set
+              # AFTER the OIDC keys are written, in a follow-up PUT, so the
+              # validator sees a fully-populated OIDC config in the DB
+              # before evaluating the mode change. Harbor's
+              # authModeCanBeModified gate only counts non-admin users, so a
+              # fresh deploy can flip the mode safely; once the first OIDC
+              # user logs in, the flip becomes irreversible — that is fine
+              # for our deployment because OIDC IS the intended mode.
+              #
+              # JSON-escape the OIDC client secret before embedding it. We
+              # don't have jq in this image; instead we apply the minimal sh
+              # quoting required for a JSON string: backslash → \\ then
+              # double-quote → \". Other control characters (newline, tab)
+              # cannot legitimately appear in a Keycloak-generated secret, so
+              # we don't try to handle them.
+              # All other values are committed YAML — we control their
+              # content and escape isn't needed.
+              echo "Building OIDC config payload..."
               umask 077
-              printf '{"oidc_client_secret":"%s"}' "${OIDC_CLIENT_SECRET}" > /tmp/body.json
+              escape_json() {
+                printf '%s' "$1" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g'
+              }
+              client_secret_escaped=$(escape_json "${OIDC_CLIENT_SECRET}")
+              {
+                printf '{'
+                printf '"oidc_name":"%s",' "${OIDC_NAME}"
+                printf '"oidc_endpoint":"%s",' "${OIDC_ENDPOINT}"
+                printf '"oidc_client_id":"%s",' "${OIDC_CLIENT_ID}"
+                printf '"oidc_client_secret":"%s",' "${client_secret_escaped}"
+                printf '"oidc_scope":"%s",' "${OIDC_SCOPE}"
+                printf '"oidc_verify_cert":%s,' "${OIDC_VERIFY_CERT}"
+                printf '"oidc_auto_onboard":%s,' "${OIDC_AUTO_ONBOARD}"
+                printf '"oidc_user_claim":"%s",' "${OIDC_USER_CLAIM}"
+                printf '"oidc_groups_claim":"%s",' "${OIDC_GROUPS_CLAIM}"
+                printf '"oidc_admin_group":"%s",' "${OIDC_ADMIN_GROUP}"
+                printf '"oidc_extra_redirect_parms":"{}"'
+                printf '}'
+              } > /tmp/oidc.json
+              unset client_secret_escaped
+
+              echo "Pushing OIDC config to Harbor..."
               http_status=$(curl -sS -o /tmp/resp -w '%{http_code}' \
                 -X PUT \
                 -u "admin:${HARBOR_ADMIN_PASSWORD}" \
                 -H 'Content-Type: application/json' \
-                --data-binary @/tmp/body.json \
+                --data-binary @/tmp/oidc.json \
                 "${HARBOR_URL}/api/v2.0/configurations")
 
               # Wipe the body before doing anything else — guarantees the
               # cleartext secret is unrecoverable from the scratch volume
               # even if the Pod is paused / inspected post-failure.
-              rm -f /tmp/body.json
+              rm -f /tmp/oidc.json
+
+              # Conservative redactor. Harbor 4xx bodies can echo the offending
+              # field name and value; redact a wide net of secret-looking keys.
+              redact() {
+                sed -E '
+                  s/("(oidc_client_secret(_old)?|client_secret|password|passwd|pwd|secret|token|credential[s]?|api[_-]?key|bearer|auth)"[[:space:]]*:[[:space:]]*)"[^"]*"/\1"REDACTED"/g;
+                  s/("value"[[:space:]]*:[[:space:]]*)"[^"]*"/\1"REDACTED"/g;
+                ' "$1" || true
+              }
 
               if [ "${http_status}" != "200" ]; then
-                # NEVER print /tmp/resp directly — Harbor's 4xx responses can
-                # echo offending field VALUES (including secrets) back in the
-                # error body. Strip any token-like substrings before
-                # surfacing. We use a conservative redactor: anything
-                # resembling a JSON value paired with a sensitive-looking
-                # key gets replaced with REDACTED.
-                echo "Harbor API returned HTTP ${http_status}; sanitised body:"
-                sed -E 's/("(oidc_client_secret|password|secret|token)"[[:space:]]*:[[:space:]]*)"[^"]*"/\1"REDACTED"/g' /tmp/resp || true
+                echo "Harbor API returned HTTP ${http_status} on OIDC config; sanitised body:"
+                redact /tmp/resp
                 echo
                 rm -f /tmp/resp
                 exit 1
               fi
               rm -f /tmp/resp
-              echo "OIDC client secret configured successfully"
+              echo "OIDC config pushed successfully"
+
+              # Now that the OIDC keys are in place, flip auth_mode. Doing it
+              # in a second PUT keeps validation simple. Idempotent: on
+              # re-runs (e.g. ArgoCD sync), Harbor returns 200 even though
+              # the value is unchanged.
+              echo "Switching auth_mode to oidc_auth..."
+              printf '{"auth_mode":"oidc_auth"}' > /tmp/auth.json
+              http_status=$(curl -sS -o /tmp/resp -w '%{http_code}' \
+                -X PUT \
+                -u "admin:${HARBOR_ADMIN_PASSWORD}" \
+                -H 'Content-Type: application/json' \
+                --data-binary @/tmp/auth.json \
+                "${HARBOR_URL}/api/v2.0/configurations")
+              rm -f /tmp/auth.json
+
+              if [ "${http_status}" != "200" ]; then
+                # 400 with "auth mode cannot be modified" is benign on
+                # re-runs after first OIDC user has been created.
+                echo "Harbor API returned HTTP ${http_status} on auth_mode flip; sanitised body:"
+                redact /tmp/resp
+                echo
+                if [ "${http_status}" = "400" ] && grep -q "auth mode cannot be modified" /tmp/resp; then
+                  echo "(benign — auth mode already locked by existing users)"
+                  rm -f /tmp/resp
+                  exit 0
+                fi
+                rm -f /tmp/resp
+                exit 1
+              fi
+              rm -f /tmp/resp
+              echo "auth_mode set to oidc_auth"
       volumes:
         - name: scratch
           emptyDir:
