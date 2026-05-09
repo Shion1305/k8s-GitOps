@@ -1,0 +1,234 @@
+# Harbor Helm chart values
+# Chart: harbor (https://helm.goharbor.io), version 1.19.0, appVersion 2.15.0.
+#
+# This deployment replaces the previous zot registry. Harbor was chosen because
+# its OIDC integration is application-native (no Envoy SecurityPolicy mediation
+# required) and its robot-account model is the supported way to authenticate
+# kubelet pulls and CI pushes — both of which were brittle on zot's
+# Keycloak-token-exchange model.
+#
+# See harbor/README.md for the full architecture, bootstrap order, and
+# day-2 operational runbook.
+
+# -----------------------------------------------------------------------------
+# expose / TLS
+# -----------------------------------------------------------------------------
+# `expose.type=clusterIP` is the chart's "no ingress / no LoadBalancer" mode.
+# We do NOT use the chart-rendered nginx fronting Service or HTTPRoute — those
+# would conflict with the Envoy Gateway-attached HTTPRoutes in
+# harbor/httproute-external.yaml and harbor/httproute-internal.yaml, which
+# target the per-component Services `harbor-core` and `harbor-portal` directly.
+#
+# `tls.enabled=false` disables in-cluster TLS plumbing. Envoy Gateway handles
+# TLS termination at the edge; cluster-internal traffic between Envoy and
+# Harbor pods is plaintext (`internalTLS.enabled: false` below reinforces this).
+expose:
+  type: clusterIP
+  tls:
+    enabled: false
+    certSource: none
+  clusterIP:
+    name: harbor
+    ports:
+      httpPort: 80
+      httpsPort: 443
+
+# -----------------------------------------------------------------------------
+# externalURL — single source of truth for OIDC redirect_uri and embedded URLs
+# -----------------------------------------------------------------------------
+# Set to the INTERNAL hostname even though pushes also arrive on the public
+# hostname. Reasoning (verified against Harbor v2.15.0 source code):
+#
+#   - `tokenSvcURL` (src/server/middleware/v2auth/auth.go) builds the /v2/ 401
+#     `Www-Authenticate: Bearer realm=...` value from `req.Host`, NOT from
+#     externalURL. So a `docker push harbor.shion1305.com/...` always gets
+#     `realm="https://harbor.shion1305.com/service/token"` regardless of this
+#     setting — pushes work via the public hostname.
+#
+#   - OIDC `redirect_uri` (src/lib/config/userconfig.go:164,176) IS hard-bound
+#     to externalURL with no per-request override. Setting this to the public
+#     host would send browsers to https://harbor.shion1305.com/c/oidc/callback,
+#     which (a) breaks session/cookie binding (browser is on the .i. host),
+#     and (b) requires exposing /c/ externally — which is undesirable.
+#
+# Therefore: externalURL=internal-only-host. Push handshake works because
+# /service/token is exposed externally (httproute-external.yaml). OIDC works
+# because redirect_uri stays on the internal host.
+externalURL: https://harbor.i.shion1305.com
+
+# -----------------------------------------------------------------------------
+# persistence
+# -----------------------------------------------------------------------------
+persistence:
+  enabled: true
+  resourcePolicy: keep
+  persistentVolumeClaim:
+    registry:
+      storageClass: longhorn
+      accessMode: ReadWriteOnce
+      size: 200Gi
+    jobservice:
+      jobLog:
+        storageClass: longhorn
+        accessMode: ReadWriteOnce
+        size: 5Gi
+    # database: ignored — we use external PostgreSQL (postgres-shared cluster).
+    database:
+      storageClass: ""
+      size: 1Gi
+    redis:
+      storageClass: longhorn
+      accessMode: ReadWriteOnce
+      size: 5Gi
+    trivy:
+      storageClass: longhorn
+      accessMode: ReadWriteOnce
+      size: 10Gi
+  imageChartStorage:
+    type: filesystem
+    filesystem:
+      rootdirectory: /storage
+    disableredirect: false
+
+# -----------------------------------------------------------------------------
+# database — external (Zalando postgres-operator's `postgres-shared` cluster)
+# -----------------------------------------------------------------------------
+# The `harbor` user/database are created automatically by postgres-operator
+# (declared in postgres-shared/postgres-cluster.yaml). The operator-generated
+# password Secret in `postgres-operator-deployment` is mirrored into the
+# `harbor` namespace as `harbor-db-credentials` by ESO's k8s provider
+# (harbor/db-external-secret.yaml). The chart's `existingSecret` key reads the
+# `password` key from that Secret.
+database:
+  type: external
+  external:
+    host: postgres-shared.postgres-operator-deployment.svc.cluster.local
+    port: "5432"
+    username: harbor
+    coreDatabase: harbor
+    sslmode: disable
+    existingSecret: harbor-db-credentials
+  maxIdleConns: 100
+  maxOpenConns: 900
+
+# -----------------------------------------------------------------------------
+# redis — internal (chart-bundled), single replica
+# -----------------------------------------------------------------------------
+redis:
+  type: internal
+
+# -----------------------------------------------------------------------------
+# Harbor admin password — sourced from Vault via ESO
+# -----------------------------------------------------------------------------
+# Built-in `admin` account password materialised from Vault path
+# `harbor/admin-password` (harbor/external-secret.yaml). Used mainly during
+# first-time bootstrap before OIDC is wired up. The chart's plain-text
+# `harborAdminPassword` value is ignored when `existingSecretAdminPassword`
+# is set, so it is omitted here.
+existingSecretAdminPassword: harbor-admin-password
+existingSecretAdminPasswordKey: HARBOR_ADMIN_PASSWORD
+
+# -----------------------------------------------------------------------------
+# secret keys — sourced from Vault via ESO
+# -----------------------------------------------------------------------------
+# - existingSecretSecretKey: the AES key Harbor uses to encrypt OIDC refresh
+#   tokens and registry credentials at rest in its DB. MUST be exactly 16 chars;
+#   rotating invalidates all stored encrypted blobs. Materialised from Vault
+#   path `harbor/secret-key` field `secretKey`.
+# - core.existingSecret / core.secretName: Harbor core's inter-component auth
+#   secret. Materialised from Vault path `harbor/core-secret` field `secret`.
+existingSecretSecretKey: harbor-secret-key
+
+# -----------------------------------------------------------------------------
+# internal TLS — disabled (TLS terminated at Envoy Gateway)
+# -----------------------------------------------------------------------------
+internalTLS:
+  enabled: false
+
+# -----------------------------------------------------------------------------
+# core / portal / registry / jobservice / trivy / exporter
+# -----------------------------------------------------------------------------
+# `configureUserSettings` is rendered into the `CONFIG_OVERWRITE_JSON` env on
+# the core Deployment. Harbor reads it on EVERY startup and overwrites matching
+# keys in the `properties` table — so this is a true seed-and-pin mechanism,
+# not first-boot-only. Value MUST be a JSON STRING — Harbor parses it with
+# `encoding/json` directly. There is NO `$VAR` interpolation: anything looking
+# like an env reference would be stored verbatim in the DB.
+#
+# That is why `oidc_client_secret` is intentionally absent from this JSON: a
+# secret value cannot live in committed YAML. The OIDC client secret is set
+# AFTER first sync by the post-sync Job in harbor/configure-oidc-job.yaml,
+# which calls Harbor's `PUT /api/v2.0/configurations` with the value mounted
+# from the `harbor-oidc-credentials` Secret. All other OIDC settings here are
+# safe in git and serve as the seed-and-pin source of truth.
+#
+# OIDC settings (declarative, seeded on every core start):
+#   - oidc_endpoint:  Keycloak realm `harbor` issuer
+#   - oidc_client_id: `harbor-ui` (matches the client in keycloak-operator/harbor-realm.yaml)
+#   - oidc_groups_claim=groups — Harbor reads project-level RBAC from the
+#       `groups` claim emitted by the harbor-ui client's group-membership
+#       protocol mapper.
+#   - oidc_admin_group=harbor-admin — members of this Keycloak group get
+#       Harbor admin privileges automatically on first login.
+#   - oidc_auto_onboard=true — first-time OIDC users are created in Harbor
+#       without an explicit admin invite. Trust boundary is the Keycloak
+#       `user` realm (passkey-only).
+#   - oidc_user_claim=preferred_username — uses Keycloak's username (matches
+#       user-realm passkey-bound usernames brokered through the user IdP).
+core:
+  replicas: 1
+  existingSecret: harbor-core-secret
+  configureUserSettings: |
+    {
+      "auth_mode": "oidc_auth",
+      "oidc_name": "keycloak",
+      "oidc_endpoint": "https://keycloak.shion1305.com/realms/harbor",
+      "oidc_client_id": "harbor-ui",
+      "oidc_scope": "openid,profile,email,groups",
+      "oidc_verify_cert": "true",
+      "oidc_auto_onboard": "true",
+      "oidc_user_claim": "preferred_username",
+      "oidc_groups_claim": "groups",
+      "oidc_admin_group": "harbor-admin",
+      "oidc_extra_redirect_parms": "{}"
+    }
+
+portal:
+  replicas: 1
+
+registry:
+  # If you see absolute http:// (not https://) URLs in pushed manifests'
+  # Location headers, set this to true so the registry emits relative URLs and
+  # lets the gateway resolve scheme/host. Not currently needed because Harbor
+  # uses externalURL for those, and externalURL is https://.
+  relativeurls: false
+
+trivy:
+  enabled: true
+  replicas: 1
+
+exporter:
+  enabled: true
+
+# -----------------------------------------------------------------------------
+# metrics — Prometheus /metrics + ServiceMonitor (kube-prometheus-stack)
+# -----------------------------------------------------------------------------
+metrics:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+    additionalLabels:
+      release: kube-prometheus-stack
+
+# -----------------------------------------------------------------------------
+# logging
+# -----------------------------------------------------------------------------
+logLevel: info
+
+# -----------------------------------------------------------------------------
+# trace / cache — leave default
+# -----------------------------------------------------------------------------
+trace:
+  enabled: false
+cache:
+  enabled: false

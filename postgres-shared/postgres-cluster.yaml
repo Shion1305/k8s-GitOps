@@ -15,12 +15,14 @@ spec:
     keycloak: []
     mlflow: []
     nc_press_chotatsu_data: []
+    harbor: []
   databases:
     openwebui: openwebui
     langfuse: langfuse
     keycloak: keycloak
     mlflow: mlflow
     nc_press_chotatsu_data: nc_press_chotatsu_data
+    harbor: harbor
   postgresql:
     version: "17"
   resources:

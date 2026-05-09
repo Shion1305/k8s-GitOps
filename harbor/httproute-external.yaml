@@ -1,0 +1,69 @@
+# Public Harbor URL — Docker Registry v2 protocol only.
+#
+# The only intended callers we expose externally are GitHub Actions runners
+# pushing OCI images via `crane` or `docker push`. There is intentionally NO
+# portal (SPA), NO `/api/`, NO `/c/` (OIDC), and NO admin surface on this
+# hostname — only the Registry v2 wire protocol.
+#
+# IMPORTANT — pull surface honesty:
+#   The `/v2/` PathPrefix below cannot distinguish push from pull at the path
+#   level. `docker pull` and `docker push` use the same `/v2/<repo>/...`
+#   namespace, with the only difference being HTTP verb (GET vs POST/PATCH/PUT).
+#   So in practice this route ALSO serves pulls, and any project flagged
+#   `public` in the Harbor portal is world-readable on this hostname WITHOUT
+#   credentials. Treat project visibility as the access-control boundary:
+#     - Default-private all projects (Harbor's chart default).
+#     - Restrict project creation to admins (system setting
+#       `project_creation_restriction=adminonly`).
+#     - Audit project visibility regularly; flipping a project to public
+#       publishes its contents on the public internet.
+#   Pull from inside the cluster is the supported flow: the kubelet resolves
+#   harbor.i.shion1305.com (WireGuard-only A record) and pulls from harbor-core
+#   via the internal HTTPRoute. External pull is incidental, not a feature.
+#
+# Why this split keeps attack surface small:
+#   - No admin UI, no `/api/`, no `/c/` on the public internet. A leaked robot
+#     token is the worst case here, not a compromised admin session.
+#   - Avoids any need for an Envoy SecurityPolicy.oidc on this Gateway. Harbor
+#     handles its own OIDC internally on the portal route (see
+#     httproute-internal.yaml); the public route never touches a browser, so
+#     there is nothing to mediate.
+#
+# Single HTTPRoute, two matches, both routed to harbor-core:80:
+#
+#   /v2/ (PathPrefix) — the Docker Registry v2 protocol surface: HEAD/GET/PUT
+#     manifests, POST/PATCH/PUT blob uploads, GET blobs (used by both push
+#     cross-repo mounts and pulls).
+#
+#   /service/token (Exact) — Harbor's Registry v2 token endpoint. The Docker
+#     daemon and crane hit this automatically after a 401 from /v2/ with
+#     `Www-Authenticate: Bearer realm=...`. Without this match the bearer
+#     challenge would dead-end at the gateway and pushes would fail before
+#     any blob is uploaded.
+#
+# Note: the Harbor chart 1.19.0 splits the SPA from the API across two
+# Services. /v2/ and /service/token are core endpoints, hence harbor-core. The
+# harbor-portal Service is intentionally not referenced from this file.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: harbor-push-external
+  namespace: harbor
+spec:
+  parentRefs:
+    - name: external
+      namespace: envoy-gateway-system
+      sectionName: https
+  hostnames:
+    - harbor.shion1305.com
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /v2/
+        - path:
+            type: Exact
+            value: /service/token
+      backendRefs:
+        - name: harbor-core
+          port: 80

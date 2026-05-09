@@ -1,0 +1,406 @@
+# =============================================================================
+# Keycloak Realm Import: harbor
+# =============================================================================
+#
+# This file is reconciled by the Keycloak Operator (KeycloakRealmImport CRD).
+# It declares the `harbor` realm used to authenticate human users to the
+# Harbor OCI registry's portal:
+#   - Browser login flow is handled by Harbor itself. When a user hits the
+#     portal, Harbor's `core` component runs the Authorization Code flow
+#     against this realm using the `harbor-ui` confidential client below.
+#     Harbor stores its OIDC settings in its own Postgres DB (seeded by the
+#     Helm chart's `core.configureUserSettings` env on first start), NOT
+#     via Envoy Gateway's SecurityPolicy.oidc. So unlike zot, there is no
+#     Envoy OIDC layer in front of Harbor for browser auth — Harbor speaks
+#     OIDC natively and just needs a working realm + client to point at.
+#   - Authorization is driven by the `groups` claim Harbor maps onto its
+#     internal projects (Harbor's `oidc_groups_claim=groups` setting reads
+#     from the same `groups` scope declared below).
+#
+# Machine pulls do NOT pass through Keycloak. Harbor uses long-lived
+# **robot accounts** — static credentials minted via Harbor's own API and
+# scoped to specific projects — for kubelet `imagePullSecrets` and for
+# GitHub Actions push/pull. There is no `cluster-puller`-equivalent client
+# in this realm because the kubelet would need a refresh path Keycloak
+# cannot give it cheaply, and Harbor's robot accounts solve the same
+# problem natively. Likewise there is no `harbor-registry` audience-target
+# client: Harbor's OIDC integration uses a single confidential client and
+# validates inbound tokens by `client_id`, not by an `aud` claim, so the
+# audience-mapper indirection used in the zot realm is unnecessary.
+#
+# External portal access is intentionally not exposed. The public hostname
+# `harbor.shion1305.com` only serves the docker registry endpoints
+# (`/v2/`, `/service/token`) for push/pull from the public internet; the
+# SPA portal and the OIDC callback are reachable ONLY at
+# `harbor.i.shion1305.com` (WireGuard-only). The single `redirectUris`
+# entry below reflects this — there is no second internet-facing redirect
+# URI to add.
+#
+# -----------------------------------------------------------------------------
+# Manual post-import steps (one-time, after first successful sync):
+# -----------------------------------------------------------------------------
+# 1. Retrieve the auto-generated client secret for the `harbor-ui` client
+#    from the Keycloak admin UI:
+#      https://keycloak.shion1305.com -> realm `harbor` -> Clients -> harbor-ui
+#      -> Credentials -> "Client secret".
+#    The placeholder `PLACEHOLDER_REPLACE_AFTER_REALM_IMPORT` declared below is
+#    overwritten by Keycloak on first import; subsequent reconciles do not
+#    re-apply the placeholder. Persist the value into Vault so ESO can
+#    project it onto the Secret Harbor's `core` reads at startup:
+#      vault kv put harbor/openid-credentials \
+#        keycloak-credentials.json='{"clientid":"harbor-ui","clientsecret":"<harbor-ui-secret>"}'
+#
+# 2. Retrieve the auto-generated client secret for the `harbor-broker`
+#    Identity Provider. Broker IdPs implicitly create a service-account
+#    client in the brokered (`user`) realm; its secret is shown under:
+#      realm `harbor` -> Identity Providers -> user -> Settings -> Client Secret.
+#    Persist into Vault:
+#      vault kv put harbor/broker-credentials \
+#        client_id=harbor-broker \
+#        client_secret=<harbor-broker-secret>
+#
+# 3. Bind the Browser authentication flow to "Identity Provider Redirector"
+#    pinned to alias `user`, so human web logins skip the choice screen and go
+#    straight to the `user` realm (passkey-only):
+#      Authentication -> Flows -> Browser -> add "Identity Provider Redirector"
+#      execution at the top, Required, with config
+#      `Default Identity Provider = user`. Bind that flow as the realm's
+#      Browser flow. This step is not declarative on the v2alpha1 CRD.
+#
+# 4. Assign the `harbor-admin` / `harbor-developer` groups to the appropriate
+#    users (after first-broker-login from the `user` realm). This is per-user
+#    state and lives in Keycloak, not git.
+#
+# -----------------------------------------------------------------------------
+# Realm recreation (when YAML changes need to take effect):
+# -----------------------------------------------------------------------------
+# `KeycloakRealmImport` is one-shot reconcile; subsequent edits are silently
+# ignored once the realm exists. To apply changes:
+#   kubectl delete keycloakrealmimport harbor -n keycloak
+#   # admin UI: realm `harbor` -> Realm Settings -> Action -> Delete
+# ArgoCD then recreates the import CR; the operator reimports.
+# WARNING: this drops federated-identity links and group memberships for
+# every brokered user; re-run step 4 above for each affected user.
+# =============================================================================
+apiVersion: k8s.keycloak.org/v2alpha1
+kind: KeycloakRealmImport
+metadata:
+  name: harbor
+  namespace: keycloak
+spec:
+  keycloakCRName: keycloak
+  realm:
+    realm: harbor
+    enabled: true
+    registrationAllowed: false
+    # `external` = HTTPS required for any non-loopback request. Cluster-internal
+    # plaintext (Pod IP, ClusterIP) still satisfies this because traffic is TLS-
+    # terminated at Envoy Gateway and the `xforwarded` proxy headers config on
+    # the Keycloak CR makes Keycloak treat `X-Forwarded-Proto: https` requests
+    # as HTTPS.
+    sslRequired: external
+
+    # -------------------------------------------------------------------------
+    # Realm roles. Harbor's project-level RBAC keys off the `groups` claim in
+    # the JWT (groups carry their associated realmRole into the claim).
+    # -------------------------------------------------------------------------
+    roles:
+      realm:
+        - name: harbor-admin
+          description: Full admin (read/create/update/delete) on all projects in Harbor
+        - name: harbor-developer
+          description: Push/pull on dev projects in Harbor
+
+    # -------------------------------------------------------------------------
+    # Groups mirror the realm roles. The group-membership mapper on the
+    # `harbor-ui` client emits the group name into the JWT `groups` claim,
+    # which Harbor's `oidc_groups_claim=groups` setting reads to drive
+    # project-level RBAC.
+    # -------------------------------------------------------------------------
+    groups:
+      - name: harbor-admin
+        realmRoles:
+          - harbor-admin
+      - name: harbor-developer
+        realmRoles:
+          - harbor-developer
+
+    # -------------------------------------------------------------------------
+    # Client scopes
+    # -------------------------------------------------------------------------
+    # When a realm is imported with a non-empty `clientScopes` list, Keycloak
+    # uses it as the COMPLETE set of scopes for the realm and skips the
+    # auto-seeded built-ins. So we have to declare every scope we want -- both
+    # the OIDC built-ins (`profile`, `email`, `roles`, `web-origins`, `acr`,
+    # `basic`) and our custom `groups`.
+    defaultDefaultClientScopes:
+      - basic
+      - profile
+      - email
+      - roles
+      - web-origins
+      - acr
+      - groups
+    defaultOptionalClientScopes: []
+    clientScopes:
+      - name: basic
+        description: "OpenID Connect scope for add all basic claims to the token"
+        protocol: openid-connect
+        attributes:
+          include.in.token.scope: "false"
+          display.on.consent.screen: "false"
+        protocolMappers:
+          - name: sub
+            protocol: openid-connect
+            protocolMapper: oidc-sub-mapper
+            config:
+              access.token.claim: "true"
+              introspection.token.claim: "true"
+          - name: auth_time
+            protocol: openid-connect
+            protocolMapper: oidc-usersessionmodel-note-mapper
+            config:
+              user.session.note: "AUTH_TIME"
+              id.token.claim: "true"
+              access.token.claim: "true"
+              introspection.token.claim: "true"
+              claim.name: "auth_time"
+              jsonType.label: "long"
+
+      - name: profile
+        description: "OpenID Connect built-in scope: profile"
+        protocol: openid-connect
+        attributes:
+          include.in.token.scope: "true"
+          display.on.consent.screen: "true"
+          consent.screen.text: "${profileScopeConsentText}"
+        protocolMappers:
+          - name: full name
+            protocol: openid-connect
+            protocolMapper: oidc-full-name-mapper
+            config:
+              id.token.claim: "true"
+              access.token.claim: "true"
+              userinfo.token.claim: "true"
+              introspection.token.claim: "true"
+          - name: family name
+            protocol: openid-connect
+            protocolMapper: oidc-usermodel-attribute-mapper
+            config:
+              user.attribute: "lastName"
+              id.token.claim: "true"
+              access.token.claim: "true"
+              userinfo.token.claim: "true"
+              introspection.token.claim: "true"
+              claim.name: "family_name"
+              jsonType.label: "String"
+          - name: given name
+            protocol: openid-connect
+            protocolMapper: oidc-usermodel-attribute-mapper
+            config:
+              user.attribute: "firstName"
+              id.token.claim: "true"
+              access.token.claim: "true"
+              userinfo.token.claim: "true"
+              introspection.token.claim: "true"
+              claim.name: "given_name"
+              jsonType.label: "String"
+          - name: username
+            protocol: openid-connect
+            protocolMapper: oidc-usermodel-attribute-mapper
+            config:
+              user.attribute: "username"
+              id.token.claim: "true"
+              access.token.claim: "true"
+              userinfo.token.claim: "true"
+              introspection.token.claim: "true"
+              claim.name: "preferred_username"
+              jsonType.label: "String"
+          - name: locale
+            protocol: openid-connect
+            protocolMapper: oidc-usermodel-attribute-mapper
+            config:
+              user.attribute: "locale"
+              id.token.claim: "true"
+              access.token.claim: "true"
+              userinfo.token.claim: "true"
+              introspection.token.claim: "true"
+              claim.name: "locale"
+              jsonType.label: "String"
+
+      - name: email
+        description: "OpenID Connect built-in scope: email"
+        protocol: openid-connect
+        attributes:
+          include.in.token.scope: "true"
+          display.on.consent.screen: "true"
+          consent.screen.text: "${emailScopeConsentText}"
+        protocolMappers:
+          - name: email
+            protocol: openid-connect
+            protocolMapper: oidc-usermodel-attribute-mapper
+            config:
+              user.attribute: "email"
+              id.token.claim: "true"
+              access.token.claim: "true"
+              userinfo.token.claim: "true"
+              introspection.token.claim: "true"
+              claim.name: "email"
+              jsonType.label: "String"
+          - name: email verified
+            protocol: openid-connect
+            protocolMapper: oidc-usermodel-property-mapper
+            config:
+              user.attribute: "emailVerified"
+              id.token.claim: "true"
+              access.token.claim: "true"
+              userinfo.token.claim: "true"
+              introspection.token.claim: "true"
+              claim.name: "email_verified"
+              jsonType.label: "boolean"
+
+      - name: roles
+        description: "OpenID Connect scope for add user roles to the access token"
+        protocol: openid-connect
+        attributes:
+          include.in.token.scope: "false"
+          display.on.consent.screen: "true"
+          consent.screen.text: "${rolesScopeConsentText}"
+        protocolMappers:
+          - name: realm roles
+            protocol: openid-connect
+            protocolMapper: oidc-usermodel-realm-role-mapper
+            config:
+              multivalued: "true"
+              access.token.claim: "true"
+              introspection.token.claim: "true"
+              claim.name: "realm_access.roles"
+              jsonType.label: "String"
+          - name: client roles
+            protocol: openid-connect
+            protocolMapper: oidc-usermodel-client-role-mapper
+            config:
+              multivalued: "true"
+              access.token.claim: "true"
+              introspection.token.claim: "true"
+              claim.name: "resource_access.${client_id}.roles"
+              jsonType.label: "String"
+          - name: audience resolve
+            protocol: openid-connect
+            protocolMapper: oidc-audience-resolve-mapper
+            config:
+              access.token.claim: "true"
+              introspection.token.claim: "true"
+
+      - name: web-origins
+        description: "OpenID Connect scope for add allowed web origins to the access token"
+        protocol: openid-connect
+        attributes:
+          include.in.token.scope: "false"
+          display.on.consent.screen: "false"
+          consent.screen.text: ""
+        protocolMappers:
+          - name: allowed web origins
+            protocol: openid-connect
+            protocolMapper: oidc-allowed-origins-mapper
+            config:
+              access.token.claim: "true"
+              introspection.token.claim: "true"
+
+      - name: acr
+        description: "OpenID Connect scope for add acr (authentication context class reference) to the token"
+        protocol: openid-connect
+        attributes:
+          include.in.token.scope: "false"
+          display.on.consent.screen: "false"
+        protocolMappers:
+          - name: acr loa level
+            protocol: openid-connect
+            protocolMapper: oidc-acr-mapper
+            config:
+              id.token.claim: "true"
+              access.token.claim: "true"
+              introspection.token.claim: "true"
+
+      - name: groups
+        description: Group memberships claim
+        protocol: openid-connect
+        attributes:
+          include.in.token.scope: "true"
+          display.on.consent.screen: "false"
+
+    # -------------------------------------------------------------------------
+    # Clients
+    # -------------------------------------------------------------------------
+    clients:
+      # harbor-ui: confidential client driven by Harbor's `core` component.
+      # Harbor runs the Authorization Code flow itself (no Envoy OIDC layer)
+      # using OIDC settings stored in its own DB and seeded from Vault via
+      # the Helm chart's `core.configureUserSettings` env on first start.
+      # Harbor authorizes by the `groups` claim (oidc_groups_claim=groups)
+      # which maps onto its internal projects.
+      #
+      # Single redirect URI / web origin: external portal access is NOT
+      # exposed (only push/pull endpoints serve `harbor.shion1305.com`);
+      # only `harbor.i.shion1305.com` (WireGuard-only) hosts the SPA + the
+      # OIDC callback path.
+      - clientId: harbor-ui
+        protocol: openid-connect
+        publicClient: false
+        clientAuthenticatorType: client-secret
+        # Keycloak generates the real value on first import and never re-applies
+        # this placeholder. Do NOT commit the actual secret.
+        secret: PLACEHOLDER_REPLACE_AFTER_REALM_IMPORT
+        standardFlowEnabled: true
+        directAccessGrantsEnabled: false
+        serviceAccountsEnabled: false
+        redirectUris:
+          - https://harbor.i.shion1305.com/c/oidc/callback
+        webOrigins:
+          - https://harbor.i.shion1305.com
+        attributes:
+          access.token.lifespan: "3600"
+        protocolMappers:
+          # Emit `groups` claim so Harbor's `oidc_groups_claim=groups` can
+          # drive project-level RBAC. No audience mapper: Harbor validates
+          # by client_id, not by `aud`.
+          - name: groups
+            protocolMapper: oidc-group-membership-mapper
+            protocol: openid-connect
+            consentRequired: false
+            config:
+              claim.name: "groups"
+              full.path: "false"
+              id.token.claim: "true"
+              access.token.claim: "true"
+              userinfo.token.claim: "true"
+
+    # -------------------------------------------------------------------------
+    # Identity Providers
+    # -------------------------------------------------------------------------
+    # Browser-flow IdP redirector binding (manual step #3 in the header) routes
+    # human web logins through the `user` realm (passkey-only) without showing
+    # a choice screen.
+    identityProviders:
+      - alias: user
+        displayName: "Sign in with passkey"
+        providerId: keycloak-oidc
+        enabled: true
+        storeToken: false
+        addReadTokenRoleOnCreate: false
+        trustEmail: true
+        firstBrokerLoginFlowAlias: "first broker login"
+        config:
+          issuer: "https://keycloak.shion1305.com/realms/user"
+          authorizationUrl: "https://keycloak.shion1305.com/realms/user/protocol/openid-connect/auth"
+          tokenUrl: "https://keycloak.shion1305.com/realms/user/protocol/openid-connect/token"
+          userInfoUrl: "https://keycloak.shion1305.com/realms/user/protocol/openid-connect/userinfo"
+          logoutUrl: "https://keycloak.shion1305.com/realms/user/protocol/openid-connect/logout"
+          jwksUrl: "https://keycloak.shion1305.com/realms/user/protocol/openid-connect/certs"
+          useJwksUrl: "true"
+          validateSignature: "true"
+          clientAuthMethod: "client_secret_post"
+          clientId: "harbor-broker"
+          clientSecret: PLACEHOLDER_REPLACE_AFTER_REALM_IMPORT
+          defaultScope: "openid profile email"
+          syncMode: IMPORT
