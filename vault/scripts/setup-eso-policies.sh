@@ -106,6 +106,25 @@ path "zot/metadata/*" {
 EOF
 echo "✓ Created policy: eso-zot"
 
+# Policy for harbor namespace (separate KV v2 engine mounted at harbor/)
+vault policy write eso-harbor - <<EOF
+path "harbor/data/*" {
+  capabilities = ["read"]
+}
+path "harbor/metadata/*" {
+  capabilities = ["read", "list"]
+}
+EOF
+echo "✓ Created policy: eso-harbor"
+
+# NOTE: An `eso-harbor-broker` role for the Keycloak namespace to read
+# `harbor/broker-credentials` is intentionally NOT created here. There is no
+# precedent yet for ESO-managed broker client secrets in the keycloak ns
+# (the existing zot-broker IdP secret is written manually into the realm via
+# the Keycloak admin UI; see keycloak-operator/user-realm.yaml). If/when
+# broker-secret automation is wired up via a vault-secret-store in the
+# keycloak ns, add an `eso-harbor-broker` policy + role mirroring that pattern.
+
 # Policy for github-app shared credentials (cluster-scoped store, separate KV v2 engine mounted at github-app-shared/)
 vault policy write eso-github-app - <<EOF
 path "github-app-shared/data/*" {
@@ -142,6 +161,21 @@ path "zot/metadata/cluster-puller" {
 }
 EOF
 echo "✓ Created policy: eso-cluster-puller"
+
+# Policy for the cluster-wide harbor-pull automation. Reads only the Harbor
+# robot-account credentials at harbor/robot-puller. Consumed by the
+# ClusterSecretStore `vault-harbor-pull` (harbor-pull/cluster-secret-store.yaml)
+# which materializes a static dockerconfigjson Secret into harbor-pull-source
+# (no token-exchange — Harbor robot creds are long-lived).
+vault policy write eso-harbor-pull - <<EOF
+path "harbor/data/robot-puller" {
+  capabilities = ["read"]
+}
+path "harbor/metadata/robot-puller" {
+  capabilities = ["read", "list"]
+}
+EOF
+echo "✓ Created policy: eso-harbor-pull"
 
 echo ""
 echo "=== Creating namespace-scoped Kubernetes auth roles ==="
@@ -210,6 +244,14 @@ vault write auth/kubernetes/role/eso-zot \
   ttl=1h
 echo "✓ Created role: eso-zot"
 
+# harbor
+vault write auth/kubernetes/role/eso-harbor \
+  bound_service_account_names=eso \
+  bound_service_account_namespaces=harbor \
+  policies=eso-harbor \
+  ttl=1h
+echo "✓ Created role: eso-harbor"
+
 # github-app (cluster-scoped store; binds to the ESO operator SA, not a per-namespace SA)
 vault write auth/kubernetes/role/eso-github-app \
   bound_service_account_names=external-secrets \
@@ -236,6 +278,16 @@ vault write auth/kubernetes/role/eso-cluster-puller \
   ttl=1h
 echo "✓ Created role: eso-cluster-puller"
 
+# harbor-pull (cluster-scoped store; binds to the ESO operator SA so the
+# ClusterSecretStore `vault-harbor-pull` can read harbor/robot-puller from
+# any namespace context the controller runs in).
+vault write auth/kubernetes/role/eso-harbor-pull \
+  bound_service_account_names=external-secrets \
+  bound_service_account_namespaces=external-secrets \
+  policies=eso-harbor-pull \
+  ttl=1h
+echo "✓ Created role: eso-harbor-pull"
+
 echo ""
 echo "=== Removing old broad policy ==="
 vault policy delete eso-policy 2>/dev/null && echo "✓ Deleted old policy: eso-policy" || echo "ⓘ Policy eso-policy not found (already removed)"
@@ -252,6 +304,8 @@ echo "  eso-lumos-bot   → SA eso/lumos-bot       → lumos-bot/data/*"
 echo "  eso-freqtrade   → SA eso/freqtrade       → freqtrade/data/*"
 echo "  eso-cert-manager→ SA eso/cert-manager    → system/data/cert-manager"
 echo "  eso-zot         → SA eso/zot             → zot/data/*"
+echo "  eso-harbor      → SA eso/harbor          → harbor/data/*"
 echo "  eso-github-app  → SA external-secrets/external-secrets → github-app-shared/data/*"
 echo "  eso-cloudflare-grafana → SA eso/monitoring     → cloudflare-grafana/data/*"
 echo "  eso-cluster-puller → SA external-secrets/external-secrets → zot/data/cluster-puller"
+echo "  eso-harbor-pull → SA external-secrets/external-secrets → harbor/data/robot-puller"

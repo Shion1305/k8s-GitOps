@@ -1,0 +1,92 @@
+# Internal Harbor URL — reachable only via WireGuard (the *.i.shion1305.com
+# DNS A record points to 10.130.5.21). This is the FULL-ACCESS hostname:
+# browser portal (SPA), OIDC code-flow callback, push, pull, robot-account
+# auth, admin API — everything Harbor exposes lives here.
+#
+# Harbor chart 1.19.0 splits the SPA bundle from the API across two Services,
+# so we need two HTTPRoutes on the same hostname:
+#
+#   harbor-portal-internal — `/` PathPrefix → harbor-portal:80. Serves the
+#     SPA bundle (HTML/JS/CSS). The portal Service has no API endpoints; it
+#     is purely the static frontend.
+#
+#   harbor-core-internal — five PathPrefixes → harbor-core:80:
+#       /api/      — Harbor's REST API (projects, repos, robots, etc.).
+#       /service/  — Registry v2 token endpoint and related auth services.
+#       /v2/       — Docker Registry v2 protocol (push/pull/blobs/manifests).
+#       /c/        — Harbor controller endpoints, including
+#                    /c/oidc/callback (the OIDC redirect target — see below).
+#       /chartrepo/— Helm chartmuseum-compatible chart repo endpoints.
+#
+# Routing precedence (Gateway API GEP-718 most-specific-path-wins): even
+# though `/` PathPrefix in harbor-portal-internal would match every request
+# on this hostname, the longer prefixes in harbor-core-internal (/api/,
+# /service/, /v2/, /c/, /chartrepo/) automatically win for those paths. So a
+# browser GET `/` lands on the portal, while a fetch to `/api/v2.0/projects`
+# from the same SPA lands on harbor-core. No explicit ordering is needed.
+#
+# OIDC: Harbor handles OIDC entirely inside its own application — there is
+# NO Envoy SecurityPolicy.oidc attached to these routes (this is a deliberate
+# departure from the zot setup, where Envoy is the OIDC mediator because zot's
+# UI doesn't speak OIDC directly). Harbor's portal redirects unauthenticated
+# browsers through the harbor-ui Keycloak client, receives the auth-code on
+# /c/oidc/callback, and stamps its own session cookie. The HTTPRoutes here
+# are pure path → backend plumbing; auth is upstream's concern.
+#
+# Why no explicit /oauth2/ match: the Keycloak client's redirect-URI lands at
+# /c/oidc/callback, which already falls under the /c/ PathPrefix routed to
+# harbor-core. Adding /oauth2/ would be a no-op because Harbor doesn't expose
+# anything at that path.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: harbor-portal-internal
+  namespace: harbor
+spec:
+  parentRefs:
+    - name: internal
+      namespace: envoy-gateway-system
+      sectionName: https
+  hostnames:
+    - harbor.i.shion1305.com
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        - name: harbor-portal
+          port: 80
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: harbor-core-internal
+  namespace: harbor
+spec:
+  parentRefs:
+    - name: internal
+      namespace: envoy-gateway-system
+      sectionName: https
+  hostnames:
+    - harbor.i.shion1305.com
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /api/
+        - path:
+            type: PathPrefix
+            value: /service/
+        - path:
+            type: PathPrefix
+            value: /v2/
+        - path:
+            type: PathPrefix
+            value: /c/
+        - path:
+            type: PathPrefix
+            value: /chartrepo/
+      backendRefs:
+        - name: harbor-core
+          port: 80

@@ -1,0 +1,180 @@
+# Post-sync Job that injects the OIDC client secret into Harbor.
+#
+# WHY THIS JOB EXISTS
+# -------------------
+# The Harbor chart's `core.configureUserSettings` value is rendered into the
+# `CONFIG_OVERWRITE_JSON` env var on the core Deployment and is parsed by
+# Harbor as plain JSON — there is NO `$VAR` interpolation. Anything that looks
+# like an env reference (e.g. `$HARBOR_OIDC_CLIENT_SECRET`) would be stored
+# verbatim in the DB. Therefore the OIDC client secret cannot live in
+# committed values.yaml.
+#
+# Instead:
+#   1. values.yaml seeds every OIDC setting EXCEPT `oidc_client_secret` via
+#      `configureUserSettings`. Harbor reapplies these on every core start
+#      (seed-and-pin).
+#   2. After first sync, this Job authenticates as the built-in `admin` user
+#      (the `harbor-admin-password` Secret) and PUTs `oidc_client_secret`
+#      from the `harbor-oidc-credentials` Secret to Harbor's
+#      `/api/v2.0/configurations` endpoint. Harbor encrypts the value with
+#      its AES key (`harbor-secret-key`) and stores it in the `properties`
+#      table.
+#   3. The Job is annotated `argocd.argoproj.io/hook: PostSync` so ArgoCD
+#      runs it after the rest of the application materialises. It is
+#      idempotent — re-running it just re-PUTs the same value, which is a
+#      no-op for Harbor.
+#
+# ROTATION
+# --------
+# To rotate the client secret: update `harbor/openid-credentials` in Vault,
+# wait for ESO refresh (5m), then delete this Job (`kubectl delete job
+# -n harbor harbor-configure-oidc`) so ArgoCD re-runs it on next sync.
+# Or trigger an out-of-band re-sync of the harbor-app to force the hook.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: harbor-configure-oidc
+  namespace: harbor
+# The Pod doesn't talk to the kube-apiserver — only to harbor-core via the
+# in-cluster Service. We disable token automount on the Pod side, but we
+# also make sure the SA itself doesn't auto-mount.
+automountServiceAccountToken: false
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: harbor-configure-oidc
+  namespace: harbor
+  annotations:
+    # PostSync runs after the main application's resources have been applied
+    # AND reported healthy. That guarantees harbor-core is up before the Job
+    # starts hitting the API.
+    argocd.argoproj.io/hook: PostSync
+    # BeforeHookCreation deletes the previous Job (if any) right before
+    # creating a new one on each sync, so re-syncing the harbor app re-runs
+    # the OIDC config push idempotently. We deliberately do NOT use
+    # HookSucceeded — that would delete the Job (and its logs) the moment
+    # it succeeds, which makes troubleshooting a borderline-failed PUT much
+    # harder.
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+spec:
+  ttlSecondsAfterFinished: 86400
+  backoffLimit: 6
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: harbor-configure-oidc
+    spec:
+      serviceAccountName: harbor-configure-oidc
+      automountServiceAccountToken: false
+      restartPolicy: OnFailure
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        fsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: configure-oidc
+          # Digest-pinned to defeat tag-mutation supply-chain attacks. Update
+          # both tag and digest together. (alpine/curl 8.17.0 amd64+arm64.)
+          image: alpine/curl:8.17.0@sha256:9705b37f23afbca210481a6ed5d4c1c22c9322ea4c300cd4f28f270eea2cc89d
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          env:
+            - name: HARBOR_URL
+              # In-cluster Service URL of the core component. Avoids the
+              # external Gateway and any TLS dependency.
+              # NOTE: this name resolves to "harbor-core" because the Argo
+              # Application name is `harbor` (Helm release name = `harbor`).
+              # If the Application is ever renamed, the chart's
+              # `harbor.fullname` helper will produce a different prefix and
+              # this Service URL will break — keep them in sync.
+              value: http://harbor-core.harbor.svc.cluster.local
+            - name: HARBOR_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: harbor-admin-password
+                  key: HARBOR_ADMIN_PASSWORD
+            - name: OIDC_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: harbor-oidc-credentials
+                  key: client-secret
+          volumeMounts:
+            # readOnlyRootFilesystem requires a writable scratch dir for the
+            # request body and response.
+            - name: scratch
+              mountPath: /tmp
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -eu
+
+              # Wait for harbor-core to accept API calls. PostSync should
+              # already imply readiness, but a short retry loop costs almost
+              # nothing and avoids brittle race conditions on first sync.
+              echo "Waiting for harbor-core to be ready..."
+              for i in $(seq 1 60); do
+                if curl -fsS -o /dev/null \
+                     -u "admin:${HARBOR_ADMIN_PASSWORD}" \
+                     "${HARBOR_URL}/api/v2.0/configurations"; then
+                  echo "harbor-core is ready"
+                  break
+                fi
+                echo "attempt ${i}/60 — sleeping 5s"
+                sleep 5
+              done
+
+              # PUT only the OIDC client secret. Every other OIDC setting is
+              # already managed by `core.configureUserSettings` (seeded on
+              # each core start), so we touch the absolute minimum here.
+              #
+              # Body is built with `printf` into a temp file rather than an
+              # inline heredoc — sh heredoc terminators must sit at column 0,
+              # and YAML's literal-block indent makes that error-prone. Using
+              # a temp file is also more robust to special characters in the
+              # secret (Keycloak client secrets are normally [A-Za-z0-9_-]+,
+              # but we avoid relying on that assumption).
+              echo "Setting oidc_client_secret via Harbor API..."
+              umask 077
+              printf '{"oidc_client_secret":"%s"}' "${OIDC_CLIENT_SECRET}" > /tmp/body.json
+              http_status=$(curl -sS -o /tmp/resp -w '%{http_code}' \
+                -X PUT \
+                -u "admin:${HARBOR_ADMIN_PASSWORD}" \
+                -H 'Content-Type: application/json' \
+                --data-binary @/tmp/body.json \
+                "${HARBOR_URL}/api/v2.0/configurations")
+
+              # Wipe the body before doing anything else — guarantees the
+              # cleartext secret is unrecoverable from the scratch volume
+              # even if the Pod is paused / inspected post-failure.
+              rm -f /tmp/body.json
+
+              if [ "${http_status}" != "200" ]; then
+                # NEVER print /tmp/resp directly — Harbor's 4xx responses can
+                # echo offending field VALUES (including secrets) back in the
+                # error body. Strip any token-like substrings before
+                # surfacing. We use a conservative redactor: anything
+                # resembling a JSON value paired with a sensitive-looking
+                # key gets replaced with REDACTED.
+                echo "Harbor API returned HTTP ${http_status}; sanitised body:"
+                sed -E 's/("(oidc_client_secret|password|secret|token)"[[:space:]]*:[[:space:]]*)"[^"]*"/\1"REDACTED"/g' /tmp/resp || true
+                echo
+                rm -f /tmp/resp
+                exit 1
+              fi
+              rm -f /tmp/resp
+              echo "OIDC client secret configured successfully"
+      volumes:
+        - name: scratch
+          emptyDir:
+            medium: Memory
+            sizeLimit: 1Mi
