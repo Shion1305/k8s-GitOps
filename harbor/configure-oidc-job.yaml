@@ -147,6 +147,13 @@ spec:
             - |
               set -eu
 
+              # Cleanup trap covers every exit path — ordinary success,
+              # `set -e` aborts mid-script, OOM, etc. The scratch volume is
+              # tmpfs and pod-scoped, so the worst-case lifetime of any
+              # leaked file is the Pod itself, but cleaning up on exit
+              # eliminates the window entirely.
+              trap 'rm -f /tmp/oidc.json /tmp/auth.json /tmp/resp' EXIT
+
               # Wait for harbor-core to accept API calls. PostSync should
               # already imply readiness, but a short retry loop costs almost
               # nothing and avoids brittle race conditions on first sync.
@@ -221,23 +228,25 @@ spec:
               # even if the Pod is paused / inspected post-failure.
               rm -f /tmp/oidc.json
 
-              # Conservative redactor. Harbor 4xx bodies can echo the offending
-              # field name and value; redact a wide net of secret-looking keys.
-              redact() {
-                sed -E '
-                  s/("(oidc_client_secret(_old)?|client_secret|password|passwd|pwd|secret|token|credential[s]?|api[_-]?key|bearer|auth)"[[:space:]]*:[[:space:]]*)"[^"]*"/\1"REDACTED"/g;
-                  s/("value"[[:space:]]*:[[:space:]]*)"[^"]*"/\1"REDACTED"/g;
-                ' "$1" || true
+              # Conservative error reporter. Harbor 4xx bodies can echo the
+              # offending field VALUE inside an arbitrary "message" string
+              # (e.g. `"message":"oidc_client_secret value abc invalid"`),
+              # which a JSON-key-aware redactor can't catch. Rather than
+              # play whack-a-mole with regex, we keep only the top-level
+              # error code (which Harbor sets to a fixed enum like
+              # BAD_REQUEST/FORBIDDEN/INTERNAL_SERVER_ERROR) and discard
+              # the message string entirely. Operators with kubectl access
+              # can re-run the Job after temporarily mounting an
+              # unredacted print, if a real diagnosis ever needs it.
+              extract_code() {
+                grep -oE '"code"[[:space:]]*:[[:space:]]*"[A-Z_]+"' "$1" | head -1 || true
               }
 
               if [ "${http_status}" != "200" ]; then
-                echo "Harbor API returned HTTP ${http_status} on OIDC config; sanitised body:"
-                redact /tmp/resp
-                echo
-                rm -f /tmp/resp
+                echo "Harbor API returned HTTP ${http_status} on OIDC config push."
+                echo "  error code: $(extract_code /tmp/resp)"
                 exit 1
               fi
-              rm -f /tmp/resp
               echo "OIDC config pushed successfully"
 
               # Now that the OIDC keys are in place, flip auth_mode. Doing it
@@ -256,19 +265,18 @@ spec:
 
               if [ "${http_status}" != "200" ]; then
                 # 400 with "auth mode cannot be modified" is benign on
-                # re-runs after first OIDC user has been created.
-                echo "Harbor API returned HTTP ${http_status} on auth_mode flip; sanitised body:"
-                redact /tmp/resp
-                echo
+                # re-runs after first OIDC user has been created. Harbor
+                # v2.15.0 emits this exact substring from controller.go:127.
+                # The substring is safe to grep even unredacted because it
+                # is a fixed validator string with no embedded user input.
                 if [ "${http_status}" = "400" ] && grep -q "auth mode cannot be modified" /tmp/resp; then
-                  echo "(benign — auth mode already locked by existing users)"
-                  rm -f /tmp/resp
+                  echo "auth_mode already locked by existing users — benign, continuing."
                   exit 0
                 fi
-                rm -f /tmp/resp
+                echo "Harbor API returned HTTP ${http_status} on auth_mode flip."
+                echo "  error code: $(extract_code /tmp/resp)"
                 exit 1
               fi
-              rm -f /tmp/resp
               echo "auth_mode set to oidc_auth"
       volumes:
         - name: scratch
