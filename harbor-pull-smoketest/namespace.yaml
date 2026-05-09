@@ -1,0 +1,20 @@
+# Smoketest namespace for the cluster-wide harbor-pull automation. Intentionally
+# bare so a Healthy state proves an arbitrary namespace can pull images from
+# the Harbor registry without manual preparation.
+#
+# Expected sequence at sync time:
+#   1. The Job creates a Pod with an image at `harbor.i.shion1305.com/...`.
+#   2. Kyverno `harbor-pull-injection` fires: mutate appends `harbor-pull` to
+#      spec.imagePullSecrets, generate clones the Secret from
+#      harbor-pull-source.
+#   3. kubelet authenticates with the robot-account dockerconfigjson and pulls.
+#      Job completes; Argo reports Healthy.
+#
+# Debugging ImagePullBackOff (in order):
+#   kubectl get clusterpolicy harbor-pull-injection -o yaml      # rule status
+#   kubectl get secret -n harbor-pull-source harbor-pull         # source materialised?
+#   kubectl get pod -n harbor-pull-smoketest -o yaml | grep imagePullSecrets
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: harbor-pull-smoketest

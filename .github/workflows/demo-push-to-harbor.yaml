@@ -1,0 +1,99 @@
+# Demo workflow: build a small OCI image and push it to Harbor at
+# harbor.shion1305.com to prove the public-facing push path works end-to-end.
+#
+# Why robot accounts and not GitHub OIDC token-exchange (unlike the zot demo):
+# Harbor's /v2/ token endpoint does not accept GitHub OIDC tokens directly. It
+# mints its own bearer tokens after authenticating the caller via either basic
+# auth (username/password OR robot-account creds) or OIDC ID-token submission
+# to /c/login (browser flow only). The clean, supported CI path is a Harbor
+# robot account: a project-scoped, long-lived static credential created via
+# Harbor's admin UI/API and restricted to push/pull on a single project (here
+# `shion1305`). It's less elegant than zot's OIDC token-exchange, but it's the
+# model Harbor supports and matches every other Harbor deployment in the wild.
+#
+# Required GitHub repo secrets:
+#   - HARBOR_ROBOT_USER  full username including the `robot$` prefix and the
+#                        project scope, e.g. `robot$shion1305+gha-pusher`
+#   - HARBOR_ROBOT_TOKEN the secret string returned at robot creation time;
+#                        Harbor does NOT let you recover it later
+#
+# One-time manual setup the user must do (Harbor robot accounts are not
+# managed declaratively from this repo):
+#   1. Login to Harbor portal at https://harbor.i.shion1305.com (WireGuard
+#      required — it's on the internal ingress class).
+#   2. Projects -> `shion1305` -> Robot Accounts -> New Robot Account.
+#   3. Name: `gha-pusher`, expiration: e.g. 365 days.
+#   4. Permissions: push and pull on Repository.
+#   5. Save the token (it's shown ONCE — Harbor cannot re-display it).
+#   6. Store the token in:
+#        - GitHub repo secrets HARBOR_ROBOT_USER and HARBOR_ROBOT_TOKEN
+#        - Vault `harbor/robot-pusher` (so kubelet can also use it for
+#          in-cluster image pulls via an imagePullSecret materialized by ESO)
+#
+# Why crane and not `docker push`: same reason as the zot demo. crane works
+# directly with OCI-layout dirs/tarballs (no docker daemon image-store
+# round-trip), sends Authorization: Bearer pre-emptively, and is more robust
+# under CI conditions. It reads ~/.docker/config.json and Just Works once the
+# auth blob is in place.
+
+name: demo - build & push to harbor.shion1305.com
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "harbor/demo/**"
+      - ".github/workflows/demo-push-to-harbor.yaml"
+  pull_request:
+    paths:
+      - "harbor/demo/**"
+      - ".github/workflows/demo-push-to-harbor.yaml"
+  workflow_dispatch:
+
+jobs:
+  build-push:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: docker/setup-buildx-action@v3
+
+      # crane is installed via aqua so the local toolchain (aqua.yaml) and CI
+      # use the exact same pinned version. Matches the zot demo workflow.
+      - uses: aquaproj/aqua-installer@v4.0.4
+        with:
+          aqua_version: v2.58.0
+
+      # Build to an OCI-layout tarball. crane push reads OCI-layout dirs and
+      # pushes manifests with the OCI media type, which Harbor accepts.
+      - name: Build OCI image
+        run: |
+          set -euo pipefail
+          docker buildx build \
+            --platform linux/amd64 \
+            --output type=oci,dest=/tmp/image.tar \
+            ./harbor/demo
+
+      - name: Push with crane
+        env:
+          HARBOR_ROBOT_USER: ${{ secrets.HARBOR_ROBOT_USER }}
+          HARBOR_ROBOT_TOKEN: ${{ secrets.HARBOR_ROBOT_TOKEN }}
+        run: |
+          set -euo pipefail
+          # Extract OCI tarball so crane can read it as an OCI layout dir.
+          mkdir -p /tmp/oci
+          tar -xf /tmp/image.tar -C /tmp/oci
+
+          # crane auth uses ~/.docker/config.json. Build it from the robot
+          # creds: Harbor accepts basic auth on /v2/token and exchanges it for
+          # a short-lived bearer that crane then uses for the actual push.
+          mkdir -p ~/.docker
+          auth=$(printf '%s:%s' "$HARBOR_ROBOT_USER" "$HARBOR_ROBOT_TOKEN" | base64 -w0)
+          jq -n --arg a "$auth" \
+            '{auths: {"harbor.shion1305.com": {auth: $a}}}' > ~/.docker/config.json
+
+          crane push /tmp/oci \
+            harbor.shion1305.com/shion1305/demo:${{ github.sha }}
+          crane tag \
+            harbor.shion1305.com/shion1305/demo:${{ github.sha }} \
+            latest
