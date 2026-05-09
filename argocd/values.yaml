@@ -148,6 +148,12 @@ controller:
   readinessProbe:
     timeoutSeconds: 5
   priorityClassName: argocd-critical
+  resources:
+    requests:
+      cpu: 250m
+      memory: 1Gi
+    limits:
+      memory: 1536Mi
 # Repo server
 repoServer:
   replicas: 1
