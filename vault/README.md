@@ -13,8 +13,8 @@ Vault is deployed in High Availability (HA) mode with Raft storage backend, prov
 Key configurations:
 
 - **HA Mode**: 3 replicas with Raft storage
-- **TLS**: Disabled at Vault level (terminated at ingress)
-- **Ingress**: Accessible at `http://vault.k.shion1305.com` via `nginx-internal`
+- **TLS**: Disabled at Vault level (terminated at the gateway)
+- **Routing**: Envoy Gateway HTTPRoutes (see `httproute-*.yaml`); the chart-rendered Ingress is disabled
 - **Storage**: 10Gi persistent volumes for data and audit logs (longhorn-hdd-ha with 2 replicas)
 - **Resources**: 256Mi/250m requests, 512Mi/500m limits
 - **Auto-Unseal**: KV-based sidecar auto-unseal via active node
@@ -22,9 +22,17 @@ Key configurations:
 
 ## Access
 
-- **UI**: <https://vault.k.shion1305.com>
-- **API**: <https://vault.k.shion1305.com/v1/>
-- **Internal**: <http://vault.vault.svc.cluster.local:8200>
+Vault is exposed on three hostnames, each with a different purpose:
+
+| Hostname | Network | Allowed Paths | Use Case |
+|----------|---------|---------------|----------|
+| `vault.i.shion1305.com` | Internal (WireGuard only) | All (full UI + API) | Admin/operator UI, all interactive use, `api_addr` |
+| `vault.shion1305.com` | Public internet | Allowlisted: `/v1/auth/jwt/login`, `/v1/auth/token/renew-self`, `/v1/auth/token/revoke-self` (KV-read paths to be added in the reusable-workflow PR) | CI (GitHub Actions) JWT login + token self-management |
+| `vault.k.shion1305.com` | Public (legacy) | 301 redirect → `vault.i.shion1305.com` | Bookmark migration only; will be removed in a future PR |
+
+- **UI**: <https://vault.i.shion1305.com>
+- **API**: <https://vault.i.shion1305.com/v1/>
+- **In-cluster**: <http://vault.vault.svc.cluster.local:8200>
 
 ## Operations
 

@@ -1,0 +1,28 @@
+# Backward-compat for the old hostname (vault.k.shion1305.com).
+# Issues a 301 Permanent Redirect to vault.i.shion1305.com so existing browser
+# bookmarks keep working during the transition. This is the same pattern as
+# keycloak-operator/httproute-legacy-redirect.yaml.
+#
+# Server-to-server callers (ESO, CI) should NOT rely on this — they must be
+# pointed at vault.i (internal full-API) or vault (external auth-only)
+# directly. This route exists only as a bookmark courtesy and will be removed
+# in a future PR.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: vault-legacy-redirect
+  namespace: vault
+spec:
+  parentRefs:
+    - name: external
+      namespace: envoy-gateway-system
+      sectionName: https-legacy-k
+  hostnames:
+    - vault.k.shion1305.com
+  rules:
+    - filters:
+        - type: RequestRedirect
+          requestRedirect:
+            scheme: https
+            hostname: vault.i.shion1305.com
+            statusCode: 301

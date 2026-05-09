@@ -211,7 +211,7 @@ kubectl logs -n external-secrets -l app.kubernetes.io/name=external-secrets
 ```bash
 # Test Vault connectivity from ESO pod
 kubectl exec -n external-secrets <eso-pod> -- \
-  curl -k https://vault.k.shion1305.com/v1/sys/health
+  curl -k https://vault.i.shion1305.com/v1/sys/health
 
 # Check ESO can authenticate to Vault (look for auth success in logs)
 kubectl logs -n external-secrets -l app.kubernetes.io/name=external-secrets | grep -i auth
