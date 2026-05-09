@@ -1,0 +1,43 @@
+# Smoketest Job that proves the cluster-wide harbor-pull automation works
+# end-to-end with no manual setup in the consumer namespace.
+#
+# Pull image: harbor.i.shion1305.com/shion1305/demo:latest — a small alpine
+# image that prints a line and exits, mirroring the zot-pull-smoketest payload.
+#
+# `imagePullSecrets` is intentionally omitted: Kyverno's `harbor-pull-injection`
+# ClusterPolicy injects it at admission and clones the source Secret into this
+# namespace. Seeing `imagePullSecrets: [{name: harbor-pull}]` on the running
+# Pod confirms the policy fired.
+#
+# Auth chain once the Secret is in place:
+#   - Source Secret `harbor-pull-source/harbor-pull`
+#     (kubernetes.io/dockerconfigjson) carries
+#     `auth = base64("<robot-username>:<robot-password>")`.
+#   - The credentials are read directly from Vault (`harbor/robot-puller`) by
+#     ESO. No token-exchange, no ClusterGenerator — Harbor robot accounts are
+#     long-lived static credentials.
+#   - kubelet sends `Authorization: Basic base64(<user>:<pass>)`; Harbor
+#     validates the robot account against its project ACLs.
+#
+# Argo reports Healthy when the Job's Complete condition is true.
+# ImagePullBackOff (robot revoked, project ACL drift, registry unreachable,
+# Kyverno not running) keeps the Job incomplete and Argo flags Degraded —
+# surfacing the regression.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: harbor-pull-smoketest
+  namespace: harbor-pull-smoketest
+spec:
+  backoffLimit: 2
+  ttlSecondsAfterFinished: 86400
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: harbor-pull-smoketest
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: smoketest
+          image: harbor.i.shion1305.com/shion1305/demo:latest
+          imagePullPolicy: Always
