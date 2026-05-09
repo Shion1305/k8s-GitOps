@@ -50,6 +50,18 @@ on:
       - ".github/workflows/demo-push-to-harbor.yaml"
   workflow_dispatch:
 
+# id-token: write is REQUIRED for cosign keyless signing — cosign exchanges
+# the workflow's GitHub OIDC token for a short-lived Fulcio certificate. The
+# resulting signature certificate is bound to this repo + ref + workflow
+# path, so a verifier can prove "this image came from
+# Shion1305/k8s-GitOps's demo-push-to-harbor.yaml on main" without any
+# long-lived signing key. See:
+# https://docs.sigstore.dev/cosign/signing/overview/#keyless-signing
+permissions:
+  contents: read
+  id-token: write
+  packages: write
+
 jobs:
   build-push:
     runs-on: ubuntu-latest
@@ -63,6 +75,21 @@ jobs:
           platforms: arm64
 
       - uses: docker/setup-buildx-action@v3
+
+      # cosign signs the image keyless via Fulcio + Rekor. SBOM generation
+      # is intentionally NOT done in CI — Harbor v2.15's UI does not surface
+      # client-attached SBOM accessories (verified empirically: both
+      # `cosign attach sbom` and `cosign attest --type cyclonedx` produce
+      # accessory artifacts that Harbor stores but doesn't display in the
+      # SBOM column). Worse, those accessories appear as standalone rows
+      # that the "GENERATE SBOM" button can mis-target, causing Trivy to
+      # fail with "invalid tar header" while trying to extract a manifest
+      # JSON as if it were an image layer. So: signing only here; SBOM is
+      # produced by Harbor's own Trivy via the GENERATE SBOM action on the
+      # image artifact.
+      - uses: sigstore/cosign-installer@v3
+        with:
+          cosign-release: v2.4.1
 
       # crane is installed via aqua so the local toolchain (aqua.yaml) and CI
       # use the exact same pinned version. Matches the zot demo workflow.
@@ -83,29 +110,48 @@ jobs:
             --output type=oci,dest=/tmp/image.tar \
             ./harbor/demo
 
-      - name: Push with crane
+      - name: Push and sign
         env:
           HARBOR_ROBOT_USER: ${{ secrets.HARBOR_ROBOT_USER }}
           HARBOR_ROBOT_TOKEN: ${{ secrets.HARBOR_ROBOT_TOKEN }}
+          # COSIGN_YES suppresses cosign's interactive "are you sure"
+          # confirmation, required in non-TTY CI runners.
+          COSIGN_YES: "true"
         run: |
           set -euo pipefail
           # Extract OCI tarball so crane can read it as an OCI layout dir.
           mkdir -p /tmp/oci
           tar -xf /tmp/image.tar -C /tmp/oci
 
-          # crane auth uses ~/.docker/config.json. Build it from the robot
-          # creds: Harbor accepts basic auth on /v2/token and exchanges it for
-          # a short-lived bearer that crane then uses for the actual push.
+          # crane and cosign both read ~/.docker/config.json. Build it from
+          # the robot creds: Harbor accepts basic auth on /v2/token and
+          # exchanges it for a short-lived bearer that crane/cosign then use
+          # for the actual push.
           mkdir -p ~/.docker
           auth=$(printf '%s:%s' "$HARBOR_ROBOT_USER" "$HARBOR_ROBOT_TOKEN" | base64 -w0)
           jq -n --arg a "$auth" \
             '{auths: {"harbor.shion1305.com": {auth: $a}}}' > ~/.docker/config.json
 
+          IMAGE=harbor.shion1305.com/shion1305/demo
+          SHA_TAG=${{ github.sha }}
+
           # --index pushes the OCI image index (multi-arch manifest list)
           # produced by buildx's --platform linux/amd64,linux/arm64. Without
           # --index, crane would push only one of the per-arch manifests.
-          crane push --index /tmp/oci \
-            harbor.shion1305.com/shion1305/demo:${{ github.sha }}
-          crane tag \
-            harbor.shion1305.com/shion1305/demo:${{ github.sha }} \
-            latest
+          crane push --index /tmp/oci "${IMAGE}:${SHA_TAG}"
+          crane tag "${IMAGE}:${SHA_TAG}" latest
+
+          # Resolve the digest BEFORE signing. Tags can be remapped after the
+          # fact (latest can move), but a digest is the cryptographic hash of
+          # the manifest itself — signing by digest guarantees the signature
+          # binds to exactly this artifact. cosign will refuse a tag-only
+          # reference for sign/attest by design.
+          DIGEST=$(crane digest "${IMAGE}:${SHA_TAG}")
+          REF="${IMAGE}@${DIGEST}"
+          echo "Signing ${REF}"
+
+          # Keyless cosign sign — no key material on disk, the signature
+          # certificate is bound to this workflow's OIDC identity. Harbor
+          # v2.15 detects the resulting cosign artifact via the OCI 1.1
+          # referrers API and shows a "Signed" badge in the UI.
+          cosign sign "${REF}"
