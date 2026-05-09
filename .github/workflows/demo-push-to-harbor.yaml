@@ -159,10 +159,22 @@ jobs:
           # to reload the local OCI tarball.
           syft "${REF}" -o cyclonedx-json=/tmp/sbom.cdx.json
 
-          # Attach the SBOM as a SIGNED in-toto CycloneDX attestation. This
-          # both stores the SBOM as an OCI referrer of the image AND signs
-          # it via the same Fulcio/Rekor flow used above. Harbor's UI
-          # surfaces this under the "SBOM" tab on the artifact page.
+          # Two SBOM artifacts get attached, intentionally:
+          #
+          # (1) `cosign attach sbom` — Harbor v2.15's UI auto-detects the
+          #     resulting `sbom.cosign` accessory and populates the "SBOM"
+          #     column / artifact tab. This path is deprecated upstream but
+          #     remains the only form Harbor renders today; the deprecation
+          #     warning is harmless.
+          # (2) `cosign attest --type cyclonedx` — wraps the same SBOM in a
+          #     signed in-toto attestation, which is what supply-chain
+          #     verifiers (admission controllers etc.) expect. Not currently
+          #     surfaced by Harbor UI, but stored as a referrer and
+          #     verifiable via `cosign verify-attestation`.
+          cosign attach sbom \
+            --sbom /tmp/sbom.cdx.json \
+            --type cyclonedx \
+            "${REF}"
           cosign attest \
             --type cyclonedx \
             --predicate /tmp/sbom.cdx.json \
