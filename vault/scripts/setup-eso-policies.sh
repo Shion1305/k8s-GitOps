@@ -348,16 +348,26 @@ echo "✓ Created policy: harbor-robot-pusher-reader"
 # token_ttl=600s (10 min): plenty for a CI image build+push. No renewal —
 # the JWT is single-use, and short TTL means a leaked token expires before
 # anyone can exfiltrate it.
-vault write auth/jwt/role/harbor-robot-pusher \
-  role_type="jwt" \
-  user_claim="repository" \
-  bound_audiences="https://github.com/Shion1305,https://github.com/Shion1305Dev" \
-  bound_claims_type="glob" \
-  bound_claims='{"repository_owner":["Shion1305","Shion1305Dev"],"job_workflow_ref":"Shion1305/k8s-GitOps/.github/workflows/harbor-build-push.yaml@*"}' \
-  token_policies="harbor-robot-pusher-reader" \
-  token_ttl="600" \
-  token_max_ttl="600" \
-  token_explicit_max_ttl="600"
+# NOTE on the `vault write -` form: `bound_claims` is a map type. Passing it
+# as a flag (`bound_claims='{"...":"..."}'`) makes the CLI treat the value
+# as a string, and Vault rejects with `expected a map, got 'string'`. Piping
+# JSON via stdin (`vault write -`) is the canonical way to send map fields.
+vault write auth/jwt/role/harbor-robot-pusher - <<'EOF'
+{
+  "role_type": "jwt",
+  "user_claim": "repository",
+  "bound_audiences": ["https://github.com/Shion1305", "https://github.com/Shion1305Dev"],
+  "bound_claims_type": "glob",
+  "bound_claims": {
+    "repository_owner": ["Shion1305", "Shion1305Dev"],
+    "job_workflow_ref": "Shion1305/k8s-GitOps/.github/workflows/harbor-build-push.yaml@*"
+  },
+  "token_policies": ["harbor-robot-pusher-reader"],
+  "token_ttl": "600",
+  "token_max_ttl": "600",
+  "token_explicit_max_ttl": "600"
+}
+EOF
 echo "✓ Created JWT role: harbor-robot-pusher"
 
 echo ""
