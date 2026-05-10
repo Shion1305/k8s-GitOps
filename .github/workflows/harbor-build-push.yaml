@@ -158,12 +158,14 @@ jobs:
       # reusable workflow. We can't reuse the root aqua.yaml: `actions/checkout`
       # above pulled the *caller* repo into the workspace, so the reusable's
       # own aqua.yaml is not on disk. Pull k8s-GitOps into a side directory and
-      # point AQUA_GLOBAL_CONFIG at the workflow-scoped .aqua-harbor.yaml,
+      # point AQUA_GLOBAL_CONFIG at the workflow-scoped harbor.aqua.yaml,
       # which lists exactly the tools this reusable needs (just crane today).
+      # The `*.aqua.yaml` filename is one of Renovate's built-in aqua manager
+      # patterns, so versions get tracked without extra config.
       #
       # job.workflow_sha is the commit SHA of the workflow file that defines
       # the current job — for a reusable call that's THIS file. So the
-      # .aqua-harbor.yaml we read always matches the version of this workflow
+      # harbor.aqua.yaml we read always matches the version of this workflow
       # the caller resolved via `uses: ...@<ref>`. (github.workflow_sha would
       # give the caller's repo SHA, which is the wrong reference here.)
       - name: Checkout k8s-GitOps for aqua config
@@ -173,14 +175,14 @@ jobs:
           ref: ${{ job.workflow_sha }}
           path: .k8s-gitops-aqua
           sparse-checkout: |
-            .github/workflows/.aqua-harbor.yaml
+            .github/workflows/harbor.aqua.yaml
           sparse-checkout-cone-mode: false
 
       - uses: aquaproj/aqua-installer@v4.0.4
         with:
           aqua_version: v2.58.0
         env:
-          AQUA_GLOBAL_CONFIG: ${{ github.workspace }}/.k8s-gitops-aqua/.github/workflows/.aqua-harbor.yaml
+          AQUA_GLOBAL_CONFIG: ${{ github.workspace }}/.k8s-gitops-aqua/.github/workflows/harbor.aqua.yaml
 
       # Exchange the workflow's GitHub OIDC token for the Harbor robot
       # credentials kept in Vault at `harbor/data/robot-pusher` (KV v2). The
