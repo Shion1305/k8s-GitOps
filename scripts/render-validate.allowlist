@@ -1,0 +1,31 @@
+# Apps whose rendered manifests fail kubeconform strict validation due to
+# pre-existing upstream chart bugs. These are NOT a free pass — each entry
+# should reference an upstream issue and be revisited when the chart updates.
+#
+# Format: one ArgoCD Application name per line. Comments and blank lines are
+# ignored.
+#
+# Renovate keeps these charts on the latest tagged version, so if the
+# upstream bug is fixed, the next bump should let us drop the entry —
+# remove the line and confirm the pipeline still passes.
+
+# Upstream chart renders Service with duplicate `prometheus.io/scrape`
+# annotation (hardcoded in templates AND merged from values.service.annotations).
+# Tracked: https://github.com/lablabs/cloudflare_exporter / chart 0.2.x
+cloudflare-monitoring
+
+# Chart renders ServiceMonitor with duplicate `release` label (`release: harbor`
+# from chart defaults, then `release: kube-prometheus-stack` from values
+# override merged in twice). Tracked: goharbor/harbor-helm.
+harbor
+
+# Chart renders postgres-operator ConfigMap with duplicate keys for
+# pod_service_account_name, pod_deletion_wait_timeout, etc. — template
+# emits both a default block and a values-override block instead of merging.
+# Tracked: zalando/postgres-operator chart 1.15.x.
+postgres-operator
+
+# Upstream zot chart's StatefulSet is missing the required `serviceName` field.
+# K8s API server accepts the manifest (defaults it), but kubeconform's strict
+# schema rejects. Tracked: project-zot/helm-charts.
+zot

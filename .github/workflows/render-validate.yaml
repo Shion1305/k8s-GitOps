@@ -1,0 +1,79 @@
+name: Render-validate manifests
+# Renders every ArgoCD Application in apps/ (Helm + Kustomize + raw paths)
+# and validates the output against Kubernetes API + CRD schemas with
+# kubeconform.
+#
+# Catches:
+#   - Helm template errors (missing values files, broken charts, bad --set)
+#   - Kustomize build errors (missing referenced files, broken patches)
+#   - Schema-invalid manifests (missing required fields, wrong types,
+#     unknown fields, malformed YAML — incl. duplicate map keys)
+#   - ArgoCD `Application` path: references pointing at nonexistent dirs
+#
+# Does NOT catch:
+#   - Cross-resource references (Ingress/HTTPRoute backendRef → nonexistent
+#     Service; SecretRef → nonexistent Secret; etc.)
+#   - Semantic correctness (wrong port numbers, wrong hostnames in OIDC
+#     callbacks, etc.) — config review still required.
+on:
+  pull_request:
+    paths:
+      - "apps/**"
+      - "**/values.yaml"
+      - "**/kustomization.yaml"
+      - "**/*.yaml"
+      - "scripts/render-validate.sh"
+      - "scripts/render-validate.allowlist"
+      - ".github/workflows/render-validate.yaml"
+
+# Cancel in-progress runs when new commits land on the same PR.
+concurrency:
+  group: render-validate-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  render-validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: v3.16.4
+
+      - name: Install kustomize
+        run: |
+          set -euo pipefail
+          KUSTOMIZE_VERSION=v5.5.0
+          curl -fsSL "https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize/${KUSTOMIZE_VERSION}/kustomize_${KUSTOMIZE_VERSION}_linux_amd64.tar.gz" \
+            | tar -xz -C /usr/local/bin
+          kustomize version
+
+      - name: Install kubeconform
+        run: |
+          set -euo pipefail
+          KUBECONFORM_VERSION=v0.6.7
+          curl -fsSL "https://github.com/yannh/kubeconform/releases/download/${KUBECONFORM_VERSION}/kubeconform-linux-amd64.tar.gz" \
+            | tar -xz -C /usr/local/bin kubeconform
+          kubeconform -v
+
+      - name: Install yq + jq
+        run: |
+          set -euo pipefail
+          # yq v4 (mikefarah). Ubuntu's `yq` package is v3 (Python) which has
+          # different syntax — pin to the binary from upstream.
+          YQ_VERSION=v4.44.5
+          sudo curl -fsSL -o /usr/local/bin/yq \
+            "https://github.com/mikefarah/yq/releases/download/${YQ_VERSION}/yq_linux_amd64"
+          sudo chmod +x /usr/local/bin/yq
+          yq --version
+          # jq is pre-installed on ubuntu-latest, but verify.
+          jq --version
+
+      - name: Render + validate
+        env:
+          # Bump when the cluster's control-plane minor version changes.
+          K8S_VERSION: "1.31.0"
+        run: ./scripts/render-validate.sh
