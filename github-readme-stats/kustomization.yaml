@@ -8,4 +8,4 @@ resources:
   - service.yaml
   - reference-grant.yaml
   - httproute-external.yaml
-  - ingress.yaml
+  - httproute-legacy-redirect.yaml

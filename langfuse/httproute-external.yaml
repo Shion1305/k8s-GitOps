@@ -7,9 +7,9 @@ spec:
   parentRefs:
     - name: external
       namespace: envoy-gateway-system
-      sectionName: https-legacy-k
+      sectionName: https
   hostnames:
-    - langfuse.k.shion1305.com
+    - langfuse.shion1305.com
   rules:
     - backendRefs:
         - name: langfuse-web

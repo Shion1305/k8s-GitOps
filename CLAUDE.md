@@ -48,7 +48,7 @@ kubectl get applications -n argocd
 kubectl patch application <app-name> -n argocd --type merge -p '{"metadata":{"annotations":{"argocd.argoproj.io/refresh":"hard"}}}'
 
 # Access ArgoCD UI
-# URL: https://argocd.k.shion1305.com
+# URL: https://argocd.shion1305.com
 ```
 
 ### PostgreSQL Operations
@@ -167,26 +167,51 @@ Service discovery via ServiceMonitors - Prometheus automatically discovers and s
 
 ## Ingress Configuration
 
-Two ingress classes are configured:
+See `docs/networking.md` for the full architecture, conventions, and
+migration status.
 
-1. **nginx-ssl**: SSL-enabled ingress with TLS termination
-   - Used by: ArgoCD, Grafana, Keycloak, Vault
-   - Configuration: `ingress/nginx-ssl-controller.yaml`
+Cluster traffic is fronted by Envoy Gateway (`envoy-gateway-system`
+namespace). Two `Gateway` resources expose two listener spaces:
 
-2. **nginx-internal**: Internal-only ingress with TLS and IP whitelist
-   - Used by: Longhorn, Airbyte, LibreChat, ATC Grafana, ATC Prometheus
-   - Configuration: `ingress/nginx-internal-controller.yaml`
+1. **`external`** (`141.147.189.36`): publicly reachable. Listeners:
+   - `https` on `*.shion1305.com` — canonical apex hostname for all
+     externally-published apps (argocd, langfuse, keycloak, vault,
+     openwebui, github-readme-stats, ynufes-cf grafana, …).
+   - `https-legacy-k` on `*.k.shion1305.com` — legacy listener serving
+     301-redirect HTTPRoutes that move old `*.k` URLs to their apex
+     equivalents during the ingress-nginx → Gateway migration. To be
+     removed once all consumers have migrated.
 
-Example ingress pattern:
+2. **`internal`** (`10.130.5.21`, reachable via WireGuard): listener
+   `https` on `*.i.shion1305.com` — used by atc/grafana, atc/prometheus,
+   longhorn, mlflow, memgator, freqtrade, etc.
+
+Apps publish themselves with `HTTPRoute` resources attached to one of
+these Gateways via `parentRefs.sectionName` (`https` or
+`https-legacy-k`). Cross-namespace `parentRefs` work because each
+Gateway's `allowedRoutes.namespaces.from: All` accepts routes from any
+namespace; per-app `ReferenceGrant` resources permit the Gateway
+namespace to dial backend `Service`s.
+
+Example HTTPRoute pattern:
 
 ```yaml
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: <app>-external
+  namespace: <app-ns>
 spec:
-  ingressClassName: nginx-ssl
-  tls:
-    - hosts:
-        - app.k.shion1305.com
+  parentRefs:
+    - name: external
+      namespace: envoy-gateway-system
+      sectionName: https
+  hostnames:
+    - <app>.shion1305.com
   rules:
-    - host: app.k.shion1305.com
+    - backendRefs:
+        - name: <service-name>
+          port: <port>
 ```
 
 ## Application Directory Structure
@@ -258,7 +283,7 @@ Renovate runs in-cluster (deployed via Helm chart in `renovate/`) and automatica
 - All applications use automated sync with self-healing enabled
 - ArgoCD automatically creates namespaces via `CreateNamespace=true` sync option
 - Most applications use `ServerSideApply=true` for better conflict resolution
-- Domain: All ingress resources use `*.k.shion1305.com` domain
+- Domains: external apps publish at `*.shion1305.com`, internal apps at `*.i.shion1305.com`. Legacy `*.k.shion1305.com` URLs 301-redirect to their apex equivalents and will be retired once consumers migrate.
 - Node labels and taints affect workload scheduling - check node status when troubleshooting pod placement
 
 ## Repository Hygiene

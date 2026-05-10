@@ -7,9 +7,9 @@ spec:
   parentRefs:
     - name: external
       namespace: envoy-gateway-system
-      sectionName: https-legacy-k
+      sectionName: https
   hostnames:
-    - argocd.k.shion1305.com
+    - argocd.shion1305.com
   rules:
     - backendRefs:
         - name: argocd-server

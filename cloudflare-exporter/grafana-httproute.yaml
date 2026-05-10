@@ -11,9 +11,9 @@ spec:
   parentRefs:
     - name: external
       namespace: envoy-gateway-system
-      sectionName: https-legacy-k
+      sectionName: https
   hostnames:
-    - ynufes-cf.k.shion1305.com
+    - ynufes-cf.shion1305.com
   rules:
     - backendRefs:
         - name: cloudflare-grafana-service

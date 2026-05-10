@@ -8,7 +8,7 @@ langfuse:
 
   # Security configurations - secrets managed directly in Kubernetes
   nextauth:
-    url: "https://langfuse.k.shion1305.com"
+    url: "https://langfuse.shion1305.com"
     secret:
       secretKeyRef:
         name: "langfuse-credentials"
