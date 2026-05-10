@@ -17,8 +17,10 @@ env:
 service:
   type: ClusterIP
   port: 8080
+  # Note: prometheus.io/scrape is added by the chart via
+  # `addPrometheusScrapeAnnotation: true` (default). Re-adding it here
+  # produces a duplicate map key that fails strict YAML/JSON validation.
   annotations:
-    prometheus.io/scrape: "true"
     prometheus.io/port: "8080"
     prometheus.io/path: "/metrics"
 # Resource limits
