@@ -78,6 +78,12 @@
       "/apps/.*\\.yaml$/"
     ]
   },
+  "aqua": {
+    "managerFilePatterns": [
+      "/(^|/)aqua\\.ya?ml$/",
+      "/(^|/)\\.aqua-[^/]+\\.ya?ml$/"
+    ]
+  },
   "kubernetes": {
     "managerFilePatterns": [
       "/\\.yaml$/"
