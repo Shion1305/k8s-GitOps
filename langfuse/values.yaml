@@ -168,6 +168,6 @@ s3:
                 values:
                   - shion-ubuntu-2505
 
-# Ingress disabled - managed separately via nginx-ssl
+# Ingress disabled - managed separately via Gateway API HTTPRoute (httproute-external.yaml)
 ingress:
   enabled: false

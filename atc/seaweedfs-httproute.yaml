@@ -1,7 +1,11 @@
 # Internal Gateway only serves *.i.shion1305.com so the legacy
-# atc-historical-source*.k.shion1305.com hostnames must be retired with this
-# migration. The path-prefix split mirrors the original two-Ingress setup —
-# the filer is on port 8888 and the S3 endpoint on port 8333.
+# atc-historical-source*.k.shion1305.com hostnames are retired with this
+# migration. Filer (8888) and S3 (8333) are split across two HTTPRoutes by
+# hostname (not path), mirroring the original two-Ingress setup. The old
+# nginx Ingress carried `proxy-body-size: 0` and (S3 only) `proxy-request-
+# buffering: off` to allow unlimited / streamed uploads. Envoy Gateway does
+# not attach a Buffer filter by default — there is no HCM-level body cap to
+# replicate — so large uploads stream through unbounded out of the box.
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:

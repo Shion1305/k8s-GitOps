@@ -122,7 +122,7 @@ configs:
   # Run argocd-server in HTTP-only mode so envoy-gateway terminates TLS
   # without having to dial the upstream over (self-signed) HTTPS.
   params:
-    server.insecure: true
+    server.insecure: "true"
 # Server configuration
 server:
   # Disable default ingress since we have a custom one

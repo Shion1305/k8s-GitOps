@@ -4,6 +4,7 @@ kind: Kustomization
 resources:
   - reference-grant.yaml
   - httproute-external.yaml
+  - ingress.yaml
   - vault-secret-store.yaml
   - db-secret-store.yaml
   - external-secret.yaml

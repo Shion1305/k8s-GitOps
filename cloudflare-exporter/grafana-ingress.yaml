@@ -1,0 +1,29 @@
+# Legacy nginx-ssl Ingress kept alongside the new HTTPRoute
+# (grafana-httproute.yaml) so traffic continues to flow while DNS for
+# ynufes-cf.k.shion1305.com still resolves to the nginx-ssl node IP.
+# Once DNS is repointed to the envoy-gateway external IP and verified,
+# this Ingress can be removed in a follow-up PR.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: cloudflare-grafana
+  namespace: monitoring
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+spec:
+  ingressClassName: nginx-ssl
+  rules:
+    - host: ynufes-cf.k.shion1305.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: cloudflare-grafana
+                port:
+                  number: 80
+  tls:
+    - hosts:
+        - ynufes-cf.k.shion1305.com

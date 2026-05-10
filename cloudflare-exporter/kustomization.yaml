@@ -5,6 +5,7 @@ resources:
   - servicemonitor.yaml
   - reference-grant.yaml
   - grafana-httproute.yaml
+  - grafana-ingress.yaml
   - grafana.yaml
   - grafana-datasource.yaml
   - grafana-folder.yaml
