@@ -1,40 +1,23 @@
 # Demo workflow: build a small OCI image and push it to Harbor at
 # harbor.shion1305.com to prove the public-facing push path works end-to-end.
 #
-# Why robot accounts and not GitHub OIDC token-exchange (unlike the zot demo):
-# Harbor's /v2/ token endpoint does not accept GitHub OIDC tokens directly. It
-# mints its own bearer tokens after authenticating the caller via either basic
-# auth (username/password OR robot-account creds) or OIDC ID-token submission
-# to /c/login (browser flow only). The clean, supported CI path is a Harbor
-# robot account: a project-scoped, long-lived static credential created via
-# Harbor's admin UI/API and restricted to push/pull on a single project (here
-# `shion1305`). It's less elegant than zot's OIDC token-exchange, but it's the
-# model Harbor supports and matches every other Harbor deployment in the wild.
+# All actual logic — multi-arch buildx, Vault JWT login for the robot creds,
+# crane push, cosign keyless signing — lives in the reusable workflow at
+# .github/workflows/harbor-build-push.yaml. This file is just the demo's
+# trigger surface (path filter on `harbor/demo/**`) plus a thin caller.
 #
-# Required GitHub repo secrets:
-#   - HARBOR_ROBOT_USER  full username including the `robot$` prefix and the
-#                        project scope, e.g. `robot$shion1305+gha-pusher`
-#   - HARBOR_ROBOT_TOKEN the secret string returned at robot creation time;
-#                        Harbor does NOT let you recover it later
+# Robot credentials are not GitHub Secrets: the reusable workflow exchanges
+# this run's GitHub OIDC token for short-lived robot creds stored in Vault at
+# `harbor/data/robot-pusher` (KV v2). The Harbor robot account itself
+# (`robot$shion1305+gha-pusher`, push/pull on the `shion1305` project) is
+# created out-of-band via Harbor's UI, and its credentials are written into
+# Vault by hand at the same time. See the PR description for the one-time
+# setup runbook.
 #
-# One-time manual setup the user must do (Harbor robot accounts are not
-# managed declaratively from this repo):
-#   1. Login to Harbor portal at https://harbor.i.shion1305.com (WireGuard
-#      required — it's on the internal ingress class).
-#   2. Projects -> `shion1305` -> Robot Accounts -> New Robot Account.
-#   3. Name: `gha-pusher`, expiration: e.g. 365 days.
-#   4. Permissions: push and pull on Repository.
-#   5. Save the token (it's shown ONCE — Harbor cannot re-display it).
-#   6. Store the token in:
-#        - GitHub repo secrets HARBOR_ROBOT_USER and HARBOR_ROBOT_TOKEN
-#        - Vault `harbor/robot-pusher` (so kubelet can also use it for
-#          in-cluster image pulls via an imagePullSecret materialized by ESO)
-#
-# Why crane and not `docker push`: same reason as the zot demo. crane works
-# directly with OCI-layout dirs/tarballs (no docker daemon image-store
-# round-trip), sends Authorization: Bearer pre-emptively, and is more robust
-# under CI conditions. It reads ~/.docker/config.json and Just Works once the
-# auth blob is in place.
+# `id-token: write` and `contents: read` are set on the calling job, NOT
+# inherited from this workflow file, because GitHub does not propagate
+# job-level permissions into reusable workflows automatically. Vault JWT
+# login + cosign keyless signing both need `id-token: write`.
 
 name: demo - build & push to harbor.shion1305.com
 
@@ -44,114 +27,26 @@ on:
     paths:
       - "harbor/demo/**"
       - ".github/workflows/demo-push-to-harbor.yaml"
+      - ".github/workflows/harbor-build-push.yaml"
   pull_request:
     paths:
       - "harbor/demo/**"
       - ".github/workflows/demo-push-to-harbor.yaml"
+      - ".github/workflows/harbor-build-push.yaml"
   workflow_dispatch:
-
-# id-token: write is REQUIRED for cosign keyless signing — cosign exchanges
-# the workflow's GitHub OIDC token for a short-lived Fulcio certificate. The
-# resulting signature certificate is bound to this repo + ref + workflow
-# path, so a verifier can prove "this image came from
-# Shion1305/k8s-GitOps's demo-push-to-harbor.yaml on main" without any
-# long-lived signing key. See:
-# https://docs.sigstore.dev/cosign/signing/overview/#keyless-signing
-permissions:
-  contents: read
-  id-token: write
-  packages: write
 
 jobs:
   build-push:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-
-      # QEMU registers arm64 emulation on the amd64 GitHub-hosted runner so
-      # buildx can produce arm64 layers from the same Dockerfile.
-      - uses: docker/setup-qemu-action@v3
-        with:
-          platforms: arm64
-
-      - uses: docker/setup-buildx-action@v3
-
-      # cosign signs the image keyless via Fulcio + Rekor. SBOM generation
-      # is intentionally NOT done in CI — Harbor v2.15's UI does not surface
-      # client-attached SBOM accessories (verified empirically: both
-      # `cosign attach sbom` and `cosign attest --type cyclonedx` produce
-      # accessory artifacts that Harbor stores but doesn't display in the
-      # SBOM column). Worse, those accessories appear as standalone rows
-      # that the "GENERATE SBOM" button can mis-target, causing Trivy to
-      # fail with "invalid tar header" while trying to extract a manifest
-      # JSON as if it were an image layer. So: signing only here; SBOM is
-      # produced by Harbor's own Trivy via the GENERATE SBOM action on the
-      # image artifact.
-      - uses: sigstore/cosign-installer@v3
-        with:
-          cosign-release: v2.4.1
-
-      # crane is installed via aqua so the local toolchain (aqua.yaml) and CI
-      # use the exact same pinned version. Matches the zot demo workflow.
-      - uses: aquaproj/aqua-installer@v4.0.4
-        with:
-          aqua_version: v2.58.0
-
-      # Build to an OCI-layout tarball. crane push reads OCI-layout dirs and
-      # pushes manifests with the OCI media type, which Harbor accepts.
-      # Multi-arch: buildx writes an OCI image index referencing one manifest
-      # per platform, and `crane push --index` propagates the whole index to
-      # Harbor in a single call.
-      - name: Build OCI image
-        run: |
-          set -euo pipefail
-          docker buildx build \
-            --platform linux/amd64,linux/arm64 \
-            --output type=oci,dest=/tmp/image.tar \
-            ./harbor/demo
-
-      - name: Push and sign
-        env:
-          HARBOR_ROBOT_USER: ${{ secrets.HARBOR_ROBOT_USER }}
-          HARBOR_ROBOT_TOKEN: ${{ secrets.HARBOR_ROBOT_TOKEN }}
-          # COSIGN_YES suppresses cosign's interactive "are you sure"
-          # confirmation, required in non-TTY CI runners.
-          COSIGN_YES: "true"
-        run: |
-          set -euo pipefail
-          # Extract OCI tarball so crane can read it as an OCI layout dir.
-          mkdir -p /tmp/oci
-          tar -xf /tmp/image.tar -C /tmp/oci
-
-          # crane and cosign both read ~/.docker/config.json. Build it from
-          # the robot creds: Harbor accepts basic auth on /v2/token and
-          # exchanges it for a short-lived bearer that crane/cosign then use
-          # for the actual push.
-          mkdir -p ~/.docker
-          auth=$(printf '%s:%s' "$HARBOR_ROBOT_USER" "$HARBOR_ROBOT_TOKEN" | base64 -w0)
-          jq -n --arg a "$auth" \
-            '{auths: {"harbor.shion1305.com": {auth: $a}}}' > ~/.docker/config.json
-
-          IMAGE=harbor.shion1305.com/shion1305/demo
-          SHA_TAG=${{ github.sha }}
-
-          # --index pushes the OCI image index (multi-arch manifest list)
-          # produced by buildx's --platform linux/amd64,linux/arm64. Without
-          # --index, crane would push only one of the per-arch manifests.
-          crane push --index /tmp/oci "${IMAGE}:${SHA_TAG}"
-          crane tag "${IMAGE}:${SHA_TAG}" latest
-
-          # Resolve the digest BEFORE signing. Tags can be remapped after the
-          # fact (latest can move), but a digest is the cryptographic hash of
-          # the manifest itself — signing by digest guarantees the signature
-          # binds to exactly this artifact. cosign will refuse a tag-only
-          # reference for sign/attest by design.
-          DIGEST=$(crane digest "${IMAGE}:${SHA_TAG}")
-          REF="${IMAGE}@${DIGEST}"
-          echo "Signing ${REF}"
-
-          # Keyless cosign sign — no key material on disk, the signature
-          # certificate is bound to this workflow's OIDC identity. Harbor
-          # v2.15 detects the resulting cosign artifact via the OCI 1.1
-          # referrers API and shows a "Signed" badge in the UI.
-          cosign sign "${REF}"
+    permissions:
+      contents: read
+      id-token: write
+    uses: ./.github/workflows/harbor-build-push.yaml
+    with:
+      image: harbor.shion1305.com/shion1305/demo
+      context: ./harbor/demo
+      # The demo intentionally moves `latest` so a `docker pull
+      # harbor.shion1305.com/shion1305/demo` always pulls the most recent
+      # smoke-test image. Production callers should NOT pass extra-tags
+      # unless they have a deliberate reason — the reusable workflow
+      # defaults extra-tags to empty for that reason.
+      extra-tags: latest

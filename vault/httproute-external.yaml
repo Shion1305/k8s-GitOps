@@ -1,16 +1,12 @@
-# Public Vault URL — auth + token-self-management only.
+# Public Vault URL — auth + token-self-management + scoped KV reads only.
 #
 # The only intended callers we expose externally are CI runners (GitHub
-# Actions) doing JWT login against Vault and managing their own token's
-# lifecycle. Admin paths (sys/*), the UI, and arbitrary API access stay on
-# the internal hostname (httproute-internal.yaml). Keeping this surface
-# allowlisted means a leaked CI credential cannot reach admin endpoints
-# regardless of any policy mistakes inside Vault.
-#
-# KV-data paths (/v1/<mount>/data/*) for CI to read scoped secrets will be
-# appended in the follow-up reusable-workflow PR (Harbor robot creds and
-# similar). They are intentionally NOT included here yet because the set of
-# mounts CI is allowed to read is being designed alongside that workflow.
+# Actions) doing JWT login against Vault, managing their own token's
+# lifecycle, and reading the specific KV paths their policy allows. Admin
+# paths (sys/*), the UI, and arbitrary API access stay on the internal
+# hostname (httproute-internal.yaml). Keeping this surface allowlisted means
+# a leaked CI credential cannot reach admin endpoints regardless of any
+# policy mistakes inside Vault.
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
@@ -40,6 +36,19 @@ spec:
             type: Exact
             value: /v1/auth/token/revoke-self
           method: POST
+      backendRefs:
+        - name: vault
+          port: 8200
+    # KV v2 read paths exposed for CI. Each path is allowlisted explicitly
+    # (Exact + GET-only) so the surface stays minimal — a leaked CI token
+    # restricted by Vault policy still can't probe paths beyond this list.
+    # New CI-readable secrets MUST be appended here AND backed by a Vault
+    # policy that scopes the JWT role to that specific path.
+    - matches:
+        - path:
+            type: Exact
+            value: /v1/harbor/data/robot-pusher
+          method: GET
       backendRefs:
         - name: vault
           port: 8200
