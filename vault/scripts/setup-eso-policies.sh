@@ -289,6 +289,88 @@ vault write auth/kubernetes/role/eso-harbor-pull \
 echo "✓ Created role: eso-harbor-pull"
 
 echo ""
+echo "=== Configuring GitHub Actions OIDC (JWT auth) for CI pushes ==="
+
+# JWT auth method for GitHub Actions OIDC tokens. This is separate from the
+# Kubernetes auth method above — Kubernetes auth is for in-cluster ESO,
+# JWT auth is for external CI runners (GitHub-hosted) that mint short-lived
+# OIDC tokens via id-token: write. Vault verifies the token signature against
+# GitHub's JWKS (oidc_discovery_url), confirms the issuer, then matches the
+# token's claims against a per-role bound_claims allowlist.
+#
+# Reachable externally via https://vault.shion1305.com (path-allowlisted in
+# vault/httproute-external.yaml). The internal hostname stays unreachable
+# from GitHub Actions.
+vault auth enable -path=jwt jwt 2>/dev/null && echo "✓ Enabled auth method: jwt" || echo "ⓘ JWT auth method already enabled"
+
+vault write auth/jwt/config \
+  oidc_discovery_url="https://token.actions.githubusercontent.com" \
+  bound_issuer="https://token.actions.githubusercontent.com"
+echo "✓ Configured JWT auth: oidc_discovery_url=token.actions.githubusercontent.com"
+
+# Policy: read-only on harbor/robot-pusher (the dynamic Harbor robot password
+# lives at this single KV v2 path; the leaf is wrapped per KV v2 conventions
+# under /data/). Scope is intentionally a single Exact path — leaking the
+# CI token must not let the caller wander other harbor/* keys.
+vault policy write harbor-robot-pusher-reader - <<EOF
+path "harbor/data/robot-pusher" {
+  capabilities = ["read"]
+}
+EOF
+echo "✓ Created policy: harbor-robot-pusher-reader"
+
+# Role: accepts GitHub OIDC tokens minted for runs that invoke the reusable
+# workflow at .github/workflows/harbor-build-push.yaml in THIS repo. The
+# `repository_owner` filter allows callers under both `Shion1305` and
+# `Shion1305Dev`. Inside a reusable-workflow call, ALL standard claims
+# (`aud`, `repository`, `repository_owner`, `sub`, etc.) describe the
+# CALLING repo; only `job_workflow_ref` reflects the called workflow file.
+# That's why we have to list both owners in `bound_audiences` AND in
+# `bound_claims.repository_owner` — the called file's owner (Shion1305) is
+# only tracked via `job_workflow_ref`.
+# Reference: https://docs.github.com/en/actions/deployment/security-hardening-your-deployments/using-openid-connect-with-reusable-workflows
+#
+# bound_audiences: GitHub's @actions/core.getIDToken() defaults the `aud`
+# claim to `https://github.com/<repository_owner>` (caller's owner) when no
+# audience is passed. Listing both owners here means caller workflows do
+# NOT need to set `jwtGithubAudience`.
+#
+# user_claim=repository → audit logs identify the CALLING repo as
+# `owner/repo`, which is the readable form Vault operators want.
+#
+# bound_claims pins `job_workflow_ref` to runs that go through THIS repo's
+# harbor-build-push.yaml reusable workflow. Without that pin, any new repo
+# created under Shion1305 / Shion1305Dev would automatically be able to mint
+# Harbor push creds — far too wide a blast radius. The glob suffix `@*`
+# covers branches, tags, and SHAs (job_workflow_ref takes the form
+# `<owner>/<repo>/.../<file>@<ref>`); bound_claims_type=glob enables it.
+#
+# token_ttl=600s (10 min): plenty for a CI image build+push. No renewal —
+# the JWT is single-use, and short TTL means a leaked token expires before
+# anyone can exfiltrate it.
+# NOTE on the `vault write -` form: `bound_claims` is a map type. Passing it
+# as a flag (`bound_claims='{"...":"..."}'`) makes the CLI treat the value
+# as a string, and Vault rejects with `expected a map, got 'string'`. Piping
+# JSON via stdin (`vault write -`) is the canonical way to send map fields.
+vault write auth/jwt/role/harbor-robot-pusher - <<'EOF'
+{
+  "role_type": "jwt",
+  "user_claim": "repository",
+  "bound_audiences": ["https://github.com/Shion1305", "https://github.com/Shion1305Dev"],
+  "bound_claims_type": "glob",
+  "bound_claims": {
+    "repository_owner": ["Shion1305", "Shion1305Dev"],
+    "job_workflow_ref": "Shion1305/k8s-GitOps/.github/workflows/harbor-build-push.yaml@*"
+  },
+  "token_policies": ["harbor-robot-pusher-reader"],
+  "token_ttl": "600",
+  "token_max_ttl": "600",
+  "token_explicit_max_ttl": "600"
+}
+EOF
+echo "✓ Created JWT role: harbor-robot-pusher"
+
+echo ""
 echo "=== Removing old broad policy ==="
 vault policy delete eso-policy 2>/dev/null && echo "✓ Deleted old policy: eso-policy" || echo "ⓘ Policy eso-policy not found (already removed)"
 
@@ -309,3 +391,6 @@ echo "  eso-github-app  → SA external-secrets/external-secrets → github-app-
 echo "  eso-cloudflare-grafana → SA eso/monitoring     → cloudflare-grafana/data/*"
 echo "  eso-cluster-puller → SA external-secrets/external-secrets → zot/data/cluster-puller"
 echo "  eso-harbor-pull → SA external-secrets/external-secrets → harbor/data/robot-puller"
+echo ""
+echo "GitHub Actions JWT roles:"
+echo "  harbor-robot-pusher → repository_owner ∈ {Shion1305, Shion1305Dev} → harbor/data/robot-pusher"
