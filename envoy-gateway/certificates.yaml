@@ -31,7 +31,7 @@ spec:
     - "shion1305.com"
 ---
 # Issued for the legacy *.k.shion1305.com hostname space so envoy-gateway can
-# serve 308 redirects from old URLs (e.g. keycloak.k.shion1305.com →
+# serve 301 redirects from old URLs (e.g. keycloak.k.shion1305.com →
 # keycloak.shion1305.com) during the ingress-nginx → Gateway migration.
 apiVersion: cert-manager.io/v1
 kind: Certificate

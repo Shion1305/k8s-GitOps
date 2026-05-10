@@ -66,28 +66,3 @@ spec:
     - name: http-web
       port: 9090
       targetPort: 9090
----
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: prometheus
-  namespace: atc
-  annotations:
-    nginx.ingress.kubernetes.io/ssl-redirect: "true"
-    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
-spec:
-  ingressClassName: nginx-internal
-  tls:
-    - hosts:
-        - atc-prom.k.shion1305.com
-  rules:
-    - host: atc-prom.k.shion1305.com
-      http:
-        paths:
-          - path: /
-            pathType: Prefix
-            backend:
-              service:
-                name: prometheus
-                port:
-                  number: 9090

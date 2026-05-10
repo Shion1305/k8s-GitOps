@@ -138,9 +138,9 @@ spec:
         directAccessGrantsEnabled: false
         serviceAccountsEnabled: false
         redirectUris:
-          - https://ynufes-cf.k.shion1305.com/*
+          - https://ynufes-cf.shion1305.com/*
         webOrigins:
-          - https://ynufes-cf.k.shion1305.com
+          - https://ynufes-cf.shion1305.com
         protocolMappers:
           # Emit `groups` claim in id_token, access_token and userinfo so
           # Grafana's role_attribute_path can map group -> org role.

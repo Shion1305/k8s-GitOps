@@ -7,4 +7,6 @@ resources:
   - external-secret.yaml
   - mcpo-deployment.yaml
   - network-policy-to-mcp.yaml
-  - ingress.yaml
+  - reference-grant.yaml
+  - httproute-external.yaml
+  - httproute-legacy-redirect.yaml

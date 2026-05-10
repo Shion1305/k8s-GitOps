@@ -11,4 +11,5 @@ resources:
   - pvc.yaml
   - deployment.yaml
   - service.yaml
-  - ingress.yaml
+  - reference-grant.yaml
+  - httproute-internal.yaml

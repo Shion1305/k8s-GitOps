@@ -24,7 +24,7 @@ spec:
         namespaces:
           from: All
     # Legacy *.k.shion1305.com listener — exists solely to terminate TLS for
-    # 308-redirect HTTPRoutes that move old URLs to their *.shion1305.com
+    # 301-redirect HTTPRoutes that move old URLs to their *.shion1305.com
     # equivalents during the ingress-nginx → Gateway migration. Once all
     # consumers are migrated and the legacy ingress-nginx subdomain is
     # decommissioned, this listener (and the matching cert) can be removed.

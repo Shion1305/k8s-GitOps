@@ -8,7 +8,7 @@ langfuse:
 
   # Security configurations - secrets managed directly in Kubernetes
   nextauth:
-    url: "https://langfuse.k.shion1305.com"
+    url: "https://langfuse.shion1305.com"
     secret:
       secretKeyRef:
         name: "langfuse-credentials"
@@ -168,6 +168,6 @@ s3:
                 values:
                   - shion-ubuntu-2505
 
-# Ingress disabled - managed separately via nginx-ssl
+# Ingress disabled - managed separately via Gateway API HTTPRoute (httproute-external.yaml)
 ingress:
   enabled: false

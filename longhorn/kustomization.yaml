@@ -8,7 +8,8 @@ resources:
   - backup-target.yaml
   # StorageClass definition
   - storageclass.yaml
-  # Internal ingress for Longhorn UI
-  - ingress.yaml
+  # Internal Gateway HTTPRoute for Longhorn UI
+  - reference-grant.yaml
+  - httproute-internal.yaml
   # Longhorn settings
   - settings.yaml

@@ -1,0 +1,20 @@
+# Backend matches the recent fix applied to main-grafana (77ede47): point at
+# the operator-created cloudflare-grafana-service:3000 instead of the
+# misnamed cloudflare-grafana:80 from the old Ingress. Drop the NodePort in
+# grafana.yaml once this route is verified working.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: cloudflare-grafana-external
+  namespace: monitoring
+spec:
+  parentRefs:
+    - name: external
+      namespace: envoy-gateway-system
+      sectionName: https
+  hostnames:
+    - ynufes-cf.shion1305.com
+  rules:
+    - backendRefs:
+        - name: cloudflare-grafana-service
+          port: 3000

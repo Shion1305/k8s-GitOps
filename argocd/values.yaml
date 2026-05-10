@@ -1,12 +1,12 @@
 global:
-  domain: argocd.k.shion1305.com
+  domain: argocd.shion1305.com
 configs:
   # Main configuration
   cm:
     # Admin account
     accounts.admin.enabled: "true"
     # Application URL
-    url: https://argocd.k.shion1305.com
+    url: https://argocd.shion1305.com
     # Dex (GitHub OAuth) configuration
     dex.config: |
       connectors:
@@ -16,7 +16,7 @@ configs:
         config:
           clientID: $github-oauth-secret:dex.github.clientID
           clientSecret: $github-oauth-secret:dex.github.clientSecret
-          redirectURI: https://argocd.k.shion1305.com/api/dex/callback
+          redirectURI: https://argocd.shion1305.com/api/dex/callback
     # Resource exclusions
     resource.exclusions: |
       ### Network resources created by the Kubernetes control plane and excluded to reduce the number of watched events and UI clutter
@@ -119,8 +119,10 @@ configs:
   # Reference to existing secrets
   secret:
     createSecret: false # We'll keep existing argocd-secret
-  # Parameters (empty as per current config)
-  params: {}
+  # Run argocd-server in HTTP-only mode so envoy-gateway terminates TLS
+  # without having to dial the upstream over (self-signed) HTTPS.
+  params:
+    server.insecure: "true"
 # Server configuration
 server:
   # Disable default ingress since we have a custom one
