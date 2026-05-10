@@ -21,9 +21,13 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: cloudflare-grafana
+                # Grafana operator emits Service `<grafana-name>-service`, not
+                # `<grafana-name>`. The pre-PR Ingress had this wrong (referenced
+                # `cloudflare-grafana:80`); fixing it on restoration so the
+                # nginx-ssl path works correctly during the DNS-cutover window.
+                name: cloudflare-grafana-service
                 port:
-                  number: 80
+                  number: 3000
   tls:
     - hosts:
         - ynufes-cf.k.shion1305.com
