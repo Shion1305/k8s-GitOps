@@ -1,0 +1,53 @@
+name: Render-validate manifests
+# Renders every ArgoCD Application in apps/ (Helm + Kustomize + raw paths)
+# and validates the output against Kubernetes API + CRD schemas with
+# kubeconform.
+#
+# Catches:
+#   - Helm template errors (missing values files, broken charts, bad --set)
+#   - Kustomize build errors (missing referenced files, broken patches)
+#   - Schema-invalid manifests (missing required fields, wrong types,
+#     unknown fields, malformed YAML — incl. duplicate map keys)
+#   - ArgoCD `Application` path: references pointing at nonexistent dirs
+#
+# Does NOT catch:
+#   - Cross-resource references (Ingress/HTTPRoute backendRef → nonexistent
+#     Service; SecretRef → nonexistent Secret; etc.)
+#   - Semantic correctness (wrong port numbers, wrong hostnames in OIDC
+#     callbacks, etc.) — config review still required.
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+
+# Cancel in-progress runs when new commits land on the same PR.
+concurrency:
+  group: render-validate-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  render-validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: v3.16.4
+
+      # kustomize, kubeconform, yq and jq are pinned in aqua.yaml so the
+      # local dev toolchain and CI run identical versions.
+      - uses: aquaproj/aqua-installer@v4.0.4
+        with:
+          aqua_version: v2.58.0
+
+      - name: Render + validate
+        env:
+          # Bump when the cluster's control-plane minor version changes.
+          K8S_VERSION: "1.31.0"
+        run: ./scripts/render-validate.sh

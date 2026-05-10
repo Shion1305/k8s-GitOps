@@ -268,6 +268,25 @@ kubectl get volumes -n longhorn-system
 kubectl get pv,pvc --all-namespaces
 ```
 
+## CI: Manifest render-validation
+
+Every PR runs `.github/workflows/render-validate.yaml`, which executes
+`scripts/render-validate.sh` to render every ArgoCD `Application` in
+`apps/` (Helm + Kustomize + raw paths) and pipe the output through
+`kubeconform` against Kubernetes API + CRD schemas.
+
+- Helm charts are pulled per their `targetRevision`; external git repos
+  (e.g. `kubernetes-sigs/gateway-api`) are shallow-cloned.
+- CRD schemas come from the datreeio CRDs-catalog repo; unknown CRDs are
+  skipped (`-ignore-missing-schemas`).
+- Apps with known upstream chart bugs are tolerated via
+  `scripts/render-validate.allowlist`. Each entry documents the upstream
+  issue. When a chart bump fixes the bug the script will report "now
+  passes — drop from allowlist".
+
+To run locally: `./scripts/render-validate.sh`. Requires `helm`,
+`kustomize`, `kubeconform`, `yq`, `jq` on `PATH`.
+
 ## Dependency Management (Renovate)
 
 Renovate runs in-cluster (deployed via Helm chart in `renovate/`) and automatically creates PRs for dependency updates:
