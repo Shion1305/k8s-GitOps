@@ -8,8 +8,3 @@
 # Renovate keeps these charts on the latest tagged version, so if the
 # upstream bug is fixed, the next bump should let us drop the entry —
 # remove the line and confirm the pipeline still passes.
-
-# Upstream zot chart's StatefulSet is missing the required `serviceName` field.
-# K8s API server accepts the manifest (defaults it), but kubeconform's strict
-# schema rejects. Tracked: https://github.com/project-zot/helm-charts/issues/124
-zot
