@@ -3,5 +3,5 @@
 .idea
 **/.DS_Store
 
-# Local-only documentation (postmortems, notes)
-docs/
+# Local-only operational documentation (postmortems, incident notes, ad-hoc investigations)
+docs/ops/
