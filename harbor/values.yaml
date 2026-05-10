@@ -217,22 +217,10 @@ exporter:
 # -----------------------------------------------------------------------------
 # metrics — Prometheus /metrics + ServiceMonitor (kube-prometheus-stack)
 # -----------------------------------------------------------------------------
-# NOTE: `metrics.serviceMonitor.additionalLabels` is intentionally NOT set.
-#
-# Upstream chart bug (goharbor/harbor-helm@1.19.0,
-# templates/metrics/metrics-svcmon.yaml): the ServiceMonitor template emits
-# the chart-default `release: <Release.Name>` label via `harbor.labels`, then
-# APPENDS any `additionalLabels` keys verbatim instead of merging — so passing
-# `additionalLabels: { release: kube-prometheus-stack }` produces a YAML map
-# with two `release:` keys, which is invalid YAML by strict schema and fails
-# kubeconform validation in CI.
-#
-# We don't need to override the label anyway: the in-cluster Prometheus
-# (`grafana/values.yaml`) is configured with `serviceMonitorSelector: {}` and
-# `serviceMonitorSelectorNilUsesHelmValues: false`, i.e. it scrapes every
-# ServiceMonitor in the cluster regardless of label. Leaving the chart-default
-# `release: harbor` label in place is therefore correct and avoids the
-# duplicate-key bug entirely.
+# `metrics.serviceMonitor.additionalLabels` is intentionally unset: upstream
+# chart appends instead of merging, producing duplicate `release:` keys (bug
+# in goharbor/harbor-helm@1.19.0 templates/metrics/metrics-svcmon.yaml). Our
+# Prometheus uses `serviceMonitorSelector: {}` so no label override is needed.
 metrics:
   enabled: true
   serviceMonitor:
