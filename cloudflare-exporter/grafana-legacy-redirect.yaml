@@ -3,7 +3,11 @@
 #
 # The Keycloak `ynufes-tech` realm's `cloudflare-grafana` client redirectUris
 # in keycloak-operator/ynufes-tech-realm.yaml have been flipped to the apex
-# hostname; the Keycloak operator reconciles the realm import on next sync.
+# hostname. NOTE: KeycloakRealmImport uses the `Create` strategy by default
+# and does not re-import an already-existing realm, so this change won't
+# apply automatically — the redirectUris must be updated manually in the
+# Keycloak admin UI (realm `ynufes-tech` → Clients → `cloudflare-grafana`)
+# before this PR's apex HTTPRoute is exercised.
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
