@@ -15,9 +15,10 @@
 # callers to download unrelated tooling like vault or kustomize.
 #
 # Versions are kept in sync with aqua.yaml at the repo root for any package
-# this file shares with it. The `*.aqua.yaml` suffix matches one of Renovate's
-# built-in aqua manager patterns, so the package list below gets version
-# updates without any extra renovate.json wiring.
+# this file shares with it. Renovate has no built-in aqua manager, so version
+# updates here are wired up via a customManagers regex entry in renovate.json
+# that matches `*.aqua.yaml` files and extracts `packages[].name` as
+# `<owner>/<repo>@<version>` from the github-tags datasource.
 registries:
   - type: standard
     ref: v4.479.0 # renovate: depName=aquaproj/aqua-registry

@@ -126,6 +126,28 @@
         "image:\\s+(?<depName>[^:\\s]+):(?<currentValue>[^\\s]+)"
       ],
       "datasourceTemplate": "docker"
+    },
+    {
+      "customType": "regex",
+      "description": "Update aqua packages in *.aqua.yaml (Renovate has no built-in aqua manager)",
+      "managerFilePatterns": [
+        "/(^|/)[^/]*\\.aqua\\.ya?ml$/"
+      ],
+      "matchStrings": [
+        "-\\s+name:\\s+(?<depName>[^@\\s]+)@(?<currentValue>v?[^\\s#]+)"
+      ],
+      "datasourceTemplate": "github-tags"
+    },
+    {
+      "customType": "regex",
+      "description": "Update aqua-registry ref in *.aqua.yaml",
+      "managerFilePatterns": [
+        "/(^|/)[^/]*\\.aqua\\.ya?ml$/"
+      ],
+      "matchStrings": [
+        "ref:\\s+(?<currentValue>v?[^\\s#]+)\\s+#\\s*renovate:\\s*depName=(?<depName>\\S+)"
+      ],
+      "datasourceTemplate": "github-tags"
     }
   ]
 }
