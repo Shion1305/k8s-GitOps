@@ -170,13 +170,20 @@ render_path_source() {
     fi
   else
     # Raw-manifest dir: concat all *.yaml files except values.yaml (helm input,
-    # not a manifest) and README/other non-YAML.
+    # not a manifest) and README/other non-YAML. Ensure a trailing newline so
+    # the next `---` separator lands on its own line even when a file omits
+    # the terminating LF.
     local f
     for f in "${dir}"/*.yaml "${dir}"/*.yml; do
       [[ -e "${f}" ]] || continue
       [[ "$(basename "${f}")" == "values.yaml" ]] && continue
       printf -- '---\n'
       cat "${f}"
+      # Some files omit the terminating LF; emit one so the next `---`
+      # separator lands on its own line.
+      if [[ "$(tail -c1 "${f}" | wc -l)" -eq 0 ]]; then
+        printf '\n'
+      fi
     done
   fi
 }
