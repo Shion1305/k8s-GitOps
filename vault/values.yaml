@@ -25,13 +25,10 @@ server:
     initialDelaySeconds: 60
     periodSeconds: 10
     failureThreshold: 5
+  # Ingress disabled; HTTPRoutes in vault/httproute-*.yaml attach the per-host
+  # routing to Envoy Gateway (matches harbor/zot/keycloak pattern).
   ingress:
-    enabled: true
-    ingressClassName: nginx-internal
-    hosts:
-      - host: vault.k.shion1305.com
-        paths:
-          - /
+    enabled: false
   affinity:
     nodeAffinity:
       requiredDuringSchedulingIgnoredDuringExecution:
@@ -116,7 +113,10 @@ server:
       setNodeId: true
       config: |
         ui = true
-        api_addr = "https://vault.k.shion1305.com"
+        # Internal hostname is the source of truth for any URL Vault echoes to
+        # clients (e.g. UI redirects). External hostname is path-restricted and
+        # auth-only — not suitable as api_addr.
+        api_addr = "https://vault.i.shion1305.com"
 
         listener "tcp" {
           tls_disable = true

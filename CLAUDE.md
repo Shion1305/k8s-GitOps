@@ -96,7 +96,7 @@ This cluster uses a layered secret management approach:
 ### Vault Configuration
 
 - Deployed in HA mode with 3 replicas (Raft storage)
-- UI: <https://vault.k.shion1305.com>
+- UI: <https://vault.i.shion1305.com>
 - Default mount path: `secret/` (KV v2); each app typically gets its own dedicated KV v2 mount
 
 ### External Secrets Operator
