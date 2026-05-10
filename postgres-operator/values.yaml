@@ -14,7 +14,6 @@ configGeneral:
   enable_pgversion_env_var: true
   enable_shm_volume: true
   enable_spilo_wal_path_compat: false
-  enable_team_superuser: false
   etcd_host: ""
   kubernetes_use_configmaps: false
   spilo_runasuser: 101
@@ -49,12 +48,9 @@ configKubernetes:
   node_readiness_label_merge: "OR"
   oauth_token_secret_name: "postgresql-operator"
   pdb_name_format: "postgres-{cluster}-pdb"
-  pod_deletion_wait_timeout: "10m"
-  pod_label_wait_timeout: "10m"
   pod_management_policy: "ordered_ready"
   pod_role_label: "spilo-role"
   pod_service_account_definition: ""
-  pod_service_account_name: "postgres-pod"
   pod_service_account_role_binding_definition: ""
   pod_terminate_grace_period: "5m"
   spilo_privileged: false
