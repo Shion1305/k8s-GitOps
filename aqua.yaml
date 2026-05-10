@@ -13,3 +13,8 @@ registries:
 packages:
 - name: hashicorp/vault@v1.21.4
 - name: google/go-containerregistry@v0.21.5
+# Used by scripts/render-validate.sh (.github/workflows/render-validate.yaml).
+- name: kubernetes-sigs/kustomize@kustomize/v5.8.1
+- name: yannh/kubeconform@v0.7.0
+- name: mikefarah/yq@v4.53.2
+- name: jqlang/jq@jq-1.8.1
