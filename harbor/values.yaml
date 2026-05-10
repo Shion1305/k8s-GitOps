@@ -217,12 +217,14 @@ exporter:
 # -----------------------------------------------------------------------------
 # metrics — Prometheus /metrics + ServiceMonitor (kube-prometheus-stack)
 # -----------------------------------------------------------------------------
+# `metrics.serviceMonitor.additionalLabels` is intentionally unset: upstream
+# chart appends instead of merging, producing duplicate `release:` keys (bug
+# in goharbor/harbor-helm@1.19.0 templates/metrics/metrics-svcmon.yaml). Our
+# Prometheus uses `serviceMonitorSelector: {}` so no label override is needed.
 metrics:
   enabled: true
   serviceMonitor:
     enabled: true
-    additionalLabels:
-      release: kube-prometheus-stack
 
 # -----------------------------------------------------------------------------
 # logging
