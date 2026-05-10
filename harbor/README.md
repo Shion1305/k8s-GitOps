@@ -126,23 +126,32 @@ Robot credentials live in Vault at `harbor/robot-puller`. ESO's `ClusterExternal
 
 There is intentionally no ESO `ClusterGenerator` in the picture (zot needed one to refresh hourly Keycloak access_tokens). Harbor robot accounts are long-lived static credentials — yearly manual rotation is the model.
 
-### c. GitHub Actions push (handled in a follow-up PR)
+### c. GitHub Actions push (Vault JWT → robot creds → crane push)
 
-The GHA push workflow and demo image live in a separate PR that lands after this one merges and Harbor is verified healthy in the cluster. The shape of the auth flow is:
+Workflows under `Shion1305/*` and `Shion1305Dev/*` push to the `shion1305` project via the reusable workflow at [`.github/workflows/harbor-build-push.yaml`](../.github/workflows/harbor-build-push.yaml). Robot credentials are NOT stored as GitHub repo Secrets — each run fetches them from Vault on demand using its GitHub OIDC token.
 
 ```
-GHA workflow → docker buildx → OCI-layout tarball
+GHA workflow → mint OIDC JWT (audience = https://github.com/<owner>)
+  → POST https://vault.shion1305.com/v1/auth/jwt/login {role: harbor-robot-pusher, jwt}
+      - Vault validates iss, aud, repository_owner, job_workflow_ref
+      - Vault returns short-lived (10m) token with policy harbor-robot-pusher-reader
+  → GET https://vault.shion1305.com/v1/harbor/data/robot-pusher
+      - Vault returns {username, password}
+  → docker buildx → OCI-layout tarball
   → write ~/.docker/config.json with auth = base64("$HARBOR_ROBOT_USER:$HARBOR_ROBOT_TOKEN")
-  → crane push /tmp/oci harbor.shion1305.com/<project>/<repo>:<sha>
+  → crane push /tmp/oci harbor.shion1305.com/shion1305/<repo>:<sha>
       - crane → POST /v2/ with Basic robot creds
       - Harbor 401 + WWW-Authenticate: Bearer realm=https://harbor.shion1305.com/service/token
       - crane → GET /service/token with Basic creds
       - Harbor mints bearer, validates project ACL
       - crane → POST /v2/.../blobs/uploads/ with Bearer
       - blob + manifest upload
+  → cosign sign (keyless, Fulcio + Rekor)
 ```
 
-GHA repo secrets `HARBOR_ROBOT_USER` (e.g. `robot$shion1305+gha-pusher`) and `HARBOR_ROBOT_TOKEN` come from Harbor's portal at robot-creation time. Robot accounts are not declarative — they're created in Harbor's UI and the token is shown exactly once.
+Robot accounts themselves still exist (Harbor requires them) — they're created in Harbor's UI and the token is shown exactly once, then written to Vault path `harbor/robot-pusher` (KV v2) by hand. The Vault role `harbor-robot-pusher` pins `job_workflow_ref` to this repo's reusable workflow file, so a new repo under either allowed owner cannot mint Harbor push creds without explicitly `uses:`-ing this workflow.
+
+**Consumer guide**: see [`harbor/REUSABLE-WORKFLOW.md`](./REUSABLE-WORKFLOW.md) for the copy-paste caller, inputs/outputs, and troubleshooting.
 
 ## Bootstrap (first-time deployment)
 
