@@ -128,7 +128,7 @@ There is intentionally no ESO `ClusterGenerator` in the picture (zot needed one 
 
 ### c. GitHub Actions push (Vault JWT → robot creds → crane push)
 
-Workflows under `Shion1305/*` and `Shion1305Dev/*` push to the `shion1305` project via the reusable workflow at [`.github/workflows/harbor-build-push.yaml`](../.github/workflows/harbor-build-push.yaml). Robot credentials are NOT stored as GitHub repo Secrets — each run fetches them from Vault on demand using its GitHub OIDC token.
+Workflows under `Shion1305/*` and `Shion1305Dev/*` push to the `shion1305` project via the composite action at [`.github/actions/harbor-build-push/`](../.github/actions/harbor-build-push/). Robot credentials are NOT stored as GitHub repo Secrets — each run fetches them from Vault on demand using its GitHub OIDC token.
 
 ```
 GHA workflow → mint OIDC JWT (audience = https://github.com/<owner>)
@@ -149,9 +149,9 @@ GHA workflow → mint OIDC JWT (audience = https://github.com/<owner>)
   → cosign sign (keyless, Fulcio + Rekor)
 ```
 
-Robot accounts themselves still exist (Harbor requires them) — they're created in Harbor's UI and the token is shown exactly once, then written to Vault path `harbor/robot-pusher` (KV v2) by hand. The Vault role `harbor-robot-pusher` pins `job_workflow_ref` to this repo's reusable workflow file, so a new repo under either allowed owner cannot mint Harbor push creds without explicitly `uses:`-ing this workflow.
+Robot accounts themselves still exist (Harbor requires them) — they're created in Harbor's UI and the token is shown exactly once, then written to Vault path `harbor/robot-pusher` (KV v2) by hand. The Vault role `harbor-robot-pusher` pins `job_workflow_ref` to callers that invoke this repo's composite action, so a new repo under either allowed owner cannot mint Harbor push creds without explicitly `uses:`-ing this action.
 
-**Consumer guide**: see [`harbor/REUSABLE-WORKFLOW.md`](./REUSABLE-WORKFLOW.md) for the copy-paste caller, inputs/outputs, and troubleshooting.
+**Consumer guide**: see [`.github/actions/harbor-build-push/README.md`](../.github/actions/harbor-build-push/README.md) for the copy-paste caller, inputs/outputs, and troubleshooting.
 
 ## Bootstrap (first-time deployment)
 

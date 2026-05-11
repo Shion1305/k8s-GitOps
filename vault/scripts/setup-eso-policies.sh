@@ -319,31 +319,28 @@ path "harbor/data/robot-pusher" {
 EOF
 echo "✓ Created policy: harbor-robot-pusher-reader"
 
-# Role: accepts GitHub OIDC tokens minted for runs that invoke the reusable
-# workflow at .github/workflows/harbor-build-push.yaml in THIS repo. The
-# `repository_owner` filter allows callers under both `Shion1305` and
-# `Shion1305Dev`. Inside a reusable-workflow call, ALL standard claims
-# (`aud`, `repository`, `repository_owner`, `sub`, etc.) describe the
-# CALLING repo; only `job_workflow_ref` reflects the called workflow file.
-# That's why we have to list both owners in `bound_audiences` AND in
-# `bound_claims.repository_owner` — the called file's owner (Shion1305) is
-# only tracked via `job_workflow_ref`.
-# Reference: https://docs.github.com/en/actions/deployment/security-hardening-your-deployments/using-openid-connect-with-reusable-workflows
+# Role: accepts GitHub OIDC tokens minted from any repo under the
+# `Shion1305` or `Shion1305Dev` owners. The previous incarnation of this
+# role additionally pinned `bound_claims.job_workflow_ref` to the (now
+# removed) reusable workflow at .github/workflows/harbor-build-push.yaml,
+# but the migration to a composite action makes that pin unworkable:
+# `job_workflow_ref` only describes the calling workflow file, not which
+# composite actions it loads, so the value differs per caller and cannot
+# be enumerated in a server-side allowlist. The blast radius is now
+# capped by the owner allowlist alone — every repo under either owner
+# that has `id-token: write` on a job can mint Harbor push creds, even
+# without `uses:`-ing the composite action. Accepted intentionally: both
+# owners are single-operator and the Harbor robot is scoped to the
+# `shion1305` project only.
+# Reference: https://docs.github.com/en/actions/deployment/security-hardening-your-deployments/about-security-hardening-with-openid-connect
 #
 # bound_audiences: GitHub's @actions/core.getIDToken() defaults the `aud`
-# claim to `https://github.com/<repository_owner>` (caller's owner) when no
-# audience is passed. Listing both owners here means caller workflows do
-# NOT need to set `jwtGithubAudience`.
+# claim to `https://github.com/<repository_owner>` when no audience is
+# passed. Listing both owners here means caller workflows do NOT need to
+# set `jwtGithubAudience`.
 #
-# user_claim=repository → audit logs identify the CALLING repo as
-# `owner/repo`, which is the readable form Vault operators want.
-#
-# bound_claims pins `job_workflow_ref` to runs that go through THIS repo's
-# harbor-build-push.yaml reusable workflow. Without that pin, any new repo
-# created under Shion1305 / Shion1305Dev would automatically be able to mint
-# Harbor push creds — far too wide a blast radius. The glob suffix `@*`
-# covers branches, tags, and SHAs (job_workflow_ref takes the form
-# `<owner>/<repo>/.../<file>@<ref>`); bound_claims_type=glob enables it.
+# user_claim=repository → audit logs identify the caller as `owner/repo`,
+# which is the readable form Vault operators want.
 #
 # token_ttl=600s (10 min): plenty for a CI image build+push. No renewal —
 # the JWT is single-use, and short TTL means a leaked token expires before
@@ -359,8 +356,7 @@ vault write auth/jwt/role/harbor-robot-pusher - <<'EOF'
   "bound_audiences": ["https://github.com/Shion1305", "https://github.com/Shion1305Dev"],
   "bound_claims_type": "glob",
   "bound_claims": {
-    "repository_owner": ["Shion1305", "Shion1305Dev"],
-    "job_workflow_ref": "Shion1305/k8s-GitOps/.github/workflows/harbor-build-push.yaml@*"
+    "repository_owner": ["Shion1305", "Shion1305Dev"]
   },
   "token_policies": ["harbor-robot-pusher-reader"],
   "token_ttl": "600",

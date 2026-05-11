@@ -2,11 +2,11 @@
 # harbor.shion1305.com to prove the public-facing push path works end-to-end.
 #
 # All actual logic — multi-arch buildx, Vault JWT login for the robot creds,
-# crane push, cosign keyless signing — lives in the reusable workflow at
-# .github/workflows/harbor-build-push.yaml. This file is just the demo's
-# trigger surface (path filter on `harbor/demo/**`) plus a thin caller.
+# crane push, cosign keyless signing — lives in the composite action at
+# .github/actions/harbor-build-push/. This file is just the demo's trigger
+# surface (path filter on `harbor/demo/**`) plus a thin caller.
 #
-# Robot credentials are not GitHub Secrets: the reusable workflow exchanges
+# Robot credentials are not GitHub Secrets: the composite action exchanges
 # this run's GitHub OIDC token for short-lived robot creds stored in Vault at
 # `harbor/data/robot-pusher` (KV v2). The Harbor robot account itself
 # (`robot$shion1305+gha-pusher`, push/pull on the `shion1305` project) is
@@ -14,10 +14,11 @@
 # Vault by hand at the same time. See the PR description for the one-time
 # setup runbook.
 #
-# `id-token: write` and `contents: read` are set on the calling job, NOT
-# inherited from this workflow file, because GitHub does not propagate
-# job-level permissions into reusable workflows automatically. Vault JWT
-# login + cosign keyless signing both need `id-token: write`.
+# `id-token: write` and `contents: read` are set on this job because both
+# Vault JWT login and cosign keyless signing need to mint a fresh OIDC token
+# from the runner. Composite actions inherit the calling job's permissions
+# but cannot define their own permissions block, so callers must grant
+# id-token: write themselves.
 
 name: demo - build & push to harbor.shion1305.com
 
@@ -27,26 +28,29 @@ on:
     paths:
       - "harbor/demo/**"
       - ".github/workflows/demo-push-to-harbor.yaml"
-      - ".github/workflows/harbor-build-push.yaml"
+      - ".github/actions/harbor-build-push/**"
   pull_request:
     paths:
       - "harbor/demo/**"
       - ".github/workflows/demo-push-to-harbor.yaml"
-      - ".github/workflows/harbor-build-push.yaml"
+      - ".github/actions/harbor-build-push/**"
   workflow_dispatch:
 
 jobs:
   build-push:
+    runs-on: ubuntu-latest
     permissions:
       contents: read
       id-token: write
-    uses: ./.github/workflows/harbor-build-push.yaml
-    with:
-      image: harbor.shion1305.com/shion1305/demo
-      context: ./harbor/demo
-      # The demo intentionally moves `latest` so a `docker pull
-      # harbor.shion1305.com/shion1305/demo` always pulls the most recent
-      # smoke-test image. Production callers should NOT pass extra-tags
-      # unless they have a deliberate reason — the reusable workflow
-      # defaults extra-tags to empty for that reason.
-      extra-tags: latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ./.github/actions/harbor-build-push
+        with:
+          image: harbor.shion1305.com/shion1305/demo
+          context: ./harbor/demo
+          # The demo intentionally moves `latest` so a `docker pull
+          # harbor.shion1305.com/shion1305/demo` always pulls the most recent
+          # smoke-test image. Production callers should NOT pass extra-tags
+          # unless they have a deliberate reason — the action defaults
+          # extra-tags to empty for that reason.
+          extra-tags: latest

@@ -1,0 +1,18 @@
+---
+# yaml-language-server: $schema=https://raw.githubusercontent.com/aquaproj/aqua/main/json-schema/aqua-yaml.json
+#
+# Tool list for the harbor-build-push composite action. The action's step
+# points AQUA_GLOBAL_CONFIG at this file via `${{ github.action_path }}`,
+# so the contents and the action.yml that consumes them are always in sync
+# regardless of which `@<ref>` the caller pinned.
+#
+# Renovate keeps the package versions current via the customManagers regex
+# in renovate.json — that regex matches files literally named `aqua.yaml`
+# (it's not aqua-aware; aqua has no built-in Renovate manager). Keep the
+# package list minimal so callers don't download unrelated tooling.
+registries:
+  - type: standard
+    ref: v4.479.0 # renovate: depName=aquaproj/aqua-registry
+packages:
+  # Provides `crane` — used by the action to push OCI artifacts.
+  - name: google/go-containerregistry@v0.21.5

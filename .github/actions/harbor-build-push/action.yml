@@ -1,0 +1,295 @@
+# Composite action: build a multi-arch OCI image, push it to
+# harbor.shion1305.com, and (optionally) keyless-sign it with cosign. Other
+# repos consume this with `uses:
+# Shion1305/k8s-GitOps/.github/actions/harbor-build-push@<ref>` and pass
+# `image:` / `context:` etc. via `with:`.
+#
+# Why a composite action and not a reusable workflow:
+# Earlier this lived at `.github/workflows/harbor-build-push.yaml` as a
+# reusable workflow. It needed to install `crane` via aqua, but a reusable
+# workflow's `actions/checkout` checks out the CALLER repo, so the aqua
+# config that travels with the workflow is not on disk. We worked around
+# that with a sparse-checkout of k8s-GitOps, but the result was brittle
+# (`aqua i -l` ignores AQUA_GLOBAL_CONFIG, callers had to remember
+# `id-token: write` semantics for reusables, etc.). A composite action
+# instead exposes `${{ github.action_path }}`, which always points at the
+# directory this action was downloaded into — so we can ship `aqua.yaml`
+# right next to `action.yml` and just read it from there. No checkout
+# step, no AQUA_GLOBAL_CONFIG gymnastics.
+#
+# Why Vault JWT auth instead of long-lived robot-account GitHub Secrets:
+# Harbor's /v2/ token endpoint does not accept GitHub OIDC tokens directly
+# (unlike zot, which we wired up in demo-push-to-zot.yaml). The supported CI
+# path is a Harbor robot account — a project-scoped static credential. The
+# naive implementation is to drop those creds into per-repo
+# `HARBOR_ROBOT_USER` / `HARBOR_ROBOT_TOKEN` GitHub Secrets, but that has
+# real downsides:
+#   - The credential is long-lived; rotation requires touching every consumer
+#     repo.
+#   - Anyone with write access to a consuming repo's Settings can read the
+#     secret-name back into a workflow they control.
+#   - There is no central audit trail of who/what fetched the credential.
+# Instead we let each workflow exchange its short-lived (~10 min) GitHub OIDC
+# token for the robot creds at job start: GitHub mints the OIDC JWT, Vault's
+# `auth/jwt` method validates it, and Vault hands back the robot creds. The
+# robot creds themselves still exist (Harbor requires them) but they live in
+# Vault and never leave the runner's job context.
+#
+# Vault binding scope:
+# Vault role `harbor-robot-pusher` is configured with
+# `bound_audiences=https://github.com/Shion1305,https://github.com/Shion1305Dev`
+# and a `bound_claims` filter on `repository_owner ∈ {Shion1305,
+# Shion1305Dev}`. So this action can only obtain robot creds when called
+# from a repo under one of those two GitHub orgs/users. A fork in some
+# unrelated namespace will fail at the Vault login step. `bound_audiences`
+# matches the GitHub default `aud` claim (`https://github.com/<owner>`), so
+# callers do NOT need to override `jwtGithubAudience` on the Vault action —
+# leaving it unset is correct.
+#
+# Why `id-token: write` is required on the CALLING JOB:
+# Composite actions run inline in the caller's job and inherit the caller
+# job's permissions; they cannot define a `permissions:` block themselves.
+# Both Vault JWT login and cosign keyless signing mint a fresh OIDC token
+# from the runner, which requires `id-token: write` on the caller's job.
+# Callers that forget to grant this will fail at the Vault step.
+# See: https://docs.sigstore.dev/cosign/signing/overview/#keyless-signing
+#
+# Why crane and not `docker push`: crane works directly with OCI-layout
+# dirs/tarballs (no docker-daemon image-store round-trip), sends
+# `Authorization: Bearer` pre-emptively, and is more robust under CI
+# conditions. It reads ~/.docker/config.json and Just Works once the auth
+# blob is in place. Same reasoning as the zot demo workflow.
+
+name: harbor - build & push
+description: >-
+  Build a multi-arch OCI image, push it to harbor.shion1305.com using
+  short-lived robot creds fetched from Vault via GitHub OIDC, and
+  optionally keyless-sign with cosign.
+
+inputs:
+  image:
+    description: >-
+      Full image reference WITHOUT tag, e.g.
+      `harbor.shion1305.com/shion1305/demo`. The robot account scoped to
+      the `shion1305` Harbor project can only push under that project's
+      namespace.
+    required: true
+  context:
+    description: Docker build context path (relative to repo root).
+    required: false
+    default: "."
+  dockerfile:
+    description: Dockerfile path relative to `context`.
+    required: false
+    default: Dockerfile
+  platforms:
+    description: >-
+      Comma-separated buildx target platforms. Default builds amd64 and
+      arm64 — matches the `harbor/demo` baseline.
+    required: false
+    default: linux/amd64,linux/arm64
+  sign:
+    description: >-
+      Whether to keyless-sign the pushed image with cosign. Off-by-default
+      would silently allow unsigned images, so we default ON; callers that
+      genuinely don't want signatures must opt out explicitly. Pass the
+      string `"false"` to disable.
+    required: false
+    default: "true"
+  tag:
+    description: >-
+      Primary tag pushed for this image. Defaults to the calling repo's
+      commit SHA so every build is uniquely addressable.
+    required: false
+    default: ${{ github.sha }}
+  extra-tags:
+    description: >-
+      Comma-separated additional tags applied to the pushed image (e.g.
+      `latest,v1.2.3`). Empty string means no extras. Tags are remapped
+      against the digest, so they all point at the exact same artifact
+      as `tag`. Defaults to empty: callers that want a moving `latest`
+      must opt in explicitly so PR builds don't silently shift it.
+    required: false
+    default: ""
+
+outputs:
+  digest:
+    description: >-
+      Digest of the pushed manifest (e.g. sha256:abc...). Use
+      `${IMAGE}@${digest}` to address the artifact unambiguously in
+      downstream deploy/attest steps — tags can move, digests cannot.
+    value: ${{ steps.push.outputs.digest }}
+  ref:
+    description: >-
+      Full pinned image reference (image@digest). Convenience output so
+      callers don't have to re-concatenate inputs.image and the digest.
+    value: ${{ steps.push.outputs.ref }}
+
+runs:
+  using: composite
+  steps:
+    # QEMU registers arm64 emulation on the amd64 GitHub-hosted runner so
+    # buildx can produce arm64 layers from the same Dockerfile.
+    - uses: docker/setup-qemu-action@v3
+      with:
+        platforms: arm64
+
+    - uses: docker/setup-buildx-action@v3
+
+    # cosign signs the image keyless via Fulcio + Rekor. SBOM generation
+    # is intentionally NOT done in CI — Harbor v2.15's UI does not surface
+    # client-attached SBOM accessories (verified empirically: both
+    # `cosign attach sbom` and `cosign attest --type cyclonedx` produce
+    # accessory artifacts that Harbor stores but doesn't display in the
+    # SBOM column). Worse, those accessories appear as standalone rows
+    # that the "GENERATE SBOM" button can mis-target, causing Trivy to
+    # fail with "invalid tar header" while trying to extract a manifest
+    # JSON as if it were an image layer. So: signing only here; SBOM is
+    # produced by Harbor's own Trivy via the GENERATE SBOM action on the
+    # image artifact.
+    - uses: sigstore/cosign-installer@v3
+      with:
+        cosign-release: v2.4.1
+
+    # crane is installed via aqua so the pinned version travels with this
+    # action. github.action_path resolves to the directory this action was
+    # downloaded into (the repo+ref the caller's `uses:` line points at),
+    # so aqua.yaml is always the version that matches this action.yml.
+    #
+    # `aqua_opts: -l -a` is load-bearing: aqua-installer's default of `-l`
+    # alone runs in lazy mode and only links aqua-proxy without consuming
+    # AQUA_GLOBAL_CONFIG, so `crane` would never be installed. Adding `-a`
+    # triggers installAll, which actually reads the config file.
+    - uses: aquaproj/aqua-installer@v4.0.4
+      with:
+        aqua_version: v2.58.0
+        aqua_opts: -l -a
+      env:
+        AQUA_GLOBAL_CONFIG: ${{ github.action_path }}/aqua.yaml
+
+    # Exchange the workflow's GitHub OIDC token for the Harbor robot
+    # credentials kept in Vault at `harbor/data/robot-pusher` (KV v2). The
+    # vault-action does the OIDC mint + JWT login + KV read in one step
+    # and exposes the results as masked env vars. We rely on the GitHub
+    # default audience (`https://github.com/<owner>`) which matches the
+    # Vault role's `bound_audiences` — overriding `jwtGithubAudience` here
+    # would cause a 400 at the Vault side.
+    - name: Fetch Harbor robot credentials from Vault
+      uses: hashicorp/vault-action@v3
+      with:
+        url: https://vault.shion1305.com
+        method: jwt
+        role: harbor-robot-pusher
+        exportEnv: true
+        secrets: |
+          harbor/data/robot-pusher username | HARBOR_ROBOT_USER ;
+          harbor/data/robot-pusher password | HARBOR_ROBOT_TOKEN
+
+    # Guard against the silent-failure case where the vault-action step
+    # "succeeds" but the KV path is missing one of the expected fields
+    # (Vault returns 404 → action fails loud, but a renamed field would
+    # bind an empty string to the env var and crane would 401 with a
+    # generic message). Failing fast here surfaces the real cause.
+    - name: Verify robot credentials are non-empty
+      shell: bash
+      run: |
+        set -euo pipefail
+        if [ -z "${HARBOR_ROBOT_USER:-}" ] || [ -z "${HARBOR_ROBOT_TOKEN:-}" ]; then
+          echo "::error::Vault returned empty Harbor robot credentials." \
+               "Check that harbor/data/robot-pusher contains both" \
+               "'username' and 'password' fields."
+          exit 1
+        fi
+
+    # Build to an OCI-layout tarball. crane push reads OCI-layout dirs and
+    # pushes manifests with the OCI media type, which Harbor accepts.
+    # Multi-arch: buildx writes an OCI image index referencing one manifest
+    # per platform, and `crane push --index` propagates the whole index to
+    # Harbor in a single call.
+    - name: Build OCI image
+      shell: bash
+      env:
+        PLATFORMS: ${{ inputs.platforms }}
+        CONTEXT: ${{ inputs.context }}
+        DOCKERFILE: ${{ inputs.dockerfile }}
+      run: |
+        set -euo pipefail
+        docker buildx build \
+          --platform "${PLATFORMS}" \
+          --file "${CONTEXT}/${DOCKERFILE}" \
+          --output type=oci,dest=/tmp/image.tar \
+          "${CONTEXT}"
+
+    - name: Push and sign
+      id: push
+      shell: bash
+      env:
+        IMAGE: ${{ inputs.image }}
+        TAG: ${{ inputs.tag }}
+        EXTRA_TAGS: ${{ inputs.extra-tags }}
+        SIGN: ${{ inputs.sign }}
+        # COSIGN_YES suppresses cosign's interactive "are you sure"
+        # confirmation, required in non-TTY CI runners.
+        COSIGN_YES: "true"
+      run: |
+        set -euo pipefail
+        # Extract OCI tarball so crane can read it as an OCI layout dir.
+        mkdir -p /tmp/oci
+        tar -xf /tmp/image.tar -C /tmp/oci
+
+        # crane and cosign both read ~/.docker/config.json. Build it from
+        # the robot creds Vault just handed us: Harbor accepts basic auth
+        # on /v2/token and exchanges it for a short-lived bearer that
+        # crane/cosign then use for the actual push. HARBOR_ROBOT_USER
+        # and HARBOR_ROBOT_TOKEN come from the vault-action step above
+        # and are already registered as masks, so they will not leak in
+        # logs even if `set -x` were enabled.
+        mkdir -p ~/.docker
+        auth=$(printf '%s:%s' "$HARBOR_ROBOT_USER" "$HARBOR_ROBOT_TOKEN" | base64 -w0)
+        jq -n --arg a "$auth" \
+          '{auths: {"harbor.shion1305.com": {auth: $a}}}' > ~/.docker/config.json
+
+        # --index pushes the OCI image index (multi-arch manifest list)
+        # produced by buildx's --platform=...,... build. Without --index,
+        # crane would push only one of the per-arch manifests.
+        crane push --index /tmp/oci "${IMAGE}:${TAG}"
+
+        # Apply any extra tags by remapping them against the just-pushed
+        # primary tag. Empty input is a no-op (no extras requested).
+        if [ -n "${EXTRA_TAGS}" ]; then
+          IFS=',' read -ra TAGS <<< "${EXTRA_TAGS}"
+          for EXTRA_TAG in "${TAGS[@]}"; do
+            # Trim surrounding whitespace so callers can write
+            # `latest, v1.2.3` without breakage.
+            EXTRA_TAG="${EXTRA_TAG#"${EXTRA_TAG%%[![:space:]]*}"}"
+            EXTRA_TAG="${EXTRA_TAG%"${EXTRA_TAG##*[![:space:]]}"}"
+            [ -z "${EXTRA_TAG}" ] && continue
+            crane tag "${IMAGE}:${TAG}" "${EXTRA_TAG}"
+          done
+        fi
+
+        # Resolve the digest BEFORE signing. Tags can be remapped after the
+        # fact (latest can move), but a digest is the cryptographic hash of
+        # the manifest itself — signing by digest guarantees the signature
+        # binds to exactly this artifact. cosign will refuse a tag-only
+        # reference for sign/attest by design.
+        DIGEST=$(crane digest "${IMAGE}:${TAG}")
+        REF="${IMAGE}@${DIGEST}"
+        echo "Pushed ${REF}"
+
+        # Expose digest + full ref as step outputs so caller workflows can
+        # chain to deploy/attest jobs that need the digest-pinned reference
+        # (e.g. updating a Helm values file for ArgoCD GitOps sync).
+        echo "digest=${DIGEST}" >> "$GITHUB_OUTPUT"
+        echo "ref=${REF}" >> "$GITHUB_OUTPUT"
+
+        # Keyless cosign sign — no key material on disk, the signature
+        # certificate is bound to this workflow's OIDC identity. Harbor
+        # v2.15 detects the resulting cosign artifact via the OCI 1.1
+        # referrers API and shows a "Signed" badge in the UI.
+        if [ "${SIGN}" = "true" ]; then
+          echo "Signing ${REF}"
+          cosign sign "${REF}"
+        else
+          echo "Skipping cosign signing (sign=false)"
+        fi
