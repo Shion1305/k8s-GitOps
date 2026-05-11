@@ -151,21 +151,21 @@ runs:
       with:
         cosign-release: v2.4.1
 
-    # crane is installed via aqua so the pinned version travels with this
-    # action. github.action_path resolves to the directory this action was
-    # downloaded into (the repo+ref the caller's `uses:` line points at),
-    # so aqua.yaml is always the version that matches this action.yml.
-    #
-    # `aqua_opts: -l -a` is load-bearing: aqua-installer's default of `-l`
-    # alone runs in lazy mode and only links aqua-proxy without consuming
-    # AQUA_GLOBAL_CONFIG, so `crane` would never be installed. Adding `-a`
-    # triggers installAll, which actually reads the config file.
+    # crane is installed via aqua. AQUA_GLOBAL_CONFIG is exported via
+    # $GITHUB_ENV (not the installer step's `env:`) so it persists for
+    # the later push step — aqua-proxy re-reads it at every crane
+    # invocation to dispatch to the pinned package version.
+    - name: Export AQUA_GLOBAL_CONFIG
+      shell: bash
+      run: echo "AQUA_GLOBAL_CONFIG=${{ github.action_path }}/aqua.yaml" >> "$GITHUB_ENV"
+
+    # aqua_opts `-l -a`: `-a` triggers installAll which actually consumes
+    # AQUA_GLOBAL_CONFIG; `-l` alone (the installer default) only links
+    # aqua-proxy and skips package installs.
     - uses: aquaproj/aqua-installer@v4.0.4
       with:
         aqua_version: v2.58.0
         aqua_opts: -l -a
-      env:
-        AQUA_GLOBAL_CONFIG: ${{ github.action_path }}/aqua.yaml
 
     # Exchange the workflow's GitHub OIDC token for the Harbor robot
     # credentials kept in Vault at `harbor/data/robot-pusher` (KV v2). The
