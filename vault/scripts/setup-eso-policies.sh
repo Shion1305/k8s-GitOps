@@ -117,6 +117,17 @@ path "harbor/metadata/*" {
 EOF
 echo "✓ Created policy: eso-harbor"
 
+# Policy for nc-press-chotatsu namespace (separate KV v2 engine mounted at nc-press-chotatsu/)
+vault policy write eso-nc-press-chotatsu - <<EOF
+path "nc-press-chotatsu/data/*" {
+  capabilities = ["read"]
+}
+path "nc-press-chotatsu/metadata/*" {
+  capabilities = ["read", "list"]
+}
+EOF
+echo "✓ Created policy: eso-nc-press-chotatsu"
+
 # NOTE: An `eso-harbor-broker` role for the Keycloak namespace to read
 # `harbor/broker-credentials` is intentionally NOT created here. There is no
 # precedent yet for ESO-managed broker client secrets in the keycloak ns
@@ -252,6 +263,14 @@ vault write auth/kubernetes/role/eso-harbor \
   ttl=1h
 echo "✓ Created role: eso-harbor"
 
+# nc-press-chotatsu
+vault write auth/kubernetes/role/eso-nc-press-chotatsu \
+  bound_service_account_names=eso \
+  bound_service_account_namespaces=nc-press-chotatsu \
+  policies=eso-nc-press-chotatsu \
+  ttl=1h
+echo "✓ Created role: eso-nc-press-chotatsu"
+
 # github-app (cluster-scoped store; binds to the ESO operator SA, not a per-namespace SA)
 vault write auth/kubernetes/role/eso-github-app \
   bound_service_account_names=external-secrets \
@@ -383,6 +402,7 @@ echo "  eso-freqtrade   → SA eso/freqtrade       → freqtrade/data/*"
 echo "  eso-cert-manager→ SA eso/cert-manager    → system/data/cert-manager"
 echo "  eso-zot         → SA eso/zot             → zot/data/*"
 echo "  eso-harbor      → SA eso/harbor          → harbor/data/*"
+echo "  eso-nc-press-chotatsu → SA eso/nc-press-chotatsu → nc-press-chotatsu/data/*"
 echo "  eso-github-app  → SA external-secrets/external-secrets → github-app-shared/data/*"
 echo "  eso-cloudflare-grafana → SA eso/monitoring     → cloudflare-grafana/data/*"
 echo "  eso-cluster-puller → SA external-secrets/external-secrets → zot/data/cluster-puller"

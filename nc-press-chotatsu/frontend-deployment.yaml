@@ -1,0 +1,49 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nc-press-chotatsu-frontend
+  namespace: nc-press-chotatsu
+  labels:
+    app: nc-press-chotatsu-frontend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nc-press-chotatsu-frontend
+  template:
+    metadata:
+      labels:
+        app: nc-press-chotatsu-frontend
+    spec:
+      nodeSelector:
+        kubernetes.io/arch: amd64
+      containers:
+        - name: frontend
+          image: harbor.i.shion1305.com/shion1305/nc-press-chotatsu-crawl-agent-frontend:latest
+          ports:
+            - containerPort: 3000
+              name: http
+              protocol: TCP
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: nc-press-chotatsu-db-credentials
+                  key: DATABASE_URL
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          readinessProbe:
+            tcpSocket:
+              port: 3000
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            tcpSocket:
+              port: 3000
+            initialDelaySeconds: 15
+            periodSeconds: 20
