@@ -1,0 +1,88 @@
+# Daily crawler run at 09:00 JST (= 00:00 UTC). `--max 500` pulls up to 500
+# new procurement records per invocation; the entrypoint always runs
+# `alembic upgrade head` first, so migrations apply automatically.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: nc-press-chotatsu-crawler
+  namespace: nc-press-chotatsu
+spec:
+  schedule: "0 0 * * *"
+  timeZone: "UTC"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      activeDeadlineSeconds: 21600
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: crawler
+              image: harbor.i.shion1305.com/shion1305/nc-press-chotatsu-crawl-agent-backend:latest
+              args:
+                - run
+                - --max
+                - "500"
+              env:
+                - name: DATABASE_URL
+                  valueFrom:
+                    secretKeyRef:
+                      name: nc-press-chotatsu-db-credentials
+                      key: DATABASE_URL
+                - name: GDRIVE_SERVICE_ACCOUNT_JSON
+                  value: /app/secret/sa.json
+                - name: OPENAI_API_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: nc-press-chotatsu-config
+                      key: OPENAI_API_KEY
+                - name: GDRIVE_PARENT_FOLDER_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: nc-press-chotatsu-config
+                      key: GDRIVE_PARENT_FOLDER_ID
+                - name: CONTACT_COMPANY
+                  valueFrom:
+                    secretKeyRef:
+                      name: nc-press-chotatsu-config
+                      key: CONTACT_COMPANY
+                - name: CONTACT_NAME
+                  valueFrom:
+                    secretKeyRef:
+                      name: nc-press-chotatsu-config
+                      key: CONTACT_NAME
+                - name: CONTACT_PHONE
+                  valueFrom:
+                    secretKeyRef:
+                      name: nc-press-chotatsu-config
+                      key: CONTACT_PHONE
+                - name: CONTACT_EMAIL
+                  valueFrom:
+                    secretKeyRef:
+                      name: nc-press-chotatsu-config
+                      key: CONTACT_EMAIL
+              resources:
+                requests:
+                  cpu: 200m
+                  memory: 1Gi
+                limits:
+                  cpu: 2000m
+                  memory: 4Gi
+              volumeMounts:
+                - name: gdrive-sa
+                  mountPath: /app/secret
+                  readOnly: true
+                - name: data
+                  mountPath: /app/data
+          volumes:
+            - name: gdrive-sa
+              secret:
+                secretName: nc-press-chotatsu-gdrive-sa
+                items:
+                  - key: sa.json
+                    path: sa.json
+            - name: data
+              emptyDir: {}
