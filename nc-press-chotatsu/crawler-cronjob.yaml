@@ -19,6 +19,8 @@ spec:
       template:
         spec:
           restartPolicy: Never
+          nodeSelector:
+            kubernetes.io/arch: amd64
           containers:
             - name: crawler
               image: harbor.i.shion1305.com/shion1305/nc-press-chotatsu-crawl-agent-backend:latest
@@ -67,10 +69,12 @@ spec:
               resources:
                 requests:
                   cpu: 200m
-                  memory: 1Gi
+                  memory: 1536Mi
+                  ephemeral-storage: 1Gi
                 limits:
                   cpu: 2000m
-                  memory: 4Gi
+                  memory: 6Gi
+                  ephemeral-storage: 10Gi
               volumeMounts:
                 - name: gdrive-sa
                   mountPath: /app/secret
@@ -85,4 +89,5 @@ spec:
                   - key: sa.json
                     path: sa.json
             - name: data
-              emptyDir: {}
+              emptyDir:
+                sizeLimit: 10Gi
