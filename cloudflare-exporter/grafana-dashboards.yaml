@@ -1,27 +1,556 @@
 apiVersion: grafana.integreatly.org/v1beta1
 kind: GrafanaDashboard
 metadata:
-  name: cloudflare-analytics
+  name: cloudflare-quota
   namespace: monitoring
 spec:
   instanceSelector:
     matchLabels:
       dashboards: cloudflare-grafana
   folderRef: cloudflare-monitoring
-  grafanaCom:
-    id: 12133
-    revision: 1
----
-apiVersion: grafana.integreatly.org/v1beta1
-kind: GrafanaDashboard
-metadata:
-  name: cloudflare-overview
-  namespace: monitoring
-spec:
-  instanceSelector:
-    matchLabels:
-      dashboards: cloudflare-grafana
-  folderRef: cloudflare-monitoring
-  grafanaCom:
-    id: 13133
-    revision: 1
+  resyncPeriod: 5m
+  json: |
+    {
+      "title": "Cloudflare Compute & Storage Quota",
+      "uid": "cloudflare-quota",
+      "schemaVersion": 39,
+      "version": 1,
+      "editable": true,
+      "graphTooltip": 1,
+      "tags": ["cloudflare"],
+      "time": { "from": "now-24h", "to": "now" },
+      "refresh": "1m",
+      "timepicker": {
+        "refresh_intervals": ["30s", "1m", "5m", "15m", "30m", "1h"],
+        "time_options": ["24h", "7d", "30d", "90d"]
+      },
+      "templating": {
+        "list": [
+          {
+            "name": "account",
+            "type": "query",
+            "datasource": { "type": "prometheus", "uid": "prometheus" },
+            "query": "label_values(cloudflare_worker_requests_count, account)",
+            "refresh": 2,
+            "multi": false,
+            "includeAll": false,
+            "label": "Account"
+          },
+          {
+            "name": "script",
+            "type": "query",
+            "datasource": { "type": "prometheus", "uid": "prometheus" },
+            "query": "label_values(cloudflare_worker_requests_count{account=\"$account\"}, script_name)",
+            "refresh": 2,
+            "multi": true,
+            "includeAll": true,
+            "label": "Worker script"
+          }
+        ]
+      },
+      "annotations": { "list": [] },
+      "panels": [
+        {
+          "type": "row",
+          "id": 1,
+          "title": "Workers — Requests",
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+          "collapsed": false
+        },
+        {
+          "type": "gauge",
+          "id": 10,
+          "title": "Requests — past 24h",
+          "description": "Sum of Worker requests in the past 24 hours. Free plan: 100,000/day. Paid plan: pro-rated daily share of 10M/month (~333k/day).",
+          "gridPos": { "h": 8, "w": 6, "x": 0, "y": 1 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "sum(increase(cloudflare_worker_requests_count{account=\"$account\", script_name=~\"$script\"}[24h]))"
+            }
+          ],
+          "options": {
+            "reduceOptions": { "calcs": ["lastNotNull"], "fields": "" },
+            "showThresholdLabels": true,
+            "showThresholdMarkers": true,
+            "minVizHeight": 75
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "min": 0,
+              "max": 333333,
+              "decimals": 0,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 80000 },
+                  { "color": "orange", "value": 100000 },
+                  { "color": "red", "value": 333333 }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "type": "gauge",
+          "id": 11,
+          "title": "Requests — selected range",
+          "description": "Sum of Worker requests for the dashboard time range. Free plan monthly: 3M (100k/day × 30). Paid plan monthly: 10M.",
+          "gridPos": { "h": 8, "w": 6, "x": 6, "y": 1 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "sum(increase(cloudflare_worker_requests_count{account=\"$account\", script_name=~\"$script\"}[$__range]))"
+            }
+          ],
+          "options": {
+            "reduceOptions": { "calcs": ["lastNotNull"], "fields": "" },
+            "showThresholdLabels": true,
+            "showThresholdMarkers": true,
+            "minVizHeight": 75
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "min": 0,
+              "max": 10000000,
+              "decimals": 0,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 2400000 },
+                  { "color": "orange", "value": 3000000 },
+                  { "color": "red", "value": 10000000 }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "type": "stat",
+          "id": 12,
+          "title": "Free plan utilization (daily)",
+          "description": "(past 24h requests) / 100,000. Above 100% means Free plan would have throttled.",
+          "gridPos": { "h": 4, "w": 6, "x": 12, "y": 1 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "sum(increase(cloudflare_worker_requests_count{account=\"$account\", script_name=~\"$script\"}[24h])) / 100000"
+            }
+          ],
+          "options": {
+            "reduceOptions": { "calcs": ["lastNotNull"], "fields": "" },
+            "colorMode": "background",
+            "graphMode": "area",
+            "textMode": "auto"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percentunit",
+              "decimals": 2,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 0.8 },
+                  { "color": "red", "value": 1.0 }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "type": "stat",
+          "id": 13,
+          "title": "Paid plan utilization (range)",
+          "description": "(requests over selected range) / 10,000,000. Above 100% incurs $0.30 per additional million.",
+          "gridPos": { "h": 4, "w": 6, "x": 18, "y": 1 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "sum(increase(cloudflare_worker_requests_count{account=\"$account\", script_name=~\"$script\"}[$__range])) / 10000000"
+            }
+          ],
+          "options": {
+            "reduceOptions": { "calcs": ["lastNotNull"], "fields": "" },
+            "colorMode": "background",
+            "graphMode": "area",
+            "textMode": "auto"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percentunit",
+              "decimals": 3,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 0.8 },
+                  { "color": "red", "value": 1.0 }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "type": "stat",
+          "id": 14,
+          "title": "Error rate (range)",
+          "description": "Worker error count / total requests over the selected range.",
+          "gridPos": { "h": 4, "w": 12, "x": 12, "y": 5 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "sum(increase(cloudflare_worker_errors_count{account=\"$account\", script_name=~\"$script\"}[$__range])) / clamp_min(sum(increase(cloudflare_worker_requests_count{account=\"$account\", script_name=~\"$script\"}[$__range])), 1)"
+            }
+          ],
+          "options": {
+            "reduceOptions": { "calcs": ["lastNotNull"], "fields": "" },
+            "colorMode": "value",
+            "graphMode": "area",
+            "textMode": "auto"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percentunit",
+              "decimals": 3,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 0.01 },
+                  { "color": "red", "value": 0.05 }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "type": "timeseries",
+          "id": 15,
+          "title": "Request rate by script",
+          "description": "Requests per second by Worker script.",
+          "gridPos": { "h": 9, "w": 12, "x": 0, "y": 9 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "sum by (script_name) (rate(cloudflare_worker_requests_count{account=\"$account\", script_name=~\"$script\"}[5m]))",
+              "legendFormat": "{{script_name}}"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "reqps",
+              "custom": { "lineWidth": 2, "fillOpacity": 10, "showPoints": "never" }
+            }
+          },
+          "options": {
+            "legend": { "displayMode": "table", "placement": "right", "calcs": ["mean", "max", "sum"] },
+            "tooltip": { "mode": "multi", "sort": "desc" }
+          }
+        },
+        {
+          "type": "timeseries",
+          "id": 16,
+          "title": "Cumulative requests",
+          "description": "Cumulative request count by script (counter value).",
+          "gridPos": { "h": 9, "w": 12, "x": 12, "y": 9 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "sum by (script_name) (cloudflare_worker_requests_count{account=\"$account\", script_name=~\"$script\"})",
+              "legendFormat": "{{script_name}}"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "custom": { "lineWidth": 2, "fillOpacity": 5, "showPoints": "never" }
+            }
+          },
+          "options": {
+            "legend": { "displayMode": "table", "placement": "right", "calcs": ["last"] },
+            "tooltip": { "mode": "multi", "sort": "desc" }
+          }
+        },
+        {
+          "type": "row",
+          "id": 2,
+          "title": "Workers — CPU time (per-invocation)",
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 18 },
+          "collapsed": false
+        },
+        {
+          "type": "timeseries",
+          "id": 20,
+          "title": "CPU time P99 vs plan caps",
+          "description": "Per-invocation CPU time, P99 quantile in milliseconds. Free plan: 10ms hard cap. Paid plan: 30,000ms default (5min absolute max).",
+          "gridPos": { "h": 9, "w": 16, "x": 0, "y": 19 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "cloudflare_worker_cpu_time{account=\"$account\", script_name=~\"$script\", quantile=\"P99\"} / 1000",
+              "legendFormat": "P99 — {{script_name}}"
+            },
+            {
+              "refId": "B",
+              "expr": "cloudflare_worker_cpu_time{account=\"$account\", script_name=~\"$script\", quantile=\"P50\"} / 1000",
+              "legendFormat": "P50 — {{script_name}}"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "ms",
+              "custom": {
+                "lineWidth": 2,
+                "fillOpacity": 5,
+                "showPoints": "never",
+                "thresholdsStyle": { "mode": "line+area" }
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 10 },
+                  { "color": "red", "value": 30000 }
+                ]
+              }
+            }
+          },
+          "options": {
+            "legend": { "displayMode": "table", "placement": "right", "calcs": ["lastNotNull", "max"] },
+            "tooltip": { "mode": "multi", "sort": "desc" }
+          }
+        },
+        {
+          "type": "stat",
+          "id": 21,
+          "title": "P99 CPU time (latest)",
+          "description": "Latest P99 CPU time per script. Free cap = 10ms (red), Paid default = 30,000ms.",
+          "gridPos": { "h": 9, "w": 8, "x": 16, "y": 19 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "cloudflare_worker_cpu_time{account=\"$account\", script_name=~\"$script\", quantile=\"P99\"} / 1000",
+              "legendFormat": "{{script_name}}"
+            }
+          ],
+          "options": {
+            "reduceOptions": { "calcs": ["lastNotNull"], "fields": "" },
+            "colorMode": "background",
+            "graphMode": "area",
+            "textMode": "value_and_name",
+            "orientation": "auto"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "ms",
+              "decimals": 2,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 5 },
+                  { "color": "orange", "value": 10 },
+                  { "color": "red", "value": 30000 }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "type": "row",
+          "id": 3,
+          "title": "R2 — Storage",
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 28 },
+          "collapsed": false
+        },
+        {
+          "type": "gauge",
+          "id": 30,
+          "title": "Total R2 storage",
+          "description": "Sum of all R2 buckets in this account. Free plan: 10 GB. Above that, Paid plan bills $0.015/GB-month.",
+          "gridPos": { "h": 9, "w": 8, "x": 0, "y": 29 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "cloudflare_r2_storage_total_bytes{account=\"$account\"}"
+            }
+          ],
+          "options": {
+            "reduceOptions": { "calcs": ["lastNotNull"], "fields": "" },
+            "showThresholdLabels": true,
+            "showThresholdMarkers": true
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "decbytes",
+              "min": 0,
+              "max": 107374182400,
+              "decimals": 2,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 8589934592 },
+                  { "color": "orange", "value": 10737418240 },
+                  { "color": "red", "value": 107374182400 }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "type": "bargauge",
+          "id": 31,
+          "title": "Per-bucket storage",
+          "description": "Breakdown of R2 usage per bucket.",
+          "gridPos": { "h": 9, "w": 16, "x": 8, "y": 29 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "cloudflare_r2_storage_bytes{account=\"$account\"}",
+              "legendFormat": "{{bucket}}"
+            }
+          ],
+          "options": {
+            "reduceOptions": { "calcs": ["lastNotNull"], "fields": "" },
+            "displayMode": "gradient",
+            "orientation": "horizontal",
+            "showUnfilled": true
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "decbytes",
+              "min": 0,
+              "max": 10737418240,
+              "decimals": 2,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 1073741824 },
+                  { "color": "red", "value": 10737418240 }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "type": "row",
+          "id": 4,
+          "title": "R2 — Operations",
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 38 },
+          "collapsed": false
+        },
+        {
+          "type": "gauge",
+          "id": 40,
+          "title": "Class A ops — selected range",
+          "description": "Mutating operations (PutObject, CopyObject, ListObjects, multipart, bucket config writes). Free plan: 1M/month. Paid plan: $4.50/M overage.",
+          "gridPos": { "h": 8, "w": 6, "x": 0, "y": 39 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "sum(increase(cloudflare_r2_operation_count{account=\"$account\", operation=~\"PutObject|CopyObject|ListObjects|ListBuckets|PutBucket|CompleteMultipartUpload|CreateMultipartUpload|LifecycleStorageTierTransition|ListMultipartUploads|UploadPart|UploadPartCopy|ListParts|PutBucketEncryption|PutBucketCors|PutBucketLifecycleConfiguration\"}[$__range]))"
+            }
+          ],
+          "options": {
+            "reduceOptions": { "calcs": ["lastNotNull"], "fields": "" },
+            "showThresholdLabels": true,
+            "showThresholdMarkers": true
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "min": 0,
+              "max": 1000000,
+              "decimals": 0,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 800000 },
+                  { "color": "red", "value": 1000000 }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "type": "gauge",
+          "id": 41,
+          "title": "Class B ops — selected range",
+          "description": "Read-only operations (GetObject, HeadObject/Bucket, bucket config reads). Free plan: 10M/month. Paid plan: $0.36/M overage.",
+          "gridPos": { "h": 8, "w": 6, "x": 6, "y": 39 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "sum(increase(cloudflare_r2_operation_count{account=\"$account\", operation=~\"GetObject|HeadObject|HeadBucket|UsageSummary|GetBucketEncryption|GetBucketLocation|GetBucketCors|GetBucketLifecycleConfiguration\"}[$__range]))"
+            }
+          ],
+          "options": {
+            "reduceOptions": { "calcs": ["lastNotNull"], "fields": "" },
+            "showThresholdLabels": true,
+            "showThresholdMarkers": true
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "min": 0,
+              "max": 10000000,
+              "decimals": 0,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 8000000 },
+                  { "color": "red", "value": 10000000 }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "type": "timeseries",
+          "id": 42,
+          "title": "R2 operation rate by operation",
+          "description": "Operations per second over time, split by operation name.",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 39 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "sum by (operation) (rate(cloudflare_r2_operation_count{account=\"$account\"}[5m]))",
+              "legendFormat": "{{operation}}"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "ops",
+              "custom": { "lineWidth": 2, "fillOpacity": 10, "showPoints": "never", "stacking": { "mode": "normal" } }
+            }
+          },
+          "options": {
+            "legend": { "displayMode": "table", "placement": "right", "calcs": ["mean", "max"] },
+            "tooltip": { "mode": "multi", "sort": "desc" }
+          }
+        }
+      ]
+    }
