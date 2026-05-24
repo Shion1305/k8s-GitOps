@@ -22,7 +22,8 @@
 #
 # Role-to-Grafana-role mapping is performed inside Grafana via
 # `auth.generic_oauth.role_attribute_path`, keying off the `groups` claim
-# emitted by the group-membership protocol mapper attached to each client.
+# emitted by the `groups` client scope (see clientScopes below). Clients
+# that need the claim opt in via defaultClientScopes.
 #
 # -----------------------------------------------------------------------------
 # Manual post-import steps (one-time, after first successful sync):
@@ -120,6 +121,34 @@ spec:
           - grafana-viewer
 
     # -------------------------------------------------------------------------
+    # Client scopes
+    # -------------------------------------------------------------------------
+    # `groups` scope: owns the oidc-group-membership-mapper so any client in
+    # this realm that needs the `groups` claim can opt in by listing this
+    # scope in defaultClientScopes (or by requesting `scope=groups` at /auth).
+    # Keeping the mapper here (rather than directly on the client) lets
+    # Keycloak accept `scope=groups` as a known scope — without a matching
+    # clientScope, Keycloak returns `invalid_scope` even though the mapper
+    # would otherwise inject the claim.
+    clientScopes:
+      - name: groups
+        protocol: openid-connect
+        attributes:
+          include.in.token.scope: "true"
+          display.on.consent.screen: "false"
+        protocolMappers:
+          - name: groups
+            protocolMapper: oidc-group-membership-mapper
+            protocol: openid-connect
+            consentRequired: false
+            config:
+              claim.name: "groups"
+              full.path: "false"
+              id.token.claim: "true"
+              access.token.claim: "true"
+              userinfo.token.claim: "true"
+
+    # -------------------------------------------------------------------------
     # Clients
     # -------------------------------------------------------------------------
     clients:
@@ -141,19 +170,11 @@ spec:
           - https://ynufes-cf.shion1305.com/*
         webOrigins:
           - https://ynufes-cf.shion1305.com
-        protocolMappers:
-          # Emit `groups` claim in id_token, access_token and userinfo so
-          # Grafana's role_attribute_path can map group -> org role.
-          - name: groups
-            protocolMapper: oidc-group-membership-mapper
-            protocol: openid-connect
-            consentRequired: false
-            config:
-              claim.name: "groups"
-              full.path: "false"
-              id.token.claim: "true"
-              access.token.claim: "true"
-              userinfo.token.claim: "true"
+        # `openid`, `email`, `profile` are Keycloak's built-in default scopes
+        # and are added automatically. Only `groups` (defined above) needs to
+        # be opted in here so the `groups` claim is emitted into tokens.
+        defaultClientScopes:
+          - groups
 
     # -------------------------------------------------------------------------
     # Identity Providers
