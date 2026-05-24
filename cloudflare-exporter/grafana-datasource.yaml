@@ -8,6 +8,10 @@ spec:
     matchLabels:
       dashboards: cloudflare-grafana
   datasource:
+    # Pin a stable UID so dashboard JSONs can reference this datasource by
+    # name. Without this, grafana-operator assigns a random UUID on first
+    # apply and dashboards lose their datasource link.
+    uid: prometheus
     name: Prometheus
     type: prometheus
     access: proxy
