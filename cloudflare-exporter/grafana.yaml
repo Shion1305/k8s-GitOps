@@ -39,6 +39,15 @@ spec:
       role_attribute_path: contains(groups[*], 'grafana-admin') && 'Admin' || contains(groups[*], 'grafana-editor') && 'Editor' || 'Viewer'
     security:
       admin_user: admin
+    # Enable Grafana's "public dashboard" feature so individual dashboards
+    # (cloudflare-overview / cloudflare-workers / cloudflare-r2) can be
+    # shared via login-less URLs. The actual publish step is performed
+    # manually from the dashboard's Share → Public dashboard UI after
+    # this feature flag is in place.
+    feature_toggles:
+      enable: publicDashboards
+    public_dashboards:
+      enabled: "true"
   deployment:
     spec:
       template:

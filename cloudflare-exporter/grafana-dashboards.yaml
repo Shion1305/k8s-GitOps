@@ -44,25 +44,25 @@ spec:
           "type": "text",
           "id": 100,
           "transparent": true,
-          "gridPos": { "h": 5, "w": 24, "x": 0, "y": 0 },
+          "gridPos": { "h": 7, "w": 24, "x": 0, "y": 0 },
           "options": {
             "mode": "markdown",
-            "content": "## Cloudflare 概要ダッシュボード\n\nCloudflare の課金サイクルは **1 ヶ月** です。このダッシュボードは選択期間 (デフォルト: 過去30日) の利用量を、Free / Paid 各プランの月間枠と比較して表示します。\n\n**色の意味**: 緑 = 余裕 / 黄 = 50% 超過 / 橙 = 80% 超過 (Paid 課金圏内) / 赤 = 100% 到達\n\n詳しく見るには: [Workers 詳細](/d/cloudflare-workers) ・ [R2 詳細](/d/cloudflare-r2)"
+            "content": "## Cloudflare 概要ダッシュボード\n\nCloudflare の課金サイクルは **1 ヶ月** です。このダッシュボードは選択期間 (デフォルト: 過去30日) の利用量を、無料プランと有料プランの月間枠と比較して表示します。\n\n**色の意味**: 🟢 緑 = 余裕 / 🟡 黄 = 50% 超過 / 🟠 橙 = 80% 超過 (有料プラン 課金圏内) / 🔴 赤 = 100% 到達\n\n詳しく見るには: [Workers 詳細](/d/cloudflare-workers) ・ [R2 詳細](/d/cloudflare-r2)\n\nページ末尾の **「📖 料金プラン解説」** セクションを開くと、無料プランと有料プランの上限・課金単価がひと目で分かる解説が出てきます。"
           }
         },
         {
           "type": "row",
           "id": 1,
           "title": "Workers (サーバーレス実行)",
-          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 5 },
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 7 },
           "collapsed": false
         },
         {
           "type": "stat",
           "id": 110,
           "title": "Workers リクエスト数 (期間合計)",
-          "description": "選択期間内に Worker が呼び出された総回数。Free 月間 300万 / Paid 月間 1,000万 が上限です。",
-          "gridPos": { "h": 6, "w": 8, "x": 0, "y": 6 },
+          "description": "選択期間内に Worker が呼び出された総回数。無料プラン 月間 300万 / 有料プラン 月間 1,000万 が上限です。",
+          "gridPos": { "h": 6, "w": 12, "x": 0, "y": 17 },
           "datasource": { "type": "prometheus", "uid": "prometheus" },
           "targets": [
             {
@@ -95,46 +95,10 @@ spec:
         },
         {
           "type": "gauge",
-          "id": 111,
-          "title": "Free 月間枠の消費率",
-          "description": "(期間リクエスト数) ÷ 3,000,000 (Free 月間枠 = 100,000 req/日 × 30 日)。100% で Free 上限に到達。",
-          "gridPos": { "h": 6, "w": 8, "x": 8, "y": 6 },
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "targets": [
-            {
-              "refId": "A",
-              "expr": "sum(increase(cloudflare_worker_requests_count{account=\"$account\"}[$__range])) / 3000000"
-            }
-          ],
-          "options": {
-            "reduceOptions": { "calcs": ["lastNotNull"], "fields": "" },
-            "showThresholdMarkers": true,
-            "orientation": "auto"
-          },
-          "fieldConfig": {
-            "defaults": {
-              "unit": "percentunit",
-              "min": 0,
-              "max": 1,
-              "decimals": 2,
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  { "color": "green", "value": null },
-                  { "color": "yellow", "value": 0.5 },
-                  { "color": "orange", "value": 0.8 },
-                  { "color": "red", "value": 1.0 }
-                ]
-              }
-            }
-          }
-        },
-        {
-          "type": "gauge",
           "id": 112,
-          "title": "Paid 月間枠の消費率",
-          "description": "(期間リクエスト数) ÷ 10,000,000 (Paid 月間枠)。100% を超えると $0.30 / 100万 req の超過課金。",
-          "gridPos": { "h": 6, "w": 8, "x": 16, "y": 6 },
+          "title": "有料プラン 月間枠の消費率",
+          "description": "(期間リクエスト数) ÷ 10,000,000 (有料プラン 月間枠)。100% を超えると $0.30 / 100万 req の超過課金。無料プランの日次上限 (100k/日) は上の日別グラフで確認してください。",
+          "gridPos": { "h": 6, "w": 12, "x": 12, "y": 17 },
           "datasource": { "type": "prometheus", "uid": "prometheus" },
           "targets": [
             {
@@ -166,18 +130,109 @@ spec:
           }
         },
         {
+          "type": "timeseries",
+          "id": 115,
+          "title": "日別リクエスト数 (無料枠 100k/日 の黄ライン入り)",
+          "description": "選択期間内の各日の Worker リクエスト合計。Cloudflare の無料プラン日次上限 100,000 (黄ライン) と有料プラン pro-rata 333,333 (赤ライン) を超えた棒が「課金圏内に入った日」です。日の境界は **00:00 UTC** (= 09:00 JST) — Cloudflare の枠は UTC 基準でリセットされるため、このパネルは UTC 時間でグループ化しています。",
+          "gridPos": { "h": 9, "w": 18, "x": 0, "y": 8 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "sum(increase(cloudflare_worker_requests_count{account=\"$account\"}[24h]))",
+              "legendFormat": "日次合計",
+              "interval": "1d"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "decimals": 0,
+              "min": 0,
+              "max": 110000,
+              "custom": {
+                "drawStyle": "bars",
+                "lineWidth": 1,
+                "fillOpacity": 80,
+                "showPoints": "never",
+                "barAlignment": -1,
+                "thresholdsStyle": { "mode": "line" },
+                "axisSoftMax": 110000
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 100000 },
+                  { "color": "red", "value": 333333 }
+                ]
+              }
+            }
+          },
+          "options": {
+            "legend": { "displayMode": "list", "placement": "bottom", "calcs": ["sum", "max"] },
+            "tooltip": { "mode": "single" },
+            "timezone": ["utc"]
+          },
+          "timezone": "utc"
+        },
+        {
+          "type": "stat",
+          "id": 116,
+          "title": "無料枠 100k/日 を超えた日数",
+          "description": "選択期間内に、日次リクエスト数が無料プラン上限 (100,000 req/日) を超えた日の数。Cloudflare の枠は UTC 基準でリセットされるため UTC 時間でカウントしています。0 日なら全期間 無料枠内に収まっており、それ以上なら有料プラン課金が発生したことになります。",
+          "gridPos": { "h": 9, "w": 6, "x": 18, "y": 8 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "count_over_time((sum(increase(cloudflare_worker_requests_count{account=\"$account\"}[1d])) > 100000)[$__range:1d]) or vector(0)"
+            }
+          ],
+          "options": {
+            "reduceOptions": { "calcs": ["lastNotNull"], "fields": "" },
+            "colorMode": "background",
+            "graphMode": "area",
+            "textMode": "value",
+            "justifyMode": "center",
+            "noValue": "0 日"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "none",
+              "decimals": 0,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "orange", "value": 1 },
+                  { "color": "red", "value": 5 }
+                ]
+              }
+            },
+            "overrides": [
+              {
+                "matcher": { "id": "byName", "options": "Value" },
+                "properties": [
+                  { "id": "displayName", "value": "超過日数" }
+                ]
+              }
+            ]
+          }
+        },
+        {
           "type": "row",
           "id": 2,
           "title": "R2 (オブジェクトストレージ)",
-          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 12 },
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 23 },
           "collapsed": false
         },
         {
           "type": "stat",
           "id": 210,
           "title": "R2 合計容量",
-          "description": "全バケット合計の使用容量。Free 枠は 10 GB まで。",
-          "gridPos": { "h": 6, "w": 6, "x": 0, "y": 13 },
+          "description": "全バケット合計の使用容量。無料枠は 10 GB まで。",
+          "gridPos": { "h": 6, "w": 6, "x": 0, "y": 24 },
           "datasource": { "type": "prometheus", "uid": "prometheus" },
           "targets": [
             {
@@ -211,9 +266,9 @@ spec:
         {
           "type": "gauge",
           "id": 211,
-          "title": "容量 Free 枠の消費率",
-          "description": "(合計容量) ÷ 10 GB。100% で Free 上限到達、Paid は超過分 $0.015 / GB-月。",
-          "gridPos": { "h": 6, "w": 6, "x": 6, "y": 13 },
+          "title": "容量 無料枠の消費率",
+          "description": "(合計容量) ÷ 10 GB。100% で 無料枠の上限到達、有料プラン は超過分 $0.015 / GB-月。",
+          "gridPos": { "h": 6, "w": 6, "x": 6, "y": 24 },
           "datasource": { "type": "prometheus", "uid": "prometheus" },
           "targets": [
             {
@@ -247,9 +302,9 @@ spec:
         {
           "type": "gauge",
           "id": 212,
-          "title": "Class A 書込み Free 枠の消費率",
-          "description": "(期間内 Class A 操作数) ÷ 1,000,000。Paid 超過は $4.50 / 100万 req。",
-          "gridPos": { "h": 6, "w": 6, "x": 12, "y": 13 },
+          "title": "Class A 書込み 無料枠の消費率",
+          "description": "(期間内 Class A 操作数) ÷ 1,000,000。有料プラン 超過は $4.50 / 100万 req。",
+          "gridPos": { "h": 6, "w": 6, "x": 12, "y": 24 },
           "datasource": { "type": "prometheus", "uid": "prometheus" },
           "targets": [
             {
@@ -284,9 +339,9 @@ spec:
         {
           "type": "gauge",
           "id": 213,
-          "title": "Class B 読込み Free 枠の消費率",
-          "description": "(期間内 Class B 操作数) ÷ 10,000,000。Paid 超過は $0.36 / 100万 req。",
-          "gridPos": { "h": 6, "w": 6, "x": 18, "y": 13 },
+          "title": "Class B 読込み 無料枠の消費率",
+          "description": "(期間内 Class B 操作数) ÷ 10,000,000。有料プラン 超過は $0.36 / 100万 req。",
+          "gridPos": { "h": 6, "w": 6, "x": 18, "y": 24 },
           "datasource": { "type": "prometheus", "uid": "prometheus" },
           "targets": [
             {
@@ -317,6 +372,55 @@ spec:
               }
             }
           }
+        },
+        {
+          "type": "row",
+          "id": 99,
+          "title": "📖 料金プラン解説 (クリックで開閉)",
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 30 },
+          "collapsed": true,
+          "panels": [
+            {
+              "type": "text",
+              "id": 990,
+              "transparent": true,
+              "gridPos": { "h": 18, "w": 12, "x": 0, "y": 31 },
+              "options": {
+                "mode": "markdown",
+                "content": "## 🔧 Workers (サーバーレス実行)\n\n### 🟢 無料プラン\n\n**月額**: $0\n\n- リクエスト数: **100,000 req / 日**\n  (= 約 300 万 req / 月)\n- 1 req あたり CPU: **10 ms まで**\n- 上限超過時 → **エラー** (制限される)\n\n### 💳 有料プラン (Standard)\n\n**月額**: $5 固定 + 超過従量\n\n- リクエスト数: 月 **1,000 万 req** 込み\n  超過分 → $0.30 / 100万 req\n- CPU 時間: 月 **3,000 万 ms** 込み\n  超過分 → $0.02 / 100万 CPU-ms\n- 1 req あたり CPU: デフォルト 30 秒 / 最大 5 分\n\n### 💡 ポイント\n\n- 無料プラン は **日次** の hard cap (1日 10万 req 超でブロック)\n- 有料プラン は **月次** 包括プラン\n- 日次枠は **00:00 UTC** (= 09:00 JST) でリセット\n- このダッシュボードでは 無料枠を超えそうな日や、有料プラン 月間枠の消費率が一目で分かるようになっています"
+              }
+            },
+            {
+              "type": "text",
+              "id": 991,
+              "transparent": true,
+              "gridPos": { "h": 18, "w": 12, "x": 12, "y": 31 },
+              "options": {
+                "mode": "markdown",
+                "content": "## 📦 R2 (オブジェクトストレージ)\n\n### 🟢 無料プラン\n\n**月額**: $0\n\n- ストレージ: **10 GB-月** まで\n- 書込み系 (Class A): 月 **100 万 req** まで\n- 読込み系 (Class B): 月 **1,000 万 req** まで\n- **エグレス** (外向きデータ転送): **完全無料**\n\n### 💳 有料プラン (超過分のみ課金)\n\n**月額**: Workers の $5 に含まれる\n\n- ストレージ超過 → $0.015 / GB-月\n- Class A 超過 → **$4.50 / 100万 req** (高い)\n- Class B 超過 → $0.36 / 100万 req\n- エグレス → **無料のまま**\n\n### 💡 ポイント\n\n- R2 最大の特徴は **エグレス無料** (S3 などにある外向きデータ転送料金が無い)\n- **Class A は単価が Class B の 12 倍** なので、書込み操作の最適化が課金抑制に効きます"
+              }
+            },
+            {
+              "type": "text",
+              "id": 992,
+              "transparent": true,
+              "gridPos": { "h": 8, "w": 24, "x": 0, "y": 49 },
+              "options": {
+                "mode": "markdown",
+                "content": "## 📋 R2 操作の Class A / B 分類\n\n| クラス | 単価 (有料プラン 超過時) | 該当する操作名 |\n|:--|:--|:--|\n| 🔴 **Class A** (書込み系) | **$4.50 / 100万 req** | `PutObject` / `CopyObject` / `ListObjects` / `ListBuckets` / `PutBucket` / `CompleteMultipartUpload` / `CreateMultipartUpload` / `LifecycleStorageTierTransition` / `ListMultipartUploads` / `UploadPart` / `UploadPartCopy` / `ListParts` / `PutBucketEncryption` / `PutBucketCors` / `PutBucketLifecycleConfiguration` |\n| 🟢 **Class B** (読込み系) | $0.36 / 100万 req | `GetObject` / `HeadObject` / `HeadBucket` / `UsageSummary` / `GetBucketEncryption` / `GetBucketLocation` / `GetBucketCors` / `GetBucketLifecycleConfiguration` |\n| ⚪ **完全無料** | — | `DeleteObject` / `DeleteBucket` / `AbortMultipartUpload` |"
+              }
+            },
+            {
+              "type": "text",
+              "id": 993,
+              "transparent": true,
+              "gridPos": { "h": 7, "w": 24, "x": 0, "y": 57 },
+              "options": {
+                "mode": "markdown",
+                "content": "## 💰 月額の目安\n\n| パターン | 概算月額 |\n|:--|--:|\n| **無料枠内で完結** | **$0** |\n| 有料プラン に移行 (無料枠超過のみ) | $5 + 超過分従量 |\n| 例: 月 2,000万 req + R2 50 GB (他は 無料枠内) | **約 $8.6 / 月**<br>= $5 base + ($0.30 × 10) req超過 + ($0.015 × 40) GB超過 |\n\n参考: [Cloudflare Workers 料金](https://developers.cloudflare.com/workers/platform/pricing/) ・ [Cloudflare R2 料金](https://developers.cloudflare.com/r2/pricing/)"
+              }
+            }
+          ]
         }
       ]
     }
@@ -377,25 +481,25 @@ spec:
           "type": "text",
           "id": 100,
           "transparent": true,
-          "gridPos": { "h": 4, "w": 24, "x": 0, "y": 0 },
+          "gridPos": { "h": 6, "w": 24, "x": 0, "y": 0 },
           "options": {
             "mode": "markdown",
-            "content": "## Workers 詳細\n\nCloudflare Workers (サーバーレス実行) の使用状況を、料金プランの上限と比較しながら詳細に見ます。\n\n**料金プラン**: Free = 100,000 req/日, 1 req あたり CPU 10ms / Paid = 月間 1,000万 req + CPU 3,000万 ms 込み, 1 req あたり CPU 最大 30秒\n\n[← 概要に戻る](/d/cloudflare-overview)"
+            "content": "## Workers 詳細  ·  [← 概要に戻る](/d/cloudflare-overview)\n\nCloudflare Workers (サーバーレス実行) の使用状況を、料金プランの上限と比較しながら詳細に見ます。\n\n**料金プラン**: 無料プラン = 100,000 req/日, 1 req あたり CPU 10ms / 有料プラン = 月間 1,000万 req + CPU 3,000万 ms 込み, 1 req あたり CPU 最大 30秒"
           }
         },
         {
           "type": "row",
           "id": 1,
           "title": "リクエスト数",
-          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 4 },
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 6 },
           "collapsed": false
         },
         {
           "type": "stat",
           "id": 110,
-          "title": "過去24時間のリクエスト数",
-          "description": "直近24時間の総リクエスト数。Free プランの 100,000 req/日 が上限。",
-          "gridPos": { "h": 5, "w": 6, "x": 0, "y": 5 },
+          "title": "過去24時間のリクエスト数 (時間範囲設定によらず固定)",
+          "description": "直近24時間の総リクエスト数 (常に過去24時間で計算、画面右上の時間範囲とは無関係)。無料プランの 100,000 req/日 が上限。",
+          "gridPos": { "h": 5, "w": 6, "x": 0, "y": 7 },
           "datasource": { "type": "prometheus", "uid": "prometheus" },
           "targets": [
             {
@@ -429,9 +533,9 @@ spec:
         {
           "type": "gauge",
           "id": 111,
-          "title": "Free 日次枠の消費率",
-          "description": "(過去24時間) ÷ 100,000",
-          "gridPos": { "h": 5, "w": 6, "x": 6, "y": 5 },
+          "title": "無料プラン 日次枠の消費率 (固定 24h ベース)",
+          "description": "(過去24時間のリクエスト数) ÷ 100,000。時間範囲設定とは無関係、常に直近 24 時間で計算します。",
+          "gridPos": { "h": 5, "w": 6, "x": 6, "y": 7 },
           "datasource": { "type": "prometheus", "uid": "prometheus" },
           "targets": [
             {
@@ -463,7 +567,7 @@ spec:
           "id": 112,
           "title": "選択期間のリクエスト総数",
           "description": "右上の時間範囲のリクエスト総数。デフォルトは過去30日 (月間枠目安)。",
-          "gridPos": { "h": 5, "w": 6, "x": 12, "y": 5 },
+          "gridPos": { "h": 5, "w": 6, "x": 12, "y": 7 },
           "datasource": { "type": "prometheus", "uid": "prometheus" },
           "targets": [
             {
@@ -497,9 +601,9 @@ spec:
         {
           "type": "gauge",
           "id": 113,
-          "title": "Paid 月間枠の消費率",
+          "title": "有料プラン 月間枠の消費率",
           "description": "(選択期間リクエスト数) ÷ 10,000,000",
-          "gridPos": { "h": 5, "w": 6, "x": 18, "y": 5 },
+          "gridPos": { "h": 5, "w": 6, "x": 18, "y": 7 },
           "datasource": { "type": "prometheus", "uid": "prometheus" },
           "targets": [
             {
@@ -529,9 +633,9 @@ spec:
         {
           "type": "timeseries",
           "id": 120,
-          "title": "スクリプトごとのリクエスト処理レート (req/sec)",
-          "description": "Worker スクリプトごとに、1 秒あたり何回呼び出されているかを時系列で表示します。",
-          "gridPos": { "h": 9, "w": 16, "x": 0, "y": 10 },
+          "title": "スクリプトごとのリクエスト処理レート (req/sec) [A 案 — 平均レート閾値付き]",
+          "description": "Worker スクリプトごとに、1 秒あたり何回呼び出されているかを時系列で表示します。閾値線は 無料プラン 100,000 req/日 を秒平均に換算した 1.157 req/sec、有料プラン 1,000万 req/月 を秒平均に換算した 3.86 req/sec。瞬間レートが閾値を継続的に超えると枠超過する目安です。",
+          "gridPos": { "h": 9, "w": 16, "x": 0, "y": 12 },
           "datasource": { "type": "prometheus", "uid": "prometheus" },
           "targets": [
             {
@@ -544,7 +648,20 @@ spec:
             "defaults": {
               "unit": "reqps",
               "decimals": 3,
-              "custom": { "lineWidth": 2, "fillOpacity": 10, "showPoints": "never" }
+              "custom": {
+                "lineWidth": 2,
+                "fillOpacity": 10,
+                "showPoints": "never",
+                "thresholdsStyle": { "mode": "line" }
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "transparent", "value": null },
+                  { "color": "yellow", "value": 1.157 },
+                  { "color": "red", "value": 3.858 }
+                ]
+              }
             }
           },
           "options": {
@@ -557,7 +674,7 @@ spec:
           "id": 121,
           "title": "選択期間のエラー率",
           "description": "(エラー数) ÷ (リクエスト数)。1% で黄、5% で赤。",
-          "gridPos": { "h": 9, "w": 8, "x": 16, "y": 10 },
+          "gridPos": { "h": 9, "w": 8, "x": 16, "y": 12 },
           "datasource": { "type": "prometheus", "uid": "prometheus" },
           "targets": [
             {
@@ -588,28 +705,156 @@ spec:
           }
         },
         {
+          "type": "timeseries",
+          "id": 122,
+          "title": "24 時間ローリングウィンドウのリクエスト数 [B 案]",
+          "description": "各時刻時点での「直前 24 時間累積」のリクエスト数。無料プラン 100,000 req/日 (黄ライン) を超えた瞬間が分かります。有料プラン pro-rata 333,333 req/日 (赤ライン) も併記。",
+          "gridPos": { "h": 9, "w": 24, "x": 0, "y": 21 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "sum(increase(cloudflare_worker_requests_count{account=\"$account\", script_name=~\"$script\"}[24h]))",
+              "legendFormat": "直近 24h 累積"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "decimals": 0,
+              "custom": {
+                "lineWidth": 2,
+                "fillOpacity": 15,
+                "showPoints": "never",
+                "thresholdsStyle": { "mode": "line+area" }
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 100000 },
+                  { "color": "red", "value": 333333 }
+                ]
+              }
+            }
+          },
+          "options": {
+            "legend": { "displayMode": "list", "placement": "bottom", "calcs": ["lastNotNull", "max"] },
+            "tooltip": { "mode": "single" }
+          }
+        },
+        {
+          "type": "timeseries",
+          "id": 123,
+          "title": "日別リクエスト数 [C 案]",
+          "description": "選択期間内の各日の合計リクエスト数 (24時間集計を 1 日ステップで描画)。Cloudflare の 無料プラン 日次上限 100,000 (黄ライン) と 有料プラン pro-rata 333,333 (赤ライン) を超えた棒が「課金圏内に入った日」です。",
+          "gridPos": { "h": 9, "w": 16, "x": 0, "y": 30 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "sum(increase(cloudflare_worker_requests_count{account=\"$account\", script_name=~\"$script\"}[24h]))",
+              "legendFormat": "日次合計",
+              "interval": "1d"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "decimals": 0,
+              "min": 0,
+              "max": 110000,
+              "custom": {
+                "drawStyle": "bars",
+                "lineWidth": 1,
+                "fillOpacity": 80,
+                "showPoints": "never",
+                "barAlignment": -1,
+                "thresholdsStyle": { "mode": "line" },
+                "axisSoftMax": 110000
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 100000 },
+                  { "color": "red", "value": 333333 }
+                ]
+              }
+            }
+          },
+          "options": {
+            "legend": { "displayMode": "list", "placement": "bottom", "calcs": ["sum", "max"] },
+            "tooltip": { "mode": "single" }
+          }
+        },
+        {
+          "type": "stat",
+          "id": 124,
+          "title": "期間内 無料プラン 100k/日 を超えた日数 [C 案]",
+          "description": "選択期間内に、日次リクエスト数が 無料枠の上限 (100,000 req/日) を超えた日の数。0 日なら全期間 無料枠内、それ以上なら 有料プラン 課金が発生したことになります。",
+          "gridPos": { "h": 9, "w": 8, "x": 16, "y": 30 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "count_over_time((sum(increase(cloudflare_worker_requests_count{account=\"$account\", script_name=~\"$script\"}[1d])) > 100000)[$__range:1d])"
+            }
+          ],
+          "options": {
+            "reduceOptions": { "calcs": ["lastNotNull"], "fields": "" },
+            "colorMode": "background",
+            "graphMode": "area",
+            "textMode": "value",
+            "justifyMode": "center",
+            "noValue": "0"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "none",
+              "decimals": 0,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "orange", "value": 1 },
+                  { "color": "red", "value": 5 }
+                ]
+              }
+            },
+            "overrides": [
+              {
+                "matcher": { "id": "byName", "options": "Value" },
+                "properties": [
+                  { "id": "displayName", "value": "無料プラン 超過日数" }
+                ]
+              }
+            ]
+          }
+        },
+        {
           "type": "row",
           "id": 2,
           "title": "1 回あたりの CPU 時間",
-          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 19 },
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 39 },
           "collapsed": false
         },
         {
           "type": "text",
           "id": 102,
           "transparent": true,
-          "gridPos": { "h": 3, "w": 24, "x": 0, "y": 20 },
+          "gridPos": { "h": 3, "w": 24, "x": 0, "y": 40 },
           "options": {
             "mode": "markdown",
-            "content": "**Free = 10ms 上限 (黄ライン) / Paid デフォルト = 30,000 ms (30秒, 赤ライン)**。P99 が 10ms を超えると Free では実行不可、30 秒に近づくと Paid でもタイムアウト警告レベル。"
+            "content": "**無料プラン = 10ms 上限 (黄ライン) / 有料プラン デフォルト = 30,000 ms (30秒, 赤ライン)**。P99 が 10ms を超えると 無料プラン では実行不可、30 秒に近づくと 有料プラン でもタイムアウト警告レベル。"
           }
         },
         {
           "type": "timeseries",
           "id": 220,
           "title": "CPU 時間 P50 / P99 の推移 (ms)",
-          "description": "中央値 (P50) と上位 1% 遅さ (P99)。閾値線は Free 10ms / Paid 30s。",
-          "gridPos": { "h": 10, "w": 16, "x": 0, "y": 23 },
+          "description": "中央値 (P50) と上位 1% 遅さ (P99)。閾値線は 無料プラン 10ms / 有料プラン 30s。",
+          "gridPos": { "h": 10, "w": 16, "x": 0, "y": 43 },
           "datasource": { "type": "prometheus", "uid": "prometheus" },
           "targets": [
             {
@@ -653,7 +898,7 @@ spec:
           "id": 221,
           "title": "スクリプト別 P99 CPU時間 (最新値, ms)",
           "description": "10 ms / 30,000 ms を基準にしたスクリプトごとの直近 P99 値。",
-          "gridPos": { "h": 10, "w": 8, "x": 16, "y": 23 },
+          "gridPos": { "h": 10, "w": 8, "x": 16, "y": 43 },
           "datasource": { "type": "prometheus", "uid": "prometheus" },
           "targets": [
             {
@@ -737,35 +982,35 @@ spec:
           "type": "text",
           "id": 100,
           "transparent": true,
-          "gridPos": { "h": 4, "w": 24, "x": 0, "y": 0 },
+          "gridPos": { "h": 6, "w": 24, "x": 0, "y": 0 },
           "options": {
             "mode": "markdown",
-            "content": "## R2 詳細\n\nCloudflare R2 オブジェクトストレージの使用状況を、料金プランと比較しながら詳細に見ます。\n\n**料金プラン**: Free = ストレージ 10 GB / Class A 月 100万 req / Class B 月 1,000万 req / Paid = 上記超過分のみ課金 (詳細は下記)\n\n[← 概要に戻る](/d/cloudflare-overview)"
+            "content": "## R2 詳細  ·  [← 概要に戻る](/d/cloudflare-overview)\n\nCloudflare R2 オブジェクトストレージの使用状況を、料金プランと比較しながら詳細に見ます。\n\n**料金プラン**: 無料プラン = ストレージ 10 GB / Class A 月 100万 req / Class B 月 1,000万 req / 有料プラン = 上記超過分のみ課金 (詳細は下記)"
           }
         },
         {
           "type": "row",
           "id": 1,
           "title": "ストレージ容量",
-          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 4 },
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 6 },
           "collapsed": false
         },
         {
           "type": "text",
           "id": 101,
           "transparent": true,
-          "gridPos": { "h": 2, "w": 24, "x": 0, "y": 5 },
+          "gridPos": { "h": 2, "w": 24, "x": 0, "y": 7 },
           "options": {
             "mode": "markdown",
-            "content": "**上限**: Free = 10 GB まで無料 / Paid = 超過分 $0.015 / GB-月 (Standard ストレージのみ)"
+            "content": "**上限**: 無料プラン = 10 GB まで無料 / 有料プラン = 超過分 $0.015 / GB-月 (Standard ストレージのみ)"
           }
         },
         {
           "type": "stat",
           "id": 210,
           "title": "R2 合計容量",
-          "description": "全バケットの合計使用容量。Free 枠 10 GB に対して色付け。",
-          "gridPos": { "h": 6, "w": 8, "x": 0, "y": 7 },
+          "description": "全バケットの合計使用容量。無料枠 10 GB に対して色付け。",
+          "gridPos": { "h": 6, "w": 8, "x": 0, "y": 9 },
           "datasource": { "type": "prometheus", "uid": "prometheus" },
           "targets": [
             {
@@ -799,9 +1044,9 @@ spec:
         {
           "type": "gauge",
           "id": 211,
-          "title": "Free 容量枠の消費率",
+          "title": "無料プラン 容量枠の消費率",
           "description": "(合計容量) ÷ 10 GB",
-          "gridPos": { "h": 6, "w": 8, "x": 8, "y": 7 },
+          "gridPos": { "h": 6, "w": 8, "x": 8, "y": 9 },
           "datasource": { "type": "prometheus", "uid": "prometheus" },
           "targets": [
             {
@@ -832,8 +1077,8 @@ spec:
           "type": "bargauge",
           "id": 212,
           "title": "バケット別の使用容量",
-          "description": "バケットごとの使用容量。バー上限は 10 GB (Free 枠 1 つ分)。",
-          "gridPos": { "h": 6, "w": 8, "x": 16, "y": 7 },
+          "description": "バケットごとの使用容量。バー上限は 10 GB (無料枠 1 つ分)。",
+          "gridPos": { "h": 6, "w": 8, "x": 16, "y": 9 },
           "datasource": { "type": "prometheus", "uid": "prometheus" },
           "targets": [
             {
@@ -872,14 +1117,14 @@ spec:
           "type": "row",
           "id": 2,
           "title": "読み書きオペレーション数",
-          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 13 },
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 15 },
           "collapsed": false
         },
         {
           "type": "text",
           "id": 102,
           "transparent": true,
-          "gridPos": { "h": 4, "w": 24, "x": 0, "y": 14 },
+          "gridPos": { "h": 5, "w": 24, "x": 0, "y": 16 },
           "options": {
             "mode": "markdown",
             "content": "R2 操作は **Class A (書込み系)** と **Class B (読込み系)** に分類されます。\n\n- **Class A (1M req/月まで無料, 超過 $4.50/100万)**: `PutObject`, `CopyObject`, `ListObjects`, multipart 関連, バケット設定書込みなど\n- **Class B (10M req/月まで無料, 超過 $0.36/100万)**: `GetObject`, `HeadObject`, `HeadBucket`, バケット設定読込みなど\n- **無料 (どちらにも計上されない)**: `DeleteObject`, `DeleteBucket`, `AbortMultipartUpload`"
@@ -889,8 +1134,8 @@ spec:
           "type": "stat",
           "id": 310,
           "title": "Class A (書込み) 操作数",
-          "description": "選択期間の Class A 操作合計。Free 月間 100万 req まで無料。",
-          "gridPos": { "h": 5, "w": 6, "x": 0, "y": 18 },
+          "description": "選択期間の Class A 操作合計。無料プラン 月間 100万 req まで無料。",
+          "gridPos": { "h": 5, "w": 6, "x": 0, "y": 20 },
           "datasource": { "type": "prometheus", "uid": "prometheus" },
           "targets": [
             {
@@ -925,9 +1170,9 @@ spec:
         {
           "type": "gauge",
           "id": 311,
-          "title": "Class A Free 枠の消費率",
+          "title": "Class A 無料枠の消費率",
           "description": "(Class A 操作数) ÷ 1,000,000",
-          "gridPos": { "h": 5, "w": 6, "x": 6, "y": 18 },
+          "gridPos": { "h": 5, "w": 6, "x": 6, "y": 20 },
           "datasource": { "type": "prometheus", "uid": "prometheus" },
           "targets": [
             {
@@ -959,8 +1204,8 @@ spec:
           "type": "stat",
           "id": 312,
           "title": "Class B (読込み) 操作数",
-          "description": "選択期間の Class B 操作合計。Free 月間 1,000万 req まで無料。",
-          "gridPos": { "h": 5, "w": 6, "x": 12, "y": 18 },
+          "description": "選択期間の Class B 操作合計。無料プラン 月間 1,000万 req まで無料。",
+          "gridPos": { "h": 5, "w": 6, "x": 12, "y": 20 },
           "datasource": { "type": "prometheus", "uid": "prometheus" },
           "targets": [
             {
@@ -995,9 +1240,9 @@ spec:
         {
           "type": "gauge",
           "id": 313,
-          "title": "Class B Free 枠の消費率",
+          "title": "Class B 無料枠の消費率",
           "description": "(Class B 操作数) ÷ 10,000,000",
-          "gridPos": { "h": 5, "w": 6, "x": 18, "y": 18 },
+          "gridPos": { "h": 5, "w": 6, "x": 18, "y": 20 },
           "datasource": { "type": "prometheus", "uid": "prometheus" },
           "targets": [
             {
@@ -1030,7 +1275,7 @@ spec:
           "id": 320,
           "title": "操作タイプ別の発生レート (ops/sec)",
           "description": "R2 操作の種類別に、1 秒あたり何回発生しているかを時系列で表示。",
-          "gridPos": { "h": 9, "w": 24, "x": 0, "y": 23 },
+          "gridPos": { "h": 9, "w": 24, "x": 0, "y": 25 },
           "datasource": { "type": "prometheus", "uid": "prometheus" },
           "targets": [
             {
