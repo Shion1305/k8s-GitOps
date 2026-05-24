@@ -31,10 +31,11 @@ spec:
             "type": "query",
             "datasource": { "type": "prometheus", "uid": "prometheus" },
             "query": "label_values(cloudflare_worker_requests_count, account)",
-            "refresh": 2,
+            "refresh": 1,
             "multi": false,
             "includeAll": false,
-            "label": "アカウント"
+            "label": "アカウント",
+            "current": { "selected": false, "text": "ynufes-tech", "value": "ynufes-tech" }
           }
         ]
       },
@@ -458,10 +459,11 @@ spec:
             "type": "query",
             "datasource": { "type": "prometheus", "uid": "prometheus" },
             "query": "label_values(cloudflare_worker_requests_count, account)",
-            "refresh": 2,
+            "refresh": 1,
             "multi": false,
             "includeAll": false,
-            "label": "アカウント"
+            "label": "アカウント",
+            "current": { "selected": false, "text": "ynufes-tech", "value": "ynufes-tech" }
           },
           {
             "name": "script",
@@ -969,10 +971,11 @@ spec:
             "type": "query",
             "datasource": { "type": "prometheus", "uid": "prometheus" },
             "query": "label_values(cloudflare_r2_storage_total_bytes, account)",
-            "refresh": 2,
+            "refresh": 1,
             "multi": false,
             "includeAll": false,
-            "label": "アカウント"
+            "label": "アカウント",
+            "current": { "selected": false, "text": "ynufes-tech", "value": "ynufes-tech" }
           }
         ]
       },
