@@ -11,7 +11,7 @@ spec:
   resyncPeriod: 5m
   json: |
     {
-      "title": "Cloudflare 概要 (月次サマリ)",
+      "title": "1. Cloudflare 概要 (月次サマリ)",
       "uid": "cloudflare-overview",
       "schemaVersion": 39,
       "version": 1,
@@ -439,7 +439,7 @@ spec:
   resyncPeriod: 5m
   json: |
     {
-      "title": "Cloudflare Workers 詳細",
+      "title": "2. Cloudflare Workers 詳細",
       "uid": "cloudflare-workers",
       "schemaVersion": 39,
       "version": 1,
@@ -951,7 +951,7 @@ spec:
   resyncPeriod: 5m
   json: |
     {
-      "title": "Cloudflare R2 詳細",
+      "title": "3. Cloudflare R2 詳細",
       "uid": "cloudflare-r2",
       "schemaVersion": 39,
       "version": 1,
