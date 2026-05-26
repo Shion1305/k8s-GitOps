@@ -1,0 +1,11 @@
+# Domains the provider_monitor exporter probes on every round.
+# Update this list and ArgoCD will roll the Deployment.
+# Lines are read in order; blank lines and lines starting with '#' are ignored.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: provider-monitor-domains
+  namespace: provider-monitor
+data:
+  domains.txt: |
+    example.com
