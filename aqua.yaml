@@ -11,7 +11,7 @@ registries:
 - type: standard
   ref: v4.479.0 # renovate: depName=aquaproj/aqua-registry
 packages:
-- name: hashicorp/vault@v1.21.4
+- name: hashicorp/vault@v2.0.1
 - name: google/go-containerregistry@v0.21.5
 # Used by scripts/render-validate.sh (.github/workflows/render-validate.yaml).
 - name: kubernetes-sigs/kustomize@kustomize/v5.8.1
