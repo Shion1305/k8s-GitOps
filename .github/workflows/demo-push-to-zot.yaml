@@ -22,7 +22,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@v4
 
       # We don't use docker/login-action / docker push: zot v2.1.16's bearer-
       # OIDC middleware does not issue a WWW-Authenticate challenge when
