@@ -1,0 +1,75 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: clearnet-website-monitoring
+  namespace: clearnet-website-monitoring
+  labels:
+    app: clearnet-website-monitoring
+spec:
+  # Single instance: the exporter holds in-memory probe state and writes
+  # baselines to a ReadWriteOnce PVC, so it cannot scale horizontally.
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: clearnet-website-monitoring
+  template:
+    metadata:
+      labels:
+        app: clearnet-website-monitoring
+    spec:
+      # Playwright (bundled with the base image) only ships amd64 binaries.
+      nodeSelector:
+        kubernetes.io/arch: amd64
+      containers:
+        - name: exporter
+          image: harbor.i.shion1305.com/shion1305/provider-monitor:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 9877
+              name: metrics
+              protocol: TCP
+          env:
+            # Probe cadence in seconds. Default 3600 (1h) — tight enough to
+            # surface takedown response within an hour, loose enough that a
+            # single Pod can comfortably finish a round.
+            - name: PROVIDER_MONITOR_INTERVAL
+              value: "3600"
+          volumeMounts:
+            - name: domains
+              mountPath: /data
+              readOnly: true
+            - name: data
+              mountPath: /app/out/provider_monitor
+          resources:
+            requests:
+              cpu: 100m
+              memory: 512Mi
+            limits:
+              cpu: "1"
+              memory: 2Gi
+          # /metrics is always served once the exporter is bound; the probe
+          # loop runs independently in a background thread.
+          readinessProbe:
+            httpGet:
+              path: /metrics
+              port: 9877
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /metrics
+              port: 9877
+            initialDelaySeconds: 30
+            periodSeconds: 30
+      volumes:
+        # Materialized from Vault by ESO
+        # (clearnet-website-monitoring/domains). The domains list is kept
+        # out of this public repo and lives in Vault.
+        - name: domains
+          secret:
+            secretName: clearnet-website-monitoring-domains
+        - name: data
+          persistentVolumeClaim:
+            claimName: clearnet-website-monitoring-data
