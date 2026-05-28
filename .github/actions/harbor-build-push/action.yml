@@ -134,7 +134,7 @@ runs:
       with:
         platforms: arm64
 
-    - uses: docker/setup-buildx-action@v3
+    - uses: docker/setup-buildx-action@v4
 
     # cosign signs the image keyless via Fulcio + Rekor. SBOM generation
     # is intentionally NOT done in CI — Harbor v2.15's UI does not surface
