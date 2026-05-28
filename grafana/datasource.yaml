@@ -8,6 +8,11 @@ spec:
     matchLabels:
       dashboards: main-grafana
   datasource:
+    # Stable UID so dashboards can reference this datasource by a fixed
+    # string. Without this, grafana-operator assigns a random UUID on first
+    # apply and any GrafanaDashboard JSON that hard-codes `uid: prometheus`
+    # silently shows "No data".
+    uid: prometheus
     name: Prometheus
     type: prometheus
     access: proxy
