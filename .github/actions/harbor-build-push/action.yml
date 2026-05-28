@@ -130,7 +130,7 @@ runs:
   steps:
     # QEMU registers arm64 emulation on the amd64 GitHub-hosted runner so
     # buildx can produce arm64 layers from the same Dockerfile.
-    - uses: docker/setup-qemu-action@v3
+    - uses: docker/setup-qemu-action@v4
       with:
         platforms: arm64
 
