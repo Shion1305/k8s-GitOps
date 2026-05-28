@@ -6,7 +6,7 @@ injector:
 server:
   image:
     repository: hashicorp/vault
-    tag: 2.0.0
+    tag: 2.0.1
   resources:
     requests:
       memory: 256Mi
@@ -54,7 +54,7 @@ server:
     name: "vault-unsealer"
   extraContainers:
     - name: unseal-sidecar
-      image: hashicorp/vault:2.0.0
+      image: hashicorp/vault:2.0.1
       securityContext:
         runAsNonRoot: true
         runAsUser: 100
