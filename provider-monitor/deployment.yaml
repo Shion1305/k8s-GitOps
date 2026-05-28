@@ -64,9 +64,11 @@ spec:
             initialDelaySeconds: 30
             periodSeconds: 30
       volumes:
+        # Materialized from Vault by ESO (provider-monitor/domains). The
+        # domains list is kept out of this public repo and lives in Vault.
         - name: domains
-          configMap:
-            name: provider-monitor-domains
+          secret:
+            secretName: provider-monitor-domains
         - name: data
           persistentVolumeClaim:
             claimName: provider-monitor-data

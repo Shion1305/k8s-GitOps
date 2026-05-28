@@ -3,7 +3,8 @@ kind: Kustomization
 resources:
   - namespace.yaml
   - pvc.yaml
-  - domains-configmap.yaml
+  - vault-secret-store.yaml
+  - external-secret.yaml
   - deployment.yaml
   - service.yaml
   - servicemonitor.yaml
