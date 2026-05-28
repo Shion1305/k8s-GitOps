@@ -147,7 +147,7 @@ runs:
     # JSON as if it were an image layer. So: signing only here; SBOM is
     # produced by Harbor's own Trivy via the GENERATE SBOM action on the
     # image artifact.
-    - uses: sigstore/cosign-installer@v3
+    - uses: sigstore/cosign-installer@v4.1.2
       with:
         cosign-release: v2.4.1
 
