@@ -1,10 +1,10 @@
 apiVersion: grafana.integreatly.org/v1beta1
 kind: GrafanaFolder
 metadata:
-  name: provider-monitor
+  name: clearnet-website-monitoring
   namespace: grafana
 spec:
   instanceSelector:
     matchLabels:
       dashboards: main-grafana
-  title: "Provider Monitor"
+  title: "Clearnet Website Monitoring"

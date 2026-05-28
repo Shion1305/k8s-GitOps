@@ -1,10 +1,10 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: provider-monitor
-  namespace: provider-monitor
+  name: clearnet-website-monitoring
+  namespace: clearnet-website-monitoring
   labels:
-    app: provider-monitor
+    app: clearnet-website-monitoring
 spec:
   # Single instance: the exporter holds in-memory probe state and writes
   # baselines to a ReadWriteOnce PVC, so it cannot scale horizontally.
@@ -13,17 +13,17 @@ spec:
     type: Recreate
   selector:
     matchLabels:
-      app: provider-monitor
+      app: clearnet-website-monitoring
   template:
     metadata:
       labels:
-        app: provider-monitor
+        app: clearnet-website-monitoring
     spec:
       # Playwright (bundled with the base image) only ships amd64 binaries.
       nodeSelector:
         kubernetes.io/arch: amd64
       containers:
-        - name: provider-monitor
+        - name: exporter
           image: harbor.i.shion1305.com/shion1305/provider-monitor:latest
           imagePullPolicy: Always
           ports:
@@ -64,11 +64,12 @@ spec:
             initialDelaySeconds: 30
             periodSeconds: 30
       volumes:
-        # Materialized from Vault by ESO (provider-monitor/domains). The
-        # domains list is kept out of this public repo and lives in Vault.
+        # Materialized from Vault by ESO
+        # (clearnet-website-monitoring/domains). The domains list is kept
+        # out of this public repo and lives in Vault.
         - name: domains
           secret:
-            secretName: provider-monitor-domains
+            secretName: clearnet-website-monitoring-domains
         - name: data
           persistentVolumeClaim:
-            claimName: provider-monitor-data
+            claimName: clearnet-website-monitoring-data

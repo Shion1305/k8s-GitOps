@@ -5,8 +5,8 @@
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: provider-monitor-data
-  namespace: provider-monitor
+  name: clearnet-website-monitoring-data
+  namespace: clearnet-website-monitoring
 spec:
   accessModes:
     - ReadWriteOnce

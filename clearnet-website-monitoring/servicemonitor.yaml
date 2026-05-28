@@ -1,20 +1,20 @@
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
-  name: provider-monitor
-  namespace: provider-monitor
+  name: clearnet-website-monitoring
+  namespace: clearnet-website-monitoring
   labels:
-    app: provider-monitor
+    app: clearnet-website-monitoring
     # Required so kube-prometheus-stack's Prometheus picks this up; the
     # release label is the chart's default ServiceMonitorSelector.
     release: kube-prometheus-stack
 spec:
   selector:
     matchLabels:
-      app: provider-monitor
+      app: clearnet-website-monitoring
   namespaceSelector:
     matchNames:
-      - provider-monitor
+      - clearnet-website-monitoring
   endpoints:
     - port: metrics
       # Match the probe interval — finer scraping just resamples the same

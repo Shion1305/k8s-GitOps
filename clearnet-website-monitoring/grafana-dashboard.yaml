@@ -1,13 +1,13 @@
 apiVersion: grafana.integreatly.org/v1beta1
 kind: GrafanaDashboard
 metadata:
-  name: provider-monitor
+  name: clearnet-website-monitoring
   namespace: grafana
 spec:
   instanceSelector:
     matchLabels:
       dashboards: main-grafana
-  folderRef: provider-monitor
+  folderRef: clearnet-website-monitoring
   resyncPeriod: 5m
   json: |
     {
@@ -31,9 +31,9 @@ spec:
       "fiscalYearStartMonth": 0,
       "graphTooltip": 0,
       "id": null,
-      "uid": "provider-monitor",
-      "title": "Provider Monitor",
-      "tags": ["provider-monitor", "takedown"],
+      "uid": "clearnet-website-monitoring",
+      "title": "Clearnet Website Monitoring",
+      "tags": ["clearnet-website-monitoring", "takedown"],
       "timezone": "browser",
       "schemaVersion": 39,
       "version": 1,

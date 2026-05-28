@@ -159,18 +159,19 @@ path "cloudflare-grafana/metadata/*" {
 EOF
 echo "✓ Created policy: eso-cloudflare-grafana"
 
-# Policy for the provider-monitor namespace. Reads the list of domains the
-# exporter probes — kept in Vault (not the public k8s-GitOps repo) because the
-# domain list itself is sensitive in the takedown-research context.
-vault policy write eso-provider-monitor - <<EOF
-path "provider-monitor/data/*" {
+# Policy for the clearnet-website-monitoring namespace. Reads the list of
+# domains the exporter probes — kept in Vault (not the public k8s-GitOps
+# repo) because the domain list itself is sensitive in the takedown-research
+# context.
+vault policy write eso-clearnet-website-monitoring - <<EOF
+path "clearnet-website-monitoring/data/*" {
   capabilities = ["read"]
 }
-path "provider-monitor/metadata/*" {
+path "clearnet-website-monitoring/metadata/*" {
   capabilities = ["read", "list"]
 }
 EOF
-echo "✓ Created policy: eso-provider-monitor"
+echo "✓ Created policy: eso-clearnet-website-monitoring"
 
 # Policy for the cluster-wide zot-pull automation. Reads only the Keycloak
 # `cluster-puller` service-account credentials at zot/cluster-puller.
@@ -300,13 +301,13 @@ vault write auth/kubernetes/role/eso-cloudflare-grafana \
   ttl=1h
 echo "✓ Created role: eso-cloudflare-grafana"
 
-# provider-monitor
-vault write auth/kubernetes/role/eso-provider-monitor \
+# clearnet-website-monitoring
+vault write auth/kubernetes/role/eso-clearnet-website-monitoring \
   bound_service_account_names=eso \
-  bound_service_account_namespaces=provider-monitor \
-  policies=eso-provider-monitor \
+  bound_service_account_namespaces=clearnet-website-monitoring \
+  policies=eso-clearnet-website-monitoring \
   ttl=1h
-echo "✓ Created role: eso-provider-monitor"
+echo "✓ Created role: eso-clearnet-website-monitoring"
 
 # cluster-puller (cluster-scoped store; binds to the ESO operator SA so the
 # ClusterSecretStore `vault-zot-cluster-puller` can read zot/cluster-puller
