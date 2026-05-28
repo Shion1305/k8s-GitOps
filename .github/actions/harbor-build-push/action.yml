@@ -175,7 +175,7 @@ runs:
     # Vault role's `bound_audiences` — overriding `jwtGithubAudience` here
     # would cause a 400 at the Vault side.
     - name: Fetch Harbor robot credentials from Vault
-      uses: hashicorp/vault-action@v3
+      uses: hashicorp/vault-action@v4
       with:
         url: https://vault.shion1305.com
         method: jwt
