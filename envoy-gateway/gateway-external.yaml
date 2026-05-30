@@ -39,3 +39,14 @@ spec:
       allowedRoutes:
         namespaces:
           from: All
+    - name: https-shion-dev
+      port: 443
+      protocol: HTTPS
+      hostname: "*.shion.dev"
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - name: wildcard-shion-dev-tls
+      allowedRoutes:
+        namespaces:
+          from: All

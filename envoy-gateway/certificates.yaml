@@ -47,3 +47,18 @@ spec:
   dnsNames:
     - "*.k.shion1305.com"
     - "k.shion1305.com"
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: wildcard-shion-dev
+  namespace: envoy-gateway-system
+spec:
+  secretName: wildcard-shion-dev-tls
+  issuerRef:
+    name: letsencrypt-prod
+    kind: ClusterIssuer
+  commonName: "*.shion.dev"
+  dnsNames:
+    - "*.shion.dev"
+    - "shion.dev"
