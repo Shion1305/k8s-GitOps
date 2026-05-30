@@ -7,6 +7,16 @@ server:
   image:
     repository: hashicorp/vault
     tag: 2.0.1
+  # vault 2.0.1 ships the binary with the cap_ipc_lock file capability, so it
+  # refuses to start unless the container is granted IPC_LOCK (mlock keeps
+  # secrets out of swap). disable_mlock does not help: the entrypoint fails at
+  # `vault -version`, before any HCL config is read.
+  statefulSet:
+    securityContext:
+      container:
+        capabilities:
+          add:
+            - IPC_LOCK
   resources:
     requests:
       memory: 256Mi
@@ -113,9 +123,6 @@ server:
       setNodeId: true
       config: |
         ui = true
-        # vault 2.0.1's entrypoint hard-requires the IPC_LOCK capability to
-        # mlock memory; the pod is not granted it, so disable mlock instead.
-        disable_mlock = true
         # Internal hostname is the source of truth for any URL Vault echoes to
         # clients (e.g. UI redirects). External hostname is path-restricted and
         # auth-only — not suitable as api_addr.
