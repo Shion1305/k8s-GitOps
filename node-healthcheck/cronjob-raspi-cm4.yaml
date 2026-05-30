@@ -28,7 +28,7 @@ spec:
                       - key: kubernetes.io/hostname
                         operator: In
                         values:
-                          - raspi-cm4
+                          - shion-raspi-cm4
           containers:
             - name: ping
               image: nicolaka/netshoot:v0.15
