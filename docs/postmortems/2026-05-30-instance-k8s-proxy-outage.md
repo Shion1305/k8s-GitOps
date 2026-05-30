@@ -30,8 +30,8 @@ No data loss. After recovery all pods returned `Running`, 0 stuck `Terminating`.
 | **05-20 16:38:01–02** | **Node-wide OOM:** 13 `CONSTRAINT_NONE` (system-wide) kills in ~2s. Largest victim: **`java` (keycloak), anon-rss ≈ 1.14 GB, oom_score_adj 858**. Bystanders reaped: vault, envoy (internal gw), external-secrets webhook, node_exporter, memgator, discordbot, php. Node survived. |
 | 05-20 16:43:53 | StatefulSet recreates `keycloak-0` on `shion-ubuntu-2505` (different node). |
 | 05-20 → 05-30 | Node ran healthy ~9.5 days (single kubelet PID, no restarts). |
-| **05-30 01:42:10** | **The outage:** node Ready heartbeat freezes. |
-| 05-30 01:46:11 | Last journal line (normal kubelet logs), then `Journal stopped`. **No OOM/panic/hung_task/lockup logged.** |
+| 05-30 01:42:10 | Node Ready heartbeat stops updating at the API server (Lease cadence / observation lag — **the node itself was still running**). |
+| **05-30 01:46:11** | **The outage:** node logging normally at full cadence (max 21s between lines), then the journal **cuts off instantly mid-activity** — abrupt VM termination. No OOM/panic/hung_task/lockup/IO error; no clean shutdown in wtmp. |
 | 05-30 ~01:47 | Control plane taints node `unreachable`; pods → `Terminating`. |
 | 05-30 ~05:40 | Manual Oracle Cloud console reboot (an earlier attempt did not take effect promptly). |
 | 05-30 05:46:56 | OS boots (new bootID `91fe2931`, kernel auto-upgraded 6.17.0-1011 → -1014). |
@@ -48,16 +48,49 @@ An initial read blamed "a ws-stream memory leak." **That is wrong for both the 5
 - Keycloak itself is **not** misconfigured today: `requests 1700Mi / limits 2Gi`, `JAVA_OPTS_APPEND=-Xms1g -Xmx1536m -XX:MaxMetaspaceSize=256m`. It is just larger than the other pods, so it had the highest non-system `oom_score`.
 - **ws-stream** (`atc/ws-stream-deployment.yaml`, 512Mi limit) leaks too, but its limit keeps kills `CONSTRAINT_MEMCG` (pod-scoped) — noisy, never node-fatal. It is a red herring for this outage.
 
-### B. The 05-30 outage — silent node hang, cause UNCONFIRMED, **NOT OOM**
-The actual outage was **9.5 days after the OOM** and shows **no memory-pressure signature**: zero OOM/panic/hung_task/lockup/IO-error entries; the journal simply stops mid-normal-operation. Heartbeat froze 01:42, journal stopped 01:46, `last -x reboot` shows the boot ended with **no clean shutdown record** (hard stop). SSH + kubelet were dead until the manual reboot.
+### B. The 05-30 outage — abrupt VM termination at the hypervisor layer (**NOT** a guest hang or OOM)
 
-Most consistent with a **silent hard-hang** with no guest-side evidence. Ranked probable causes:
-1. Oracle Cloud hypervisor stall / live-migration freezing the VM (no guest panic would log).
-2. Guest kernel hang with no console output flushed before freeze.
-3. Disk/IO stall freezing journald + kubelet together.
-4. (Less likely) network partition — would leave the local journal running.
+> An earlier draft of this section claimed a "silent guest hang with a 4-minute log gap (01:42→01:46)."
+> **That was wrong** — it was an artifact of truncated SSH captures. A clean re-read of the on-node
+> journal disproves it; the corrected analysis follows.
 
-**Confirming evidence not yet collected:** Oracle **instance console history for 01:42–01:46**, `/var/crash`/kdump (not configured), Oracle VM host metrics 01:30–01:46.
+**The node was fully alive and logging normally right up to a hard cut.** Decisive forensics from
+`journalctl -b -1` on the node (UTC):
+
+- **No gap, no hang.** Between 01:30:00 and the last line, the **maximum silence between any two
+  consecutive journal lines was 21 seconds** — i.e. completely normal cadence. There was no
+  freeze and no 4-minute gap.
+- **Normal forward progress until the end.** The final lines (01:46:00–01:46:11) show the kernel
+  creating a new container veth (`eth0: renamed from tmpcc07b`), kubelet actively cleaning up pod
+  volumes / removing cgroup slices / syncing pods, containerd pulling images, and even an SSH
+  brute-force probe being rejected at 01:46:08 — all routine activity.
+- **The journal then stops instantly at 01:46:11**, mid-activity, with **no shutdown sequence**
+  (no systemd "Stopping …" units, no `reboot.target`), **no kernel panic / BUG / oops / call
+  trace**, **no hung_task / soft-lockup / hard-lockup / rcu-stall / watchdog**, **no OOM**, and
+  **no I/O / EXT4 / MCE / thermal** errors.
+- `last -x reboot` shows the prev boot ended with **no matching "shutdown system down" entry**
+  (every other reboot — 5/9, 5/6, 5/2, 4/29 — has a clean shutdown pair). This was a **hard stop**.
+- The control-plane "heartbeat froze at 01:42:10" was a **red herring**: that is just the Node
+  Lease renewal cadence / observation lag at the API server. The node itself kept running and
+  logging for ~4 more minutes, until 01:46:11.
+
+**Conclusion:** a process that is healthy and logging at full cadence one instant and produces
+**zero** output the next — with no guest-side distress of any kind and no clean shutdown — is the
+signature of the **VM being killed/powered-off instantaneously from outside the guest** (Oracle
+Cloud hypervisor layer): an abrupt host-level stop, host hardware fault, failed/forced
+live-migration, or an infra-side power event. A guest kernel hang, disk-IO stall, or OOM would all
+leave traces (lockup/hung_task, IO errors, OOM-killer lines) and would *not* cut the log mid-line
+at full cadence — so those are **ruled out** by the evidence.
+
+**Still unconfirmed (needs Oracle-side data):** the *specific* host event. Guest logs cannot
+distinguish "host crashed" from "host intentionally stopped the VM." To close this:
+- Oracle Cloud **Console → instance → Work Requests / Maintenance events** around 2026-05-30 01:46 UTC.
+- Oracle **instance console history** (capture before it rolls off).
+- Oracle host/VM **metrics** for 01:40–01:47 UTC.
+
+Note: kdump is **not** configured and `/var/crash` is empty, and there is **no
+`/var/log/oracle-cloud-agent/`** on this image — so no guest-side crash artifact was or could be
+captured. Enabling kdump would let us distinguish a (future) guest kernel crash from a host event.
 
 ## Aftermath issues (post-reboot, currently open)
 
@@ -84,7 +117,9 @@ Most consistent with a **silent hard-hang** with no guest-side evidence. Ranked 
 
 ## Lessons
 
-- **Don't conflate co-occurring symptoms.** The loud ws-stream leak was a red herring; the 5/20 OOM was an over-committed node tripped by the Keycloak JVM; the 5/30 outage had **no memory signature at all**.
+- **Don't conflate co-occurring symptoms.** The loud ws-stream leak was a red herring; the 5/20 OOM was an over-committed node tripped by the Keycloak JVM; the 5/30 outage was an abrupt **hypervisor-layer VM termination** with no guest cause at all.
+- **A frozen API-server heartbeat ≠ a frozen node.** The 01:42:10 Lease freeze looked like the failure moment but the node logged normally for 4 more minutes; always corroborate the heartbeat against on-node logs before concluding "the node hung."
+- **An instant log cut at full cadence, with no shutdown sequence and no kernel distress, points outside the guest.** A guest hang/OOM/IO-stall leaves traces (lockup, hung_task, OOM lines, IO errors) and tapers; an external kill does not.
 - **Trust the kernel's `Killed process … anon-rss:` lines, not the oom process-table dump** — the latter's columns are trivially misparsed (it led to two wrong attributions during this very investigation).
 - An **over-committed, swap-less node** can be tipped into a node-wide OOM by any one pod's burst; eviction thresholds don't reliably catch a fast multi-GB allocation.
-- **Persistent journaling was decisive** — but a silent hang needs **hypervisor-side** evidence the guest can't provide; collect Oracle console history immediately, before it rolls off.
+- **Persistent journaling was decisive** — but pinning a host-level event needs **Oracle-side** evidence (Work Requests / maintenance events / console history) the guest can't provide; collect it immediately, before it rolls off. Enable kdump to capture any future guest kernel crash.
