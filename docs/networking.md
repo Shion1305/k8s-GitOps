@@ -5,14 +5,8 @@ cluster and how applications publish themselves on the network.
 
 ## TL;DR
 
-- **Canonical**: Envoy Gateway (Gateway API). All new apps publish via
-  `HTTPRoute`.
-- **Deprecated**: nginx-ingress (`nginx-ssl` and `nginx-internal`
-  IngressClasses). Do **not** add new `Ingress` resources. Existing nginx
-  controllers remain in the cluster only to serve any consumer that has
-  not yet repointed DNS to the Envoy Gateway IPs; once that is verified
-  complete, the nginx-ingress controllers will be removed (see
-  [Migration status](#migration-status)).
+- **Canonical**: Envoy Gateway (Gateway API). All HTTP traffic enters
+  through the Gateway; all apps publish via `HTTPRoute`.
 
 ## Topology
 
@@ -52,8 +46,8 @@ issued by cert-manager via Let's Encrypt DNS-01 (Cloudflare); see
 | Public legacy (DEPRECATED) | `*.k.shion1305.com` | external / `https-legacy-k` | redirect → `*.shion1305.com` |
 | WireGuard / internal | `*.i.shion1305.com` | internal / `https` | `longhorn.i.shion1305.com` |
 
-The `*.k.shion1305.com` namespace is the original ingress-nginx hostname
-space; it survives only as 301-redirect HTTPRoutes during the migration.
+The `*.k.shion1305.com` space survives only as 301-redirect HTTPRoutes on
+the `https-legacy-k` listener.
 Server-to-server clients (CLIs, OAuth callbacks, JWT issuers) **must**
 target the apex hostname directly — most clients do not follow redirects
 on POSTs and OIDC discovery returns the canonical issuer URL anyway.
@@ -144,9 +138,7 @@ rejected.
 The internal Gateway sits on `10.130.5.21` and is reachable only from
 the WireGuard CIDR (the LAN-side L4 control). There is no
 SecurityPolicy / IP-allowlist on the internal Gateway today; defense in
-depth at L7 may be added later. The previous `nginx-internal`
-controller's IP allowlist was a defense-in-depth layer over the same
-WireGuard constraint, not a separate trust boundary.
+depth at L7 may be added later.
 
 ## Migration status
 
@@ -157,14 +149,7 @@ WireGuard constraint, not a separate trust boundary.
 | Per-app HTTPRoute migration | ✅ done | All currently-deployed apps |
 | 301-redirects on `*.k` | ✅ done | argocd, langfuse, openwebui, github-readme-stats, ynufes-cf-grafana, keycloak, vault |
 | DNS repoint of `*.k` to Envoy | 🟡 in progress | Per-record cutover; tracked out-of-band |
-| nginx-ingress controller removal | ⏳ pending | Awaiting DNS cutover verification |
 | `*.k` listener + cert removal | ⏳ pending | Once all redirects unused |
-
-Until the nginx-ingress controllers are removed, the `ingress/`
-directory continues to deploy `nginx-ssl-controller.yaml` and
-`nginx-internal-controller.yaml`. They serve no live HTTPRoute-managed
-traffic; they exist solely to keep the cluster reconcilable while
-historic DNS records resolve to their LoadBalancer IPs.
 
 ## Anti-patterns (do not do this)
 
@@ -184,7 +169,6 @@ historic DNS records resolve to their LoadBalancer IPs.
 ## See also
 
 - `envoy-gateway/` — Gateway / GatewayClass / Certificate manifests
-- `ingress/` — legacy nginx-ingress controllers (deprecated)
 - `keycloak-operator/httproute-external.yaml` + `httproute-legacy-redirect.yaml`
   — canonical example of the apex + redirect pattern
 - `zot/securitypolicy.yaml` — example of OIDC `SecurityPolicy` attachment

@@ -179,8 +179,7 @@ namespace). Two `Gateway` resources expose two listener spaces:
      openwebui, github-readme-stats, ynufes-cf grafana, …).
    - `https-legacy-k` on `*.k.shion1305.com` — legacy listener serving
      301-redirect HTTPRoutes that move old `*.k` URLs to their apex
-     equivalents during the ingress-nginx → Gateway migration. To be
-     removed once all consumers have migrated.
+     equivalents. To be removed once all consumers have migrated.
 
 2. **`internal`** (`10.130.5.21`, reachable via WireGuard): listener
    `https` on `*.i.shion1305.com` — used by atc/grafana, atc/prometheus,
