@@ -4,12 +4,17 @@ metadata:
   name: healthcheck-script
   namespace: node-healthcheck
 data:
+  # Shared healthcheck for every node CronJob. Runs in curlimages/curl
+  # (~10MB, Alpine/musl, non-root) instead of netshoot (~200MB). On failure it
+  # emits lightweight diagnostics using only what that image provides:
+  # /etc/resolv.conf, busybox nslookup, and a verbose curl. Tools that are NOT
+  # available there (dig, getent, ping as non-root, nsswitch.conf) are omitted.
   healthcheck.sh: |
     #!/bin/sh
     set -eu
 
-    # Diagnostic function - runs on failure to help troubleshoot
-    # Always returns success to prevent script exit with set -e
+    # Lightweight diagnostics on failure. Always returns 0 so `set -e` does not
+    # abort the script while collecting diagnostics.
     diag() {
       url="$1"
       host="${url#*://}"
@@ -17,80 +22,34 @@ data:
       host="${host%%:*}"
 
       echo "---" >&2
-      echo "Time: $(date -Is)" >&2
-      echo "Diagnostics for failed healthcheck to: $url" >&2
-      echo "" >&2
+      echo "Diagnostics for failed healthcheck (host: $host)" >&2
 
-      # Network configuration
-      echo "[Network Interface]" >&2
-      ip -br addr >&2 || true
-      echo "" >&2
-
-      echo "[Default Route]" >&2
-      ip route show default >&2 || true
-      echo "" >&2
-
-      # DNS configuration
       echo "[DNS Config - /etc/resolv.conf]" >&2
       cat /etc/resolv.conf >&2 || true
-      echo "" >&2
 
-      # NSSwitch configuration - critical for curl DNS resolution
-      echo "[NSSwitch Config - /etc/nsswitch.conf]" >&2
-      if [ -f /etc/nsswitch.conf ]; then
-        cat /etc/nsswitch.conf >&2
-      else
-        echo "MISSING: /etc/nsswitch.conf not found - this may cause curl DNS failures!" >&2
-      fi
-      echo "" >&2
-
-      # DNS resolution using different methods
-      echo "[DNS Resolution Test: $host]" >&2
-      echo "dig:" >&2
-      dig +short +time=2 +tries=1 "$host" >&2 || echo "  dig failed" >&2
-
-      echo "getent:" >&2
-      getent hosts "$host" >&2 || echo "  getent failed (uses nsswitch.conf)" >&2
-
-      echo "nslookup:" >&2
+      echo "[DNS Resolution - nslookup $host]" >&2
       nslookup "$host" >&2 || echo "  nslookup failed" >&2
-      echo "" >&2
 
-      # Curl verbose test
-      echo "[Curl Verbose Test: $host]" >&2
+      echo "[Curl Verbose - https://$host]" >&2
       curl -v --max-time 5 "https://$host" >&2 || true
-      echo "" >&2
 
-      # Connectivity test
-      echo "[Ping Test: $host]" >&2
-      ping -c 2 -W 2 "$host" >&2 || echo "Ping failed" >&2
-      echo "" >&2
-
-      # Ensure function always returns success
       return 0
     }
 
-    # Retry loop with diagnostics on failure
+    # Retry loop; run diagnostics once on the first failure to aid debugging.
     for i in 1 2 3 4; do
-      echo "Attempt $i/4: checking $HEALTHCHECK_URL" >&2
-
-      if curl -fsSv --max-time 15 "$HEALTHCHECK_URL"; then
-        echo "✓ Healthcheck successful" >&2
+      echo "Attempt $i/4: checking healthcheck endpoint" >&2
+      if curl -fsS --max-time 15 "$HEALTHCHECK_URL"; then
+        echo "Healthcheck successful" >&2
         exit 0
       fi
-
-      echo "✗ Attempt $i/4 failed" >&2
-
-      # Run diagnostics on first failure only to avoid spam
+      echo "Attempt $i/4 failed" >&2
       if [ "$i" -eq 1 ]; then
         diag "$HEALTHCHECK_URL"
       fi
-
       sleep 2
     done
 
-    # Final diagnostics after all retries exhausted
-    echo "" >&2
     echo "All retries exhausted. Final diagnostics:" >&2
     diag "$HEALTHCHECK_URL"
     exit 1
