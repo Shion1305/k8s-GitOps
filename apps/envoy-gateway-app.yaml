@@ -11,6 +11,12 @@ spec:
       targetRevision: 1.8.0
       helm:
         releaseName: envoy-gateway
+        # Gateway API CRDs and Envoy Gateway's own CRDs are managed by the
+        # dedicated gateway-api-crds / envoy-gateway-crds apps. Skipping them
+        # here stops the chart from re-installing Gateway API CRDs on the
+        # experimental channel, which the safe-upgrades ValidatingAdmissionPolicy
+        # rejects on top of the standard channel CRDs.
+        skipCrds: true
         valueFiles:
           - $values/envoy-gateway/values.yaml
     - repoURL: https://github.com/Shion1305/k8s-GitOps.git
@@ -24,7 +30,11 @@ spec:
     namespace: envoy-gateway-system
   syncPolicy:
     automated:
-      prune: true
+      # TEMPORARY (CRD ownership handoff): prune disabled so this app cannot
+      # delete the previously-bundled CRDs — and cascade-delete their CRs —
+      # when skipCrds removes them from its desired state. Restore to `true`
+      # in a follow-up once envoy-gateway-crds / gateway-api-crds own all CRDs.
+      prune: false
       selfHeal: true
     syncOptions:
       - CreateNamespace=true

@@ -1,0 +1,32 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: envoy-gateway-crds
+  namespace: argocd
+  annotations:
+    # Install CRDs before the controller and any CRs (same wave as gateway-api-crds).
+    argocd.argoproj.io/sync-wave: "-10"
+spec:
+  project: default
+  # Envoy Gateway's *own* CRDs (gateway.envoyproxy.io/*) only.
+  # The Gateway API CRDs (gateway.networking.k8s.io/*) are owned by the
+  # `gateway-api-crds` app (standard channel). The envoy-gateway controller
+  # app sets helm.skipCrds=true so the chart no longer ships either set,
+  # which is what previously collided with the standard CRDs via the
+  # safe-upgrades ValidatingAdmissionPolicy.
+  # Keep targetRevision in lockstep with the gateway-helm chart version in
+  # apps/envoy-gateway-app.yaml.
+  source:
+    repoURL: https://github.com/envoyproxy/gateway.git
+    targetRevision: v1.8.0
+    path: charts/gateway-helm/charts/crds/crds/generated
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kube-system
+  syncPolicy:
+    automated:
+      prune: false
+      selfHeal: true
+    syncOptions:
+      - ServerSideApply=true
+      - Replace=true
