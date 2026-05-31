@@ -15,6 +15,7 @@ spec:
         spec:
           terminationGracePeriodSeconds: 5
           restartPolicy: Never
+          priorityClassName: system-node-critical
           tolerations:
             - operator: Exists
           affinity:
@@ -28,7 +29,7 @@ spec:
                           - shion-ubuntu-2505
           containers:
             - name: ping
-              image: nicolaka/netshoot:v0.15
+              image: curlimages/curl:8.20.0
               command: ["/bin/sh", "/scripts/healthcheck.sh"]
               env:
                 - name: HEALTHCHECK_URL
