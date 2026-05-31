@@ -4,4 +4,3 @@ kind: Kustomization
 resources:
   - postgres-cluster.yaml
   - tlsroute-internal.yaml
-  - prometheus-rule.yaml

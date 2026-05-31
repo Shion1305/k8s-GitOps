@@ -39,6 +39,9 @@ configKubernetes:
   enable_init_containers: true
   enable_pod_antiaffinity: false
   enable_pod_disruption_budget: true
+  # Probe Patroni /readiness so a pod whose postgres failed to start drops to
+  # Ready=False. Without it Ready only tracks the container process.
+  enable_readiness_probe: true
   enable_sidecars: true
   master_pod_move_timeout: "20m"
   node_readiness_label: {}
