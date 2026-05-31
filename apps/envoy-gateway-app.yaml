@@ -30,11 +30,7 @@ spec:
     namespace: envoy-gateway-system
   syncPolicy:
     automated:
-      # TEMPORARY (CRD ownership handoff): prune disabled so this app cannot
-      # delete the previously-bundled CRDs — and cascade-delete their CRs —
-      # when skipCrds removes them from its desired state. Restore to `true`
-      # in a follow-up once envoy-gateway-crds / gateway-api-crds own all CRDs.
-      prune: false
+      prune: true
       selfHeal: true
     syncOptions:
       - CreateNamespace=true
