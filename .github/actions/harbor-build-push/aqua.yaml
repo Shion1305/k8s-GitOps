@@ -15,4 +15,4 @@ registries:
     ref: v4.479.0 # renovate: depName=aquaproj/aqua-registry
 packages:
   # Provides `crane` — used by the action to push OCI artifacts.
-  - name: google/go-containerregistry@v0.21.5
+  - name: google/go-containerregistry@v0.21.6
