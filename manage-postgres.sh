@@ -4,7 +4,7 @@
 
 set -e
 
-NAMESPACE="postgres-clusters"
+NAMESPACE="postgres-operator-deployment"
 
 function usage() {
     echo "Usage: $0 [command] [options]"
