@@ -112,18 +112,28 @@ clickhouse:
                   values:
                     - shion-ubuntu-2505
 
-# Redis - embedded deployment
+# Redis: bitnami valkey subchart (aliased `redis`) -> uses `primary.*`,
+# not the redis chart's `master.*` (the latter is silently ignored here).
 redis:
-  enabled: true
+  deploy: true
   auth:
     enabled: true
     existingSecret: "langfuse-credentials"
     existingSecretPasswordKey: "REDIS_PASSWORD"
-  master:
+  # RDB snapshots (written to a temp file then atomically renamed) instead of
+  # AOF (in-place append): an unclean node shutdown can't leave a half-written
+  # file that blocks startup. redis is a disposable BullMQ queue/cache here;
+  # postgres + clickhouse hold the source of truth.
+  commonConfiguration: |-
+    appendonly no
+    save "900 1 300 10 60 10000"
+  primary:
+    extraFlags:
+      - "--maxmemory-policy noeviction"   # required by the langfuse chart
     persistence:
       enabled: true
-      size: 5Gi
-      storageClass: "longhorn-ssd"
+      # size/storageClass left at chart default (8Gi, default longhorn-ssd):
+      # the existing PVC is 8Gi and StatefulSet volumeClaimTemplates are immutable.
     resources:
       requests:
         cpu: 100m
