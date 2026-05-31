@@ -1,3 +1,8 @@
+# Single replica with an RWO Longhorn artifact PVC: roll the old pod out before
+# the new one so the volume can detach instead of dead-locking the rollout.
+strategy:
+  type: Recreate
+
 backendStore:
   databaseMigration: true
   databaseConnectionCheck: true
