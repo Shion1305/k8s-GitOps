@@ -1,5 +1,5 @@
 # Allows Gateways in envoy-gateway-system to attach HTTPRoutes living in the keycloak namespace.
-apiVersion: gateway.networking.k8s.io/v1beta1
+apiVersion: gateway.networking.k8s.io/v1
 kind: ReferenceGrant
 metadata:
   name: allow-envoy-gateway

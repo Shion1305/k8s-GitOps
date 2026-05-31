@@ -2,7 +2,7 @@
 # internal Gateway's port 5432 listener to the postgres-shared master Service.
 # Envoy does not terminate TLS — Spilo presents its self-signed cert and the
 # client must connect with sslmode=require (or distribute the CA for verify-full).
-apiVersion: gateway.networking.k8s.io/v1alpha2
+apiVersion: gateway.networking.k8s.io/v1
 kind: TLSRoute
 metadata:
   name: postgres-shared
