@@ -82,7 +82,7 @@ to reach a backend `Service` in your app's namespace, also add a
 `ReferenceGrant`:
 
 ```yaml
-apiVersion: gateway.networking.k8s.io/v1beta1
+apiVersion: gateway.networking.k8s.io/v1
 kind: ReferenceGrant
 metadata:
   name: allow-envoy-gateway
