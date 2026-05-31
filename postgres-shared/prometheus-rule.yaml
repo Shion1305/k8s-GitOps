@@ -1,0 +1,33 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: spilo-postgres-health
+  namespace: postgres-operator-deployment
+  labels:
+    app.kubernetes.io/part-of: postgres-operator
+spec:
+  groups:
+    - name: spilo-postgres
+      rules:
+        # Detect the fsGroup-induced "data directory has invalid permissions"
+        # FATAL: Patroni cannot start postgres, so the pod is NotReady while its
+        # container keeps running (no crashloop). This signature is distinct from
+        # a normal crash and is what the 2026-05-30 outage looked like.
+        - alert: SpiloPostgresNotReadyWhileRunning
+          expr: |
+            (kube_pod_container_status_running{namespace="postgres-operator-deployment"} == 1)
+            and on (namespace, pod)
+            (kube_pod_status_ready{namespace="postgres-operator-deployment", condition="true"} == 0)
+            and on (namespace, pod)
+            (kube_pod_labels{label_application="spilo"} == 1)
+          for: 10m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Spilo postgres pod {{ $labels.pod }} is running but NotReady (possible PGDATA permission failure)"
+            description: >-
+              {{ $labels.namespace }}/{{ $labels.pod }} has a running container but has been
+              NotReady for >10m with no restart. This matches the fsGroup-induced
+              'data directory has invalid permissions' FATAL, where Patroni cannot start
+              postgres while the container stays up. Recovery: recreate the pod
+              (kubectl delete pod) so the spilo entrypoint re-applies chmod 0700 to PGDATA.
