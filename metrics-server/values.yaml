@@ -1,0 +1,18 @@
+# metrics-server (kubernetes-sigs): serves the resource metrics API
+# (metrics.k8s.io) that backs `kubectl top` and HPA.
+# Chart: metrics-server/metrics-server
+
+# Kubelet serving certificates on this cluster are self-signed (kubeadm does
+# not have them signed by the cluster CA by default), so metrics-server cannot
+# verify them over TLS. This is the standard self-managed/homelab fix.
+args:
+  - --kubelet-insecure-tls
+
+replicas: 1
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 128Mi
+  limits:
+    memory: 256Mi
