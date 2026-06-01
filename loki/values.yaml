@@ -1,0 +1,80 @@
+# Loki — governance log store for Claude Code OTLP events.
+# Single-binary, filesystem-backed, single replica: this is an append-only
+# audit store at homelab volume, so HA replication isn't worth the footprint
+# (instance-k8s-proxy is already memory-constrained). Loki 3.x ingests OTLP
+# natively at /otlp/v1/logs; the OTel collector ships logs straight here.
+deploymentMode: SingleBinary
+
+loki:
+  auth_enabled: false
+  commonConfig:
+    replication_factor: 1
+  schemaConfig:
+    configs:
+      - from: "2024-04-01"
+        store: tsdb
+        object_store: filesystem
+        schema: v13
+        index:
+          prefix: index_
+          period: 24h
+  storage:
+    type: filesystem
+  limits_config:
+    # 90-day governance retention; enforced by the compactor below.
+    retention_period: 2160h
+    # Required for OTLP ingestion (resource/scope attributes land as
+    # structured metadata).
+    allow_structured_metadata: true
+    volume_enabled: true
+  compactor:
+    working_directory: /var/loki/compactor
+    retention_enabled: true
+    delete_request_store: filesystem
+  # Trim the collector's chatter; keep server defaults otherwise.
+  server:
+    http_listen_port: 3100
+    grpc_listen_port: 9095
+
+singleBinary:
+  replicas: 1
+  persistence:
+    enabled: true
+    storageClass: longhorn-hdd
+    size: 100Gi
+  resources:
+    requests:
+      cpu: 100m
+      memory: 192Mi
+    limits:
+      memory: 512Mi
+
+# Single-binary mode only — keep the scalable targets at zero replicas.
+read:
+  replicas: 0
+write:
+  replicas: 0
+backend:
+  replicas: 0
+
+# No nginx gateway: the collector and Grafana reach the `loki` Service
+# (port 3100) directly inside the cluster.
+gateway:
+  enabled: false
+
+# Drop the optional sidecars/caches that don't pull their weight at this scale.
+lokiCanary:
+  enabled: false
+test:
+  enabled: false
+chunksCache:
+  enabled: false
+resultsCache:
+  enabled: false
+monitoring:
+  selfMonitoring:
+    enabled: false
+    grafanaAgent:
+      installOperator: false
+  serviceMonitor:
+    enabled: false

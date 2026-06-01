@@ -84,6 +84,17 @@ path "freqtrade/metadata/*" {
 EOF
 echo "✓ Created policy: eso-freqtrade"
 
+# Policy for claude-code namespace (separate KV v2 engine mounted at claude-code/)
+vault policy write eso-claude-code - <<EOF
+path "claude-code/data/*" {
+  capabilities = ["read"]
+}
+path "claude-code/metadata/*" {
+  capabilities = ["read", "list"]
+}
+EOF
+echo "✓ Created policy: eso-claude-code"
+
 # Policy for cert-manager namespace (system/ KV v2 mount, cert-manager only)
 vault policy write eso-cert-manager - <<EOF
 path "system/data/cert-manager" {
@@ -253,6 +264,14 @@ vault write auth/kubernetes/role/eso-freqtrade \
   ttl=1h
 echo "✓ Created role: eso-freqtrade"
 
+# claude-code
+vault write auth/kubernetes/role/eso-claude-code \
+  bound_service_account_names=eso \
+  bound_service_account_namespaces=claude-code \
+  policies=eso-claude-code \
+  ttl=1h
+echo "✓ Created role: eso-claude-code"
+
 # cert-manager
 vault write auth/kubernetes/role/eso-cert-manager \
   bound_service_account_names=eso \
@@ -421,6 +440,7 @@ echo "  eso-keycloak    → SA eso/keycloak        → secret/data/shared/keyclo
 echo "  eso-atc         → SA eso/atc             → atc/data/*"
 echo "  eso-lumos-bot   → SA eso/lumos-bot       → lumos-bot/data/*"
 echo "  eso-freqtrade   → SA eso/freqtrade       → freqtrade/data/*"
+echo "  eso-claude-code → SA eso/claude-code     → claude-code/data/*"
 echo "  eso-cert-manager→ SA eso/cert-manager    → system/data/cert-manager"
 echo "  eso-zot         → SA eso/zot             → zot/data/*"
 echo "  eso-harbor      → SA eso/harbor          → harbor/data/*"

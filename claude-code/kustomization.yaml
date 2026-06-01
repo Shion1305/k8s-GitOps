@@ -1,0 +1,9 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: claude-code
+resources:
+  - reference-grant.yaml
+  - httproute-internal.yaml
+  - vault-secret-store.yaml
+  - external-secret.yaml
+  - servicemonitor.yaml

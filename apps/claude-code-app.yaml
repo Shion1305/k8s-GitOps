@@ -1,0 +1,31 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: claude-code
+  namespace: argocd
+spec:
+  project: default
+  sources:
+    - repoURL: https://open-telemetry.github.io/opentelemetry-helm-charts
+      chart: opentelemetry-collector
+      targetRevision: 0.158.0
+      helm:
+        releaseName: claude-code
+        valueFiles:
+          - $values/claude-code/values.yaml
+    - repoURL: https://github.com/Shion1305/k8s-GitOps.git
+      targetRevision: HEAD
+      ref: values
+    - repoURL: https://github.com/Shion1305/k8s-GitOps.git
+      targetRevision: HEAD
+      path: claude-code
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: claude-code
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true

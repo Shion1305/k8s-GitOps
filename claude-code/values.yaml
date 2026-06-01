@@ -1,0 +1,103 @@
+# OpenTelemetry Collector — the OTLP receiver for Claude Code governance data.
+# Published at cc.i.shion1305.com (internal Gateway, WireGuard-only). Validates a
+# bearer token, ships events to Loki and metrics to Prometheus.
+mode: deployment
+replicaCount: 1
+
+# Contrib distribution: the core image lacks the bearertokenauth extension.
+image:
+  repository: otel/opentelemetry-collector-contrib
+command:
+  name: otelcol-contrib
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    memory: 512Mi
+
+# Only OTLP/HTTP is published (HTTPRoute is HTTP-only; gRPC would need a
+# GRPCRoute). The prometheus port exposes the Claude Code metrics scrape target.
+ports:
+  otlp:
+    enabled: false
+  otlp-http:
+    enabled: true
+    containerPort: 4318
+    servicePort: 4318
+    hostPort: null
+    protocol: TCP
+  jaeger-compact:
+    enabled: false
+  jaeger-thrift:
+    enabled: false
+  jaeger-grpc:
+    enabled: false
+  zipkin:
+    enabled: false
+  prometheus:
+    enabled: true
+    containerPort: 8889
+    servicePort: 8889
+    protocol: TCP
+
+# Mount the ESO-synced bearer token; bearertokenauth reads it from this file.
+extraVolumes:
+  - name: otlp-token
+    secret:
+      secretName: claude-code-otlp-token
+extraVolumeMounts:
+  - name: otlp-token
+    mountPath: /etc/otelcol/token
+    readOnly: true
+
+config:
+  extensions:
+    health_check:
+      endpoint: ${env:MY_POD_IP}:13133
+    bearertokenauth:
+      scheme: "Bearer"
+      filename: /etc/otelcol/token/token
+  receivers:
+    # Drop the chart's default receivers we don't accept.
+    jaeger: null
+    zipkin: null
+    prometheus: null
+    otlp:
+      protocols:
+        grpc: null
+        http:
+          endpoint: ${env:MY_POD_IP}:4318
+          auth:
+            authenticator: bearertokenauth
+  processors:
+    batch: {}
+    memory_limiter:
+      check_interval: 5s
+      limit_percentage: 80
+      spike_limit_percentage: 25
+  exporters:
+    # Loki 3.x ingests OTLP natively at /otlp/v1/logs.
+    otlphttp/loki:
+      endpoint: http://loki.claude-code.svc.cluster.local:3100/otlp
+    prometheus:
+      endpoint: ${env:MY_POD_IP}:8889
+      resource_to_telemetry_conversion:
+        enabled: true
+  service:
+    extensions:
+      - health_check
+      - bearertokenauth
+    pipelines:
+      # Drop the chart's default traces pipeline (it references the jaeger /
+      # zipkin receivers removed above); Claude Code emits no spans.
+      traces: null
+      logs:
+        receivers: [otlp]
+        processors: [memory_limiter, batch]
+        exporters: [otlphttp/loki]
+      metrics:
+        receivers: [otlp]
+        processors: [memory_limiter, batch]
+        exporters: [prometheus]
