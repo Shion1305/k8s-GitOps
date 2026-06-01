@@ -1,0 +1,33 @@
+# Allow the atc namespace (and the operator's Patroni REST API) to reach the atc
+# Postgres cluster. The cluster is defined in atc/postgres-cluster.yaml and runs
+# in the postgres-operator-deployment namespace, so this policy targets it there.
+# Additive ingress allow.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-ingress-to-atc-postgres
+  namespace: postgres-operator-deployment
+spec:
+  endpointSelector:
+    matchLabels:
+      cluster-name: atc
+  enableDefaultDeny:
+    ingress: false
+    egress: false
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: atc
+      toPorts:
+        - ports:
+            - port: "5432"
+              protocol: TCP
+    - fromEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: postgres-operator
+      toPorts:
+        - ports:
+            - port: "5432"
+              protocol: TCP
+            - port: "8008"
+              protocol: TCP
