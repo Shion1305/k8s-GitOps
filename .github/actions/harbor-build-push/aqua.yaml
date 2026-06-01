@@ -12,7 +12,7 @@
 # package list minimal so callers don't download unrelated tooling.
 registries:
   - type: standard
-    ref: v4.519.0 # renovate: depName=aquaproj/aqua-registry
+    ref: v4.520.0 # renovate: depName=aquaproj/aqua-registry
 packages:
   # Provides `crane` — used by the action to push OCI artifacts.
   - name: google/go-containerregistry@v0.21.6
