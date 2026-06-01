@@ -21,3 +21,4 @@ resources:
   - seaweedfs-statefulset.yaml
   - seaweedfs-service.yaml
   - seaweedfs-httproute.yaml
+  - network-policy-openwebui-to-mcp.yaml

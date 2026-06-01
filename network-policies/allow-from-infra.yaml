@@ -1,0 +1,52 @@
+# Universal ingress allows that every pod needs. All additive
+# (enableDefaultDeny: false) — they grant ingress without isolating anything;
+# the per-namespace generator applies the default-deny.
+apiVersion: cilium.io/v2
+kind: CiliumClusterwideNetworkPolicy
+metadata:
+  name: allow-ingress-from-node-and-apiserver
+spec:
+  # host/remote-node: kubelet probes and node/cross-node datapath.
+  # kube-apiserver: admission & conversion webhook callbacks.
+  # health: Cilium endpoint health checks.
+  endpointSelector: {}
+  enableDefaultDeny:
+    ingress: false
+    egress: false
+  ingress:
+    - fromEntities:
+        - host
+        - remote-node
+        - kube-apiserver
+        - health
+---
+# Envoy Gateway is the ingress proxy and reaches every published backend.
+apiVersion: cilium.io/v2
+kind: CiliumClusterwideNetworkPolicy
+metadata:
+  name: allow-ingress-from-envoy-gateway
+spec:
+  endpointSelector: {}
+  enableDefaultDeny:
+    ingress: false
+    egress: false
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: envoy-gateway-system
+---
+# Prometheus scrapes, and the Grafana operator manages, targets in every
+# namespace.
+apiVersion: cilium.io/v2
+kind: CiliumClusterwideNetworkPolicy
+metadata:
+  name: allow-ingress-from-monitoring
+spec:
+  endpointSelector: {}
+  enableDefaultDeny:
+    ingress: false
+    egress: false
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: grafana

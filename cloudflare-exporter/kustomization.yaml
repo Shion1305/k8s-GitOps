@@ -12,3 +12,4 @@ resources:
   - grafana-dashboards.yaml
   - vault-secret-store.yaml
   - external-secret.yaml
+  - networkpolicy.yaml

@@ -1,0 +1,21 @@
+# Allow External Secrets Operator to reach Vault. Additive: contributes an
+# ingress allow without isolating Vault by itself (cross-ns default-deny is
+# applied by the cluster-wide network-policies generator).
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-ingress-from-external-secrets
+  namespace: vault
+spec:
+  endpointSelector: {}
+  enableDefaultDeny:
+    ingress: false
+    egress: false
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: external-secrets
+      toPorts:
+        - ports:
+            - port: "8200"
+              protocol: TCP

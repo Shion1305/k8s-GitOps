@@ -1,0 +1,65 @@
+# Default-deny cross-namespace ingress in every non-system namespace, current and
+# future. Kyverno watches Namespace objects and generates a NetworkPolicy that
+# denies ingress except from the same namespace; allow-from-infra.yaml and each
+# app's own policy add back the permitted cross-namespace ingress (Cilium
+# evaluates standard and Cilium policies together as a union of allows).
+#
+# A standard networking.k8s.io NetworkPolicy is generated (Kyverno already has the
+# RBAC for it). synchronize: true realigns/recreates the policy and removes it on
+# ClusterPolicy deletion. failurePolicy: Ignore keeps Namespace admission working
+# if Kyverno is down, at the cost of isolation being applied only once it recovers.
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: cross-ns-isolation
+  annotations:
+    policies.kyverno.io/title: Cross-namespace ingress isolation
+    policies.kyverno.io/category: Network Isolation
+    policies.kyverno.io/subject: Namespace, NetworkPolicy
+    policies.kyverno.io/description: >-
+      Generates a default-deny-ingress NetworkPolicy (allowing same-namespace
+      ingress) into every non-system namespace so cross-namespace traffic is
+      denied by default. Cross-namespace allows are added by
+      network-policies/allow-from-infra.yaml and each app's own policy.
+spec:
+  generateExisting: true
+  webhookConfiguration:
+    failurePolicy: Ignore
+  rules:
+    - name: add-cross-ns-isolation-netpol
+      match:
+        any:
+          - resources:
+              kinds:
+                - Namespace
+      exclude:
+        any:
+          - resources:
+              kinds:
+                - Namespace
+              names:
+                # CoreDNS in kube-system serves DNS to every namespace; the
+                # kyverno engine is kept unisolated to avoid coupling it to its
+                # own reachability.
+                - kube-system
+                - kube-node-lease
+                - kube-public
+                - kyverno
+      generate:
+        apiVersion: networking.k8s.io/v1
+        kind: NetworkPolicy
+        name: cross-ns-isolation
+        namespace: "{{ request.object.metadata.name }}"
+        synchronize: true
+        data:
+          metadata:
+            labels:
+              app.kubernetes.io/managed-by: kyverno
+              network-policies/purpose: cross-ns-isolation
+          spec:
+            podSelector: {}
+            policyTypes:
+              - Ingress
+            ingress:
+              - from:
+                  - podSelector: {}
