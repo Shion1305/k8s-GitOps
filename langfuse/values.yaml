@@ -78,6 +78,9 @@ postgresql:
 # ClickHouse - embedded deployment
 clickhouse:
   enabled: true
+  # Single replica for PoC: shards=1, so every replica is a full copy of the
+  # same data. HA replication isn't worth 3x the memory/disk at this scale.
+  replicaCount: 1
   auth:
     existingSecret: "langfuse-credentials"
     existingSecretKey: "CLICKHOUSE_PASSWORD"
@@ -90,8 +93,8 @@ clickhouse:
       cpu: 500m
       memory: 1Gi
     limits:
-      cpu: 2000m
-      memory: 4Gi
+      cpu: 1000m
+      memory: 2Gi
   affinity:
     nodeAffinity:
       requiredDuringSchedulingIgnoredDuringExecution:
@@ -102,6 +105,9 @@ clickhouse:
                 values:
                   - shion-ubuntu-2505
   zookeeper:
+    # Single node: just enough coordination for ClickHouse's ReplicatedMergeTree
+    # tables, which langfuse's migrations require even on one ClickHouse replica.
+    replicaCount: 1
     affinity:
       nodeAffinity:
         requiredDuringSchedulingIgnoredDuringExecution:
