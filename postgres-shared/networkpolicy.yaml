@@ -1,13 +1,15 @@
-# Allow the shared-Postgres DB clients (:5432) and the operator's Patroni REST
-# API (:8008). Additive ingress allow; cross-ns default-deny is applied by the
-# cluster-wide network-policies generator.
+# Allow shared-Postgres clients (:5432) and the operator's Patroni REST API
+# (:8008). Scoped to the postgres-shared cluster; the atc cluster has its own
+# policy in atc/. Additive ingress allow.
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
 metadata:
-  name: allow-ingress-from-db-clients
+  name: allow-ingress-to-postgres-shared
   namespace: postgres-operator-deployment
 spec:
-  endpointSelector: {}
+  endpointSelector:
+    matchLabels:
+      cluster-name: postgres-shared
   enableDefaultDeny:
     ingress: false
     egress: false
@@ -18,7 +20,6 @@ spec:
               operator: In
               values:
                 - adminer
-                - atc
                 - harbor
                 - keycloak
                 - langfuse
