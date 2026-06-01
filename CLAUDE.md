@@ -213,6 +213,36 @@ spec:
           port: <port>
 ```
 
+## Network Policy & Namespace Isolation
+
+Cross-namespace traffic is **default-denied on ingress**. A Kyverno
+`ClusterPolicy` (`network-policies/cross-ns-isolation-generator.yaml`)
+generates a default-deny-ingress `NetworkPolicy` into every non-system
+namespace (current and future), allowing only **same-namespace** ingress.
+**Egress is left open** (the generated policy sets `policyTypes: [Ingress]`
+only). Cilium evaluates standard + Cilium policies as a **union of allows**.
+
+The only cluster-wide ingress allows are in
+`network-policies/allow-from-infra.yaml` (additive
+`CiliumClusterwideNetworkPolicy`, all ports):
+
+- node / kubelet / kube-apiserver / Cilium health
+- the **`envoy-gateway-system`** namespace (the ingress proxy → any backend)
+- the **`grafana`** namespace (Prometheus scrapes **and** Grafana datasource
+  queries both originate here)
+
+**When adding an app, ask who needs to reach it on ingress:**
+
+- Reached only by the **Gateway**, by **Prometheus/Grafana**, or by
+  **same-namespace** pods → **no NetworkPolicy needed** (covered above).
+- Reached from **any other namespace** (e.g. another app's pod, or a
+  controller that connects *from* its own namespace) → add an app-specific
+  allow policy in the app dir; it unions with the generated default-deny.
+
+Note that `ServiceMonitor` scrapes and cross-namespace `GrafanaDatasource`
+queries are both ingress *from the `grafana` namespace*, so both are already
+allowed. See `network-policies/README.md` for the full model.
+
 ## Application Directory Structure
 
 Each application directory typically contains:
