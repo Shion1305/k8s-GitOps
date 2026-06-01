@@ -1,0 +1,22 @@
+# cloudflare-grafana is reached externally via Cloudflare tunnel, so allow
+# ingress from outside the cluster on :3000. Additive ingress allow; cross-ns
+# default-deny is applied by the cluster-wide network-policies generator.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-ingress-from-world-to-cloudflare-grafana
+  namespace: monitoring
+spec:
+  endpointSelector:
+    matchLabels:
+      app: cloudflare-grafana
+  enableDefaultDeny:
+    ingress: false
+    egress: false
+  ingress:
+    - fromEntities:
+        - world
+      toPorts:
+        - ports:
+            - port: "3000"
+              protocol: TCP

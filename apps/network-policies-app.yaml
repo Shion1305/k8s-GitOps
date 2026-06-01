@@ -1,0 +1,23 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: network-policies
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/Shion1305/k8s-GitOps.git
+    targetRevision: HEAD
+    path: network-policies
+  destination:
+    server: https://kubernetes.default.svc
+    # CiliumClusterwideNetworkPolicy is cluster-scoped (this namespace is only
+    # Argo bookkeeping); the per-namespace CiliumNetworkPolicy resources carry
+    # their own metadata.namespace and land there.
+    namespace: kube-system
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - ServerSideApply=true

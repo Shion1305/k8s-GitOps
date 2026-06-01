@@ -1,0 +1,21 @@
+# Allow the monitoring namespace (cloudflare-grafana proxy datasource) to query
+# Prometheus on :9090. Additive ingress allow; cross-ns default-deny is applied
+# by the cluster-wide network-policies generator.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-ingress-from-monitoring
+  namespace: grafana
+spec:
+  endpointSelector: {}
+  enableDefaultDeny:
+    ingress: false
+    egress: false
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: monitoring
+      toPorts:
+        - ports:
+            - port: "9090"
+              protocol: TCP

@@ -1,0 +1,13 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Cluster-wide cross-namespace isolation framework:
+# - cross-ns-isolation-generator.yaml : Kyverno ClusterPolicy that default-denies
+#   ingress (allowing same-namespace) in every non-system namespace, current and
+#   future.
+# - allow-from-infra.yaml : the universal ingress allows (node/apiserver, Envoy
+#   Gateway, monitoring).
+# Per-namespace east-west allows live in each app's own directory. See README.md.
+resources:
+  - allow-from-infra.yaml
+  - cross-ns-isolation-generator.yaml

@@ -4,3 +4,4 @@ resources:
   - httproute-internal.yaml
   - httproute-external.yaml
   - httproute-legacy-redirect.yaml
+  - networkpolicy.yaml

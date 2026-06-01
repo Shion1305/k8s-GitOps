@@ -1,0 +1,39 @@
+# Allow the shared-Postgres DB clients (:5432) and the operator's Patroni REST
+# API (:8008). Additive ingress allow; cross-ns default-deny is applied by the
+# cluster-wide network-policies generator.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-ingress-from-db-clients
+  namespace: postgres-operator-deployment
+spec:
+  endpointSelector: {}
+  enableDefaultDeny:
+    ingress: false
+    egress: false
+  ingress:
+    - fromEndpoints:
+        - matchExpressions:
+            - key: k8s:io.kubernetes.pod.namespace
+              operator: In
+              values:
+                - adminer
+                - atc
+                - harbor
+                - keycloak
+                - langfuse
+                - mlflow
+                - nc-press-chotatsu
+                - openwebui
+                - postgres-operator
+      toPorts:
+        - ports:
+            - port: "5432"
+              protocol: TCP
+    - fromEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: postgres-operator
+      toPorts:
+        - ports:
+            - port: "8008"
+              protocol: TCP

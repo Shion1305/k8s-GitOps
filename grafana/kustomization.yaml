@@ -10,3 +10,4 @@ resources:
   - dashboards/kubernetes.yaml
   - dashboards/node-metrics.yaml
   - dashboards/monitoring.yaml
+  - networkpolicy.yaml
