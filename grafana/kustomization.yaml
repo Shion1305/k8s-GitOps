@@ -6,6 +6,7 @@ resources:
   - httproute-external.yaml
   - grafana.yaml
   - datasource.yaml
+  - datasource-loki.yaml
   - folders.yaml
   - dashboards/kubernetes.yaml
   - dashboards/node-metrics.yaml

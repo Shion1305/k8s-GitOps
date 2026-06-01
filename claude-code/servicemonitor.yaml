@@ -1,0 +1,22 @@
+# Scrapes the collector's prometheus exporter (Claude Code token/cost/session
+# metrics). The `release` label is how kube-prometheus-stack discovers it.
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: claude-code-collector
+  namespace: claude-code
+  labels:
+    app: claude-code-collector
+    release: kube-prometheus-stack
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: opentelemetry-collector
+      app.kubernetes.io/instance: claude-code
+  namespaceSelector:
+    matchNames:
+      - claude-code
+  endpoints:
+    - port: prometheus
+      path: /metrics
+      interval: 30s
