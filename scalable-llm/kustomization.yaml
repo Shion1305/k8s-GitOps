@@ -4,5 +4,6 @@ kind: Kustomization
 resources:
   - namespace.yaml
   - device-plugin.yaml
+  - llama-hf-token.yaml
   - models/tt-llama.yaml
   - litellm

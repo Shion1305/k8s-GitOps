@@ -1,11 +1,13 @@
 # Phase 3 (方式A): expose Tenstorrent Blackhole to the scheduler.
 #
 # No official Tenstorrent device plugin exists, so squat/generic-device-plugin
-# advertises the two linked cards as a single allocatable unit. A Pod that
-# requests `squat.io/tenstorrent: 1` gets BOTH /dev/tenstorrent/0 and
-# /dev/tenstorrent/1 injected — matching the "2 cards meshed into one vLLM
-# instance" model. The DaemonSet only runs on shion-ubuntu-2605 (the labelled
-# TT node); other nodes have no cards.
+# advertises each Blackhole card as its own allocatable unit. The node has two
+# p150a cards, so it advertises squat.io/tenstorrent: 2; a Pod that requests
+# `squat.io/tenstorrent: 1` gets ONE card injected. tt-inference-server has no
+# 2-card (p150x2) mesh for this model — Llama-3.1-8B runs single-card (p150) and
+# fits one card's 32GB — so each model replica uses one card, and the two cards
+# back up to two independent replicas. The DaemonSet only runs on
+# shion-ubuntu-2605 (the labelled TT node); other nodes have no cards.
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
@@ -42,11 +44,12 @@ spec:
             - |
               name: tenstorrent
               groups:
-                # One group = one allocation unit = both linked cards. A single
-                # vLLM instance gets card 0 and card 1 together (TP / mesh).
-                - count: 1
-                  paths:
+                # Each group is one allocatable unit = one card. Two groups → the
+                # node advertises squat.io/tenstorrent: 2. A Pod requesting 1 gets
+                # exactly one card's device file injected.
+                - paths:
                     - path: /dev/tenstorrent/0
+                - paths:
                     - path: /dev/tenstorrent/1
           ports:
             - containerPort: 8080

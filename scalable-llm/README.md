@@ -1,7 +1,15 @@
 # scalable-llm — KubeAI on Tenstorrent Blackhole (PoC)
 
-OpenAI-compatible inference on **Tenstorrent Blackhole** (2 cards meshed) via the
-**Tenstorrent vLLM fork**, orchestrated by **KubeAI**, fronted by **LiteLLM**.
+OpenAI-compatible inference on **Tenstorrent Blackhole** via the official
+**tt-inference-server vLLM** image, orchestrated by **KubeAI**, fronted by
+**LiteLLM**.
+
+**Hardware (verified):** `shion-ubuntu-2605` has **2× Blackhole p150a** (32GB
+each), tt-kmd 2.8.0, FW 19.6.0.0. tt-inference-server has no 2-card (p150x2)
+mesh, and **Llama-3.1-8B** (the only LLM it supports on p150) fits one card — so
+the design is **one card per replica**: the device-plugin advertises
+`squat.io/tenstorrent: 2` and each model replica takes one card. The second card
+backs a second replica (`maxReplicas: 2`) later.
 
 All TT workloads are pinned to **`shion-ubuntu-2605`** (`ssh s2605`) — the only
 node with cards. Everything in this namespace is GitOps-managed; do not
@@ -28,9 +36,10 @@ helm template kubeai kubeai/kubeai --version <new> --include-crds \
 ```
 scalable-llm/
 ├── namespace.yaml          # ns: scalable-llm
-├── device-plugin.yaml      # generic-device-plugin: 2 cards -> squat.io/tenstorrent:1
-├── kubeai-values.yaml      # KubeAI Helm values: resourceProfile + tt-vllm image + hostPath cache patch
-├── models/tt-llama.yaml    # KubeAI Model (TEMPLATE — fill from Phase 2)
+├── device-plugin.yaml      # generic-device-plugin: 1 card = 1 unit -> squat.io/tenstorrent:2
+├── kubeai-values.yaml      # KubeAI Helm values: resourceProfile + tt image + cache/HF/hugepages patches
+├── llama-hf-token.yaml     # ESO: Vault scalable-llm/llama → HF_TOKEN Secret (gated Llama-3.1-8B)
+├── models/tt-llama.yaml    # KubeAI Model: Llama-3.1-8B on one p150 card
 └── litellm/                # LiteLLM front + DB (shared Postgres) + Vault key + HTTPRoute
 ```
 
@@ -76,46 +85,55 @@ kubectl label node shion-ubuntu-2605 tenstorrent.com/blackhole=true
 kubectl describe node shion-ubuntu-2605 | grep -i taint   # mirror any taint into kubeai-values
 ```
 
-### Phase 2 — build the image and single-container smoke test
+### Phase 2 — official image, no custom build
 
-Build with containerd tooling and load into the `k8s.io` namespace so kubelet
-sees it (or push to a registry the cluster can pull):
+We use Tenstorrent's published image directly (no Dockerfile to build):
+`ghcr.io/tenstorrent/tt-inference-server/vllm-tt-metal-src-release-ubuntu-22.04-amd64:0.10.0-555f240-22be241`
+(public on ghcr; pinned in `kubeai-values.yaml` and `models/tt-llama.yaml`).
+
+Optional host smoke test (outside Kubernetes) once the HF token is in your
+shell — proves the card + weights + server before relying on KubeAI:
 
 ```bash
-# on s2605
-nerdctl build -t REPLACE_ME/tt-vllm:REPLACE_TAG -f Dockerfile .
-sudo nerdctl -n k8s.io load -i tt-vllm.tar          # if not using a registry
-sudo crictl images | grep tt-vllm
-
-# verify the container talks to BOTH cards as a mesh, OUTSIDE Kubernetes:
-sudo nerdctl run --rm \
-  --device /dev/tenstorrent/0 --device /dev/tenstorrent/1 \
-  --mount type=bind,src=/dev/hugepages,dst=/dev/hugepages \
-  --shm-size=<value> -p 8000:8000 \
-  REPLACE_ME/tt-vllm:REPLACE_TAG <TT launch: mesh-shape=1x2 ... --model ...>
+# on s2605; docker is installed there. Needs HF_TOKEN (gated Llama-3.1-8B).
+docker run --rm \
+  --env HF_TOKEN=$HF_TOKEN \
+  --env CACHE_ROOT=/home/container_app_user/cache_root \
+  --ipc host \
+  --device /dev/tenstorrent \
+  --mount type=bind,src=/dev/hugepages-1G,dst=/dev/hugepages-1G \
+  -v tt_llama_cache:/home/container_app_user/cache_root \
+  -p 8000:8000 \
+  ghcr.io/tenstorrent/tt-inference-server/vllm-tt-metal-src-release-ubuntu-22.04-amd64:0.10.0-555f240-22be241 \
+  --model Llama-3.1-8B --tt-device p150
 curl localhost:8000/v1/models
 ```
 
-**The launch command that works here is the source of truth** for `models/tt-llama.yaml`
-(`spec.args`) and the TT cache env var (`spec.env`).
+The image entrypoint downloads the weights (first run, slow), compiles TT-Metal
+kernels (cached under `CACHE_ROOT`), and serves the OpenAI API on :8000.
 
 ---
 
-## Placeholders to fill before this serves traffic
+## The one remaining out-of-band step: the HF token
 
-| Where | Placeholder | Replace with |
-|-------|-------------|--------------|
-| `kubeai-values.yaml`, `models/tt-llama.yaml` | `REPLACE_ME/tt-vllm:REPLACE_TAG` | the image built in Phase 2 |
-| `models/tt-llama.yaml` | `url`, `metadata.name` | real model + TT load method |
-| `models/tt-llama.yaml` | `spec.args`, `spec.env` | Phase-2 launch flags + TT cache var |
-| `kubeai-values.yaml` | `/cache/tt` mountPath | TT runtime's actual cache dir |
+Everything else is wired in git. Llama-3.1-8B is **gated** on Hugging Face, so the
+weight download needs your HF token (accept the model's license on huggingface.co
+first, then create a read token). Write it to Vault; ESO syncs it and the model
+Pod picks it up:
+
+```bash
+vault kv put scalable-llm/llama hf_token=hf_xxx
+# force-sync (else waits up to 5m):
+kubectl annotate externalsecret -n scalable-llm llama-hf-token force-sync="$(date +%s)" --overwrite
+```
 
 ## Secrets (out-of-band, public repo — never commit values)
 
 ```bash
-# Vault KV v2 mount + LiteLLM master key
+# Vault KV v2 mount + LiteLLM master key + HF token
 vault secrets enable -path=scalable-llm kv-v2
 vault kv put scalable-llm/litellm master_key=sk-<random>
+vault kv put scalable-llm/llama   hf_token=hf_<your-token>
 # Vault policy + k8s auth role: run vault/scripts/setup-eso-policies.sh (eso-scalable-llm added)
 ```
 
