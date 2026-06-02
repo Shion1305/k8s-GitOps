@@ -112,6 +112,57 @@ configs:
         - /metadata
         - /endpoints
         - /ports
+    # Sync-diff ignore rules: the API server stamps schema defaults onto these
+    # CRD-backed resources at admission. Because every app syncs with
+    # ServerSideApply=true and the repo manifests are field-sparse, the
+    # defaulted fields live only on the cluster object and never appear in the
+    # desired state, so ArgoCD reports a permanent (cosmetic) OutOfSync. These
+    # entries drop the defaulted fields from the diff. Kinds are grouped here
+    # because the same defaults recur for every Gateway-API / External-Secrets
+    # resource cluster-wide; narrower per-app fields stay in apps/*.yaml.
+    resource.customizations.ignoreDifferences.gateway.networking.k8s.io_HTTPRoute: |
+      jqPathExpressions:
+        - '.spec.parentRefs[].group'
+        - '.spec.parentRefs[].kind'
+        - '.spec.rules[].backendRefs[].group'
+        - '.spec.rules[].backendRefs[].kind'
+        - '.spec.rules[].backendRefs[].weight'
+        - '.spec.rules[].matches'
+    resource.customizations.ignoreDifferences.gateway.networking.k8s.io_TLSRoute: |
+      jqPathExpressions:
+        - '.spec.parentRefs[].group'
+        - '.spec.parentRefs[].kind'
+        - '.spec.rules[].backendRefs[].group'
+        - '.spec.rules[].backendRefs[].kind'
+        - '.spec.rules[].backendRefs[].weight'
+    resource.customizations.ignoreDifferences.gateway.networking.k8s.io_Gateway: |
+      jqPathExpressions:
+        - '.spec.listeners[].tls.certificateRefs[].group'
+        - '.spec.listeners[].tls.certificateRefs[].kind'
+        - '.spec.listeners[].allowedRoutes.kinds[].group'
+    resource.customizations.ignoreDifferences.external-secrets.io_ExternalSecret: |
+      jqPathExpressions:
+        - '.spec.data[].remoteRef.conversionStrategy'
+        - '.spec.data[].remoteRef.decodingStrategy'
+        - '.spec.data[].remoteRef.metadataPolicy'
+        - '.spec.data[].remoteRef.nullBytePolicy'
+        - '.spec.dataFrom[].extract.conversionStrategy'
+        - '.spec.dataFrom[].extract.decodingStrategy'
+        - '.spec.dataFrom[].extract.metadataPolicy'
+        - '.spec.dataFrom[].extract.nullBytePolicy'
+        - '.spec.target.deletionPolicy'
+        - '.spec.target.template.engineVersion'
+        - '.spec.target.template.mergePolicy'
+    resource.customizations.ignoreDifferences.external-secrets.io_ClusterExternalSecret: |
+      jqPathExpressions:
+        - '.spec.externalSecretSpec.data[].remoteRef.conversionStrategy'
+        - '.spec.externalSecretSpec.data[].remoteRef.decodingStrategy'
+        - '.spec.externalSecretSpec.data[].remoteRef.metadataPolicy'
+        - '.spec.externalSecretSpec.data[].remoteRef.nullBytePolicy'
+        - '.spec.externalSecretSpec.target.template.mergePolicy'
+    resource.customizations.ignoreDifferences.apiextensions.k8s.io_CustomResourceDefinition: |
+      jqPathExpressions:
+        - '.spec.conversion'
   # RBAC configuration
   rbac:
     policy.default: role:admin
