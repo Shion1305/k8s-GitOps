@@ -166,9 +166,40 @@ curl https://ai.i.shion1305.com/v1/chat/completions \
   -d '{"model":"tt-llama","messages":[{"role":"user","content":"hello"}]}'
 ```
 
-Cold-start (`minReplicas: 0`) measurement, latency/throughput baseline, and the
-prefix-aware LB question are deferred to Phase 7; the PoC ships warm
-(`minReplicas: 1`) so weight load + TT-Metal compile stays off the request path.
+## Benchmarking & scale (Phase 7)
+
+Two dependency-free load tools live in `bench/`:
+
+```bash
+kubectl -n scalable-llm port-forward svc/kubeai 8000:80 &
+# throughput / latency sweep across concurrency levels
+python3 scalable-llm/bench/llm_bench.py --base-url http://localhost:8000/openai/v1 \
+    --model tt-llama --concurrency 1 8 16 32 --requests-per-level 16 --max-tokens 128
+# scale-from-zero cold start (run when at 0 replicas)
+python3 scalable-llm/bench/coldstart.py --base-url http://localhost:8000/openai/v1 --model tt-llama
+```
+
+Measured on one **p150a** card (Llama-3.1-8B-Instruct, BF16):
+
+| concurrency | TTFT med | agg tok/s | note |
+|-------------|----------|-----------|------|
+| 1  | 170 ms | 28  | single-stream |
+| 16 | 930 ms | ~212 | **saturation** (continuous batching full) |
+| 32 | 980 ms | ~212 | flat — batch is full |
+| 128 | 14 s | ~250 | TTFT explodes; 0 errors (requests queue, don't drop) |
+
+So one card saturates around **concurrency 16 / ~212 tok/s**; beyond that TTFT grows
+while throughput is flat — the signal to scale out to the second card.
+
+**Cold start:** first ever start ~10 min (16 GB weight download + TT-Metal compile).
+Subsequent starts reuse the hostPath cache — checkpoint load <1 s, full warmup
+~2–2.5 min. This is what makes warm (`minReplicas: 1`) cheap to keep and
+scale-from-zero viable.
+
+**Horizontal scale:** the node has two cards, so `maxReplicas: 2` lets KubeAI run
+a replica per card under load. The memory request is **8Gi** (a replica uses only
+~3.3Gi of host RAM — weights live in card VRAM); the old 32Gi request was ~10×
+reality and blocked the second replica from scheduling (2×32Gi > the node's ~52Gi).
 
 ## Network model
 
