@@ -41,8 +41,10 @@ spec:
               value: shion-ubuntu-2605
             - name: ARBITER_INTERVAL_SECONDS
               value: "5"
+            # Below KubeAI's own idle scale-down (~60-70s) so the arbiter can win
+            # the race and free a card when one is genuinely contended.
             - name: ARBITER_IDLE_GRACE_SECONDS
-              value: "60"
+              value: "20"
             - name: ARBITER_EVICT_HOLD_SECONDS
               value: "120"
           resources:

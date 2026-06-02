@@ -9,15 +9,17 @@ spec:
     server: https://kubernetes.default.svc
     namespace: scalable-llm
   # The card-arbiter (scalable-llm/card-arbiter) evicts an idle model to free a
-  # Tenstorrent card for a waiting model by patching Model maxReplicas (and KubeAI
-  # then rewrites replicas). Those fields are managed live at runtime, so exclude
-  # them from self-heal — otherwise ArgoCD reverts the patch within seconds and
-  # the arbiter can never free a card. The git value of maxReplicas stays the
-  # normal-operation ceiling that the arbiter restores to.
+  # Tenstorrent card for a waiting model by pinning that Model's minReplicas AND
+  # maxReplicas to 0 (KubeAI clamps max before min, so min must drop too or a warm
+  # holder re-clamps back up; KubeAI then rewrites replicas). These fields are
+  # managed live at runtime, so exclude them from self-heal — otherwise ArgoCD
+  # reverts the patch within seconds and the arbiter can never free a card. The
+  # git values stay the normal-operation bounds the arbiter restores to.
   ignoreDifferences:
     - group: kubeai.org
       kind: Model
       jqPathExpressions:
+        - '.spec.minReplicas'
         - '.spec.maxReplicas'
         - '.spec.replicas'
   syncPolicy:

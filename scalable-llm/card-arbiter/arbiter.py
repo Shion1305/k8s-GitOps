@@ -53,8 +53,12 @@ KUBEAI_SELECTOR = os.environ.get(
 INTERVAL = float(os.environ.get("ARBITER_INTERVAL_SECONDS", "5"))
 # A holder must have read sum==0 for this long before it is evictable. Guards
 # against evicting a model between two requests of a bursty-but-active client.
-IDLE_GRACE = float(os.environ.get("ARBITER_IDLE_GRACE_SECONDS", "60"))
-# After eviction, keep maxReplicas pinned at 0 at least this long so the freed
+# Keep this BELOW KubeAI's own idle scale-down (timeWindow + scaleDownDelay,
+# ~60-70s): an idle minReplicas:0 holder self-scales to 0 on that schedule, so a
+# longer grace means KubeAI frees the card before the arbiter ever acts. A
+# shorter grace lets the arbiter win the race when the card is genuinely needed.
+IDLE_GRACE = float(os.environ.get("ARBITER_IDLE_GRACE_SECONDS", "20"))
+# After eviction, keep the holder pinned at 0 at least this long so the freed
 # card is actually consumed by the waiter before the victim can reclaim it.
 EVICT_HOLD = float(os.environ.get("ARBITER_EVICT_HOLD_SECONDS", "120"))
 # How many log lines to scan for the latest per-model in-flight counts.
@@ -166,21 +170,27 @@ def in_flight_by_model():
     return counts
 
 
-def model_max_replicas(model):
+def model_bounds(model):
+    """Return (minReplicas, maxReplicas) from the Model spec; None on error."""
     try:
-        m = api(f"/apis/kubeai.org/v1/namespaces/{NS}/models/{model}")
-        v = m.get("spec", {}).get("maxReplicas")
-        return None if v is None else int(v)
+        spec = api(f"/apis/kubeai.org/v1/namespaces/{NS}/models/{model}").get("spec", {})
+        mn = spec.get("minReplicas")
+        mx = spec.get("maxReplicas")
+        return (0 if mn is None else int(mn), None if mx is None else int(mx))
     except Exception as e:
-        log(f"read maxReplicas error for {model}: {e!r}")
+        log(f"read bounds error for {model}: {e!r}")
         return None
 
 
-def set_max_replicas(model, value):
+def set_bounds(model, minr, maxr):
+    # Pin BOTH bounds. maxReplicas alone is not enough: KubeAI's
+    # enforceReplicaBounds applies max first then min, so min wins — a warm
+    # holder (minReplicas>=1) re-clamps back up and never releases its card
+    # unless minReplicas is lowered too. Restoring puts both back.
     api(
         f"/apis/kubeai.org/v1/namespaces/{NS}/models/{model}",
         method="PATCH",
-        body={"spec": {"maxReplicas": value}},
+        body={"spec": {"minReplicas": minr, "maxReplicas": maxr}},
         content_type="application/merge-patch+json",
     )
 
@@ -194,7 +204,7 @@ def main():
 
     # model -> monotonic time it was first observed idle (reset whenever busy).
     idle_since = {}
-    # model -> (original maxReplicas, monotonic time pinned) for evicted holders.
+    # model -> (orig_min, orig_max, monotonic time pinned) for evicted holders.
     evicted = {}
 
     while True:
@@ -234,11 +244,11 @@ def tick(idle_since, evicted):
 
     # Restore any evicted holder once pressure is gone and the hold has elapsed.
     for m in list(evicted):
-        orig, pinned_at = evicted[m]
+        orig_min, orig_max, pinned_at = evicted[m]
         if not pending_for_card and (now - pinned_at) >= EVICT_HOLD:
-            log(f"restore: model={m} maxReplicas 0->{orig} (pressure cleared)")
+            log(f"restore: model={m} bounds ->(min={orig_min},max={orig_max}) (pressure cleared)")
             try:
-                set_max_replicas(m, orig)
+                set_bounds(m, orig_min, orig_max)
                 evicted.pop(m, None)
             except Exception as e:
                 log(f"restore failed for {m}: {e!r}")
@@ -274,17 +284,21 @@ def tick(idle_since, evicted):
     # LRU: evict the holder idle the longest.
     candidates.sort(reverse=True)
     idle_for, victim = candidates[0]
-    orig = model_max_replicas(victim)
-    if orig is None or orig == 0:
-        log(f"victim={victim} has maxReplicas={orig}; skip")
+    bounds = model_bounds(victim)
+    if bounds is None:
+        log(f"victim={victim}: could not read bounds; skip")
+        return
+    orig_min, orig_max = bounds
+    if orig_max == 0:
+        log(f"victim={victim} already has maxReplicas=0; skip")
         return
     log(
-        f"EVICT victim={victim} (idle {round(idle_for)}s) maxReplicas {orig}->0 "
-        f"to free a card for {pending_for_card}"
+        f"EVICT victim={victim} (idle {round(idle_for)}s) "
+        f"bounds (min={orig_min},max={orig_max})->(0,0) to free a card for {pending_for_card}"
     )
     try:
-        set_max_replicas(victim, 0)
-        evicted[victim] = (orig, now)
+        set_bounds(victim, 0, 0)
+        evicted[victim] = (orig_min, orig_max, now)
     except Exception as e:
         log(f"evict failed for {victim}: {e!r}")
 
