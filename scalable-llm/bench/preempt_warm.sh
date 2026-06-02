@@ -55,7 +55,7 @@ log "start: $PRIMARY ready=$(ready $PRIMARY) max=$(maxrep $PRIMARY) | $WAITER re
 ) & POLL=$!
 (
   kubectl logs -n "$NS" -l app=card-arbiter -f --tail=0 2>/dev/null | while IFS= read -r line; do
-    case "$line" in *EVICT*|*restore*|*PRESSURE*) log "ARBITER $line";; esac
+    case "$line" in *EVICT*|*restore*|*PRESSURE*|*failed*|*error*) log "ARBITER $line";; esac
   done
 ) & ALOG=$!
 trap 'kill $POLL $ALOG 2>/dev/null' EXIT
