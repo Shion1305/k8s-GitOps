@@ -32,7 +32,9 @@ resourceProfiles:
     requests:
       squat.io/tenstorrent: "1"
       cpu: "4"
-      memory: "48Gi" # headroom for the 8B host-side weight load + TT runtime
+      # 8B BF16 weights ≈ 16GB + TT runtime. 32Gi fits the node's ~50Gi
+      # allocatable alongside the existing pods; 48Gi did not (Insufficient memory).
+      memory: "32Gi"
     # shion-ubuntu-2605 carries no TT-specific taint today. If one is added,
     # mirror it here (confirm with `kubectl describe node shion-ubuntu-2605`):
     # tolerations:
