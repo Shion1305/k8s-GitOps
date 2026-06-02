@@ -25,6 +25,15 @@ spec:
   destination:
     server: https://kubernetes.default.svc
     namespace: monitoring
+  # The grafana-operator writes the running version back into spec.version, and
+  # the embedded ServicePort defaults protocol=TCP — neither is in the repo CR,
+  # so ArgoCD diffs them forever. Per-app because spec.version is operator-owned.
+  ignoreDifferences:
+    - group: grafana.integreatly.org
+      kind: Grafana
+      jqPathExpressions:
+        - '.spec.version'
+        - '.spec.service.spec.ports[].protocol'
   syncPolicy:
     automated:
       prune: true

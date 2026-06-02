@@ -15,6 +15,18 @@ spec:
     # Argo bookkeeping); the per-namespace CiliumNetworkPolicy resources carry
     # their own metadata.namespace and land there.
     namespace: kube-system
+  # Kyverno defaults these ClusterPolicy fields server-side (the cross-ns
+  # isolation generator policy omits them), producing a permanent OutOfSync
+  # under ServerSideApply. Kept per-app for the same reason as kyverno-policies.
+  ignoreDifferences:
+    - group: kyverno.io
+      kind: ClusterPolicy
+      jqPathExpressions:
+        - '.spec.admission'
+        - '.spec.background'
+        - '.spec.emitWarning'
+        - '.spec.validationFailureAction'
+        - '.spec.rules[].skipBackgroundRequests'
   syncPolicy:
     automated:
       prune: true

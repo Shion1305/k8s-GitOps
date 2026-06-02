@@ -19,6 +19,19 @@ spec:
   destination:
     server: https://kubernetes.default.svc
     namespace: kyverno
+  # Kyverno defaults these ClusterPolicy fields server-side; the repo manifests
+  # omit them, so ServerSideApply leaves them live-only and ArgoCD diffs them
+  # forever. Kept per-app rather than cluster-wide because these fields can
+  # carry real intent on other ClusterPolicies.
+  ignoreDifferences:
+    - group: kyverno.io
+      kind: ClusterPolicy
+      jqPathExpressions:
+        - '.spec.admission'
+        - '.spec.background'
+        - '.spec.emitWarning'
+        - '.spec.validationFailureAction'
+        - '.spec.rules[].skipBackgroundRequests'
   syncPolicy:
     automated:
       prune: true
