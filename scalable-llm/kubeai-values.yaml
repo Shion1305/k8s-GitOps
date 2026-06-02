@@ -62,6 +62,13 @@ modelServerPods:
     capabilities:
       drop:
         - ALL
+      # The TT image runs as root and writes runtime dirs it owns as
+      # container_app_user (tt-metal/generated, logs/generated). Dropping ALL
+      # also drops CAP_DAC_OVERRIDE, so root loses its permission-bypass and the
+      # engine crashes with "Permission denied" creating those dirs. Add back
+      # only DAC_OVERRIDE — the one cap needed — keeping the rest dropped.
+      add:
+        - DAC_OVERRIDE
   # NOTE: `add /spec/volumes/-` (append) requires spec.volumes to already exist.
   # KubeAI's vLLM engine always adds a `dshm` volume + the server container's
   # volumeMount, so both arrays exist on every model Pod and these appends are
