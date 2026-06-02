@@ -74,8 +74,11 @@ tt-smi                                              # expect 2x Blackhole
 tt-topology                                         # configure + verify the 2-card mesh
 ls -l /dev/tenstorrent/ /dev/tenstorrent/by-id/     # devices 0 and 1
 
-# Pre-create the node-local TT compile/weights cache (mounted by every model Pod)
-sudo mkdir -p /var/local-storage/tt-cache && sudo chmod 1777 /var/local-storage/tt-cache
+# Pre-create the node-local TT compile/weights cache (mounted by every model Pod).
+# Owned by uid 1000 because the model Pod runs as the TT image's container_app_user
+# (uid 1000) with ALL caps dropped — it must be able to write here. Use chown -R
+# so any root-owned leftovers from a docker smoke test don't block writes.
+sudo mkdir -p /var/local-storage/tt-cache && sudo chown -R 1000:1000 /var/local-storage/tt-cache
 ```
 
 ### Phase 1-3 — cluster side (from your kubectl host)

@@ -56,19 +56,25 @@ modelServers:
 # PoC pins Pods to shion-ubuntu-2605, these patches only ever land on the TT
 # node. They attach the TT compile/program cache and the device directory.
 modelServerPods:
+  # The TT image is built so its files (tt-metal, logs, app) are owned by
+  # container_app_user (uid 1000), even though its default USER is root. KubeAI
+  # drops ALL caps, which also drops CAP_DAC_OVERRIDE — so the default root user
+  # loses its permission-bypass and the engine crashes with "Permission denied"
+  # creating tt-metal/generated and logs/generated.
+  #
+  # Run as the image's own uid 1000 instead: it owns those dirs, so no extra cap
+  # is needed and the container stays non-root with ALL caps dropped (tighter
+  # than re-adding DAC_OVERRIDE to root). The hostPath cache must then be
+  # writable by uid 1000 — done out-of-band on the host (see README):
+  #   sudo chown -R 1000:1000 /var/local-storage/tt-cache
   securityContext:
+    runAsUser: 1000
+    runAsGroup: 1000
     readOnlyRootFilesystem: false
     allowPrivilegeEscalation: false
     capabilities:
       drop:
         - ALL
-      # The TT image runs as root and writes runtime dirs it owns as
-      # container_app_user (tt-metal/generated, logs/generated). Dropping ALL
-      # also drops CAP_DAC_OVERRIDE, so root loses its permission-bypass and the
-      # engine crashes with "Permission denied" creating those dirs. Add back
-      # only DAC_OVERRIDE — the one cap needed — keeping the rest dropped.
-      add:
-        - DAC_OVERRIDE
   # NOTE: `add /spec/volumes/-` (append) requires spec.volumes to already exist.
   # KubeAI's vLLM engine always adds a `dshm` volume + the server container's
   # volumeMount, so both arrays exist on every model Pod and these appends are
