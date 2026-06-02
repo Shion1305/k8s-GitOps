@@ -3,7 +3,7 @@ kind: Kustomization
 resources:
   - namespace.yaml
   - postgres-cluster.yaml
-  - tcp-service.yaml
+  - tlsroute-internal.yaml
   - ws-stream-deployment.yaml
   - mcp-connector.yaml
   - network-policy-mcp-to-postgres.yaml
