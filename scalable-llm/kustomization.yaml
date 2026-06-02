@@ -6,4 +6,6 @@ resources:
   - device-plugin.yaml
   - llama-hf-token.yaml
   - models/tt-llama.yaml
+  - models/tt-llama-b.yaml
+  - card-arbiter
   - litellm
