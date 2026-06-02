@@ -7,6 +7,17 @@ replicaCount: 1
 
 # Istio / Knative / Prometheus-adapter are not used. Default messaging off.
 
+# Autoscaling responsiveness. The chart default timeWindow is 10m — a moving
+# average that long means a burst of load barely moves the average (e.g. 24
+# concurrent requests showed as averageActiveRequests ≈ 0.2), so the model never
+# scaled past 1 replica and scale-down took ~10m. For this PoC (cold start is
+# already ~2 min, batch is small) a 60s window makes scale-out/in actually track
+# load: sustained load reaches the 2-replica threshold in ~1 min, and idle scales
+# back down in ~1 min.
+modelAutoscaling:
+  interval: 10s
+  timeWindow: 60s
+
 # The KubeAI chart bundles an Open WebUI subchart, enabled by default. This
 # cluster already runs Open WebUI as its own `openwebui` app, so disable the
 # bundled one to avoid a duplicate StatefulSet/PVC/Service in this namespace.
