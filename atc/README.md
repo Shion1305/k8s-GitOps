@@ -6,6 +6,9 @@
 - Managed by Zalando Postgres Operator in `postgres-operator-deployment` namespace
 - Database: `atc`, User: `atcuser`
 - Connection secret: `atc-database-secret` (key: `ATC_DATABASE_URL`)
+- External access (via WireGuard): `atc.i.shion1305.com:5432`, exposed through the
+  internal Envoy Gateway's `tls-passthrough` listener (SNI-routed). Connect with
+  `sslmode=require` — Spilo presents its own cert; Envoy does not terminate TLS.
 
 ### Grafana
 - Standalone instance at `https://atc-grafana.i.shion1305.com` (envoy-gateway internal listener)
