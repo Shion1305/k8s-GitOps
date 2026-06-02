@@ -33,6 +33,11 @@ spec:
           # is the digest-pinnable tag. Renovate keeps it current.
           image: ghcr.io/squat/generic-device-plugin:latest
           args:
+            # generic-device-plugin defaults its resource domain to "devic.es";
+            # pin it to squat.io so the advertised name is squat.io/tenstorrent,
+            # matching the resourceProfile limits/requests in kubeai-values.yaml.
+            - --domain
+            - squat.io
             - --device
             - |
               name: tenstorrent
