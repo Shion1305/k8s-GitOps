@@ -1,57 +1,52 @@
-# Phase 6: the KubeAI Model served on Blackhole.
+# Phase 6: the KubeAI Model served on a single Blackhole p150a card.
 #
-# ⚠️ This is a template. Before it serves traffic you MUST fill in, from the
-# Phase 2 single-container run that succeeded:
-#   - metadata.name / url            -> the actual model + how the TT fork loads it
-#   - spec.image                     -> the tt-vllm tag built & loaded on s2605
-#   - spec.args                      -> the TT-fork launch flags (mesh-shape, etc.)
-#   - spec.env TT cache var          -> point at the mounted /cache/tt (see values)
+# Confirmed for this node (2x Blackhole p150a, tt-kmd 2.8.0, FW 19.6.0.0):
+#   - Llama-3.1-8B is the only LLM tt-inference-server supports on p150
+#     (experimental); 8B fits one card's 32GB → single-card (--tt-device p150).
+#   - There is no p150x2 mesh, so one replica = one card. With two cards the
+#     device-plugin advertises squat.io/tenstorrent: 2, so maxReplicas can be 2.
 #
-# The KubeAI default args for `engine: VLLM` assume upstream vLLM (GPU flags like
-# --gpu-memory-utilization) which the TT fork does NOT accept. Override them all
-# via spec.args, or absorb the TT launch in the image ENTRYPOINT and keep args
-# minimal. Whatever launched the container in Phase 2 is the source of truth.
+# Llama-3.1-8B is GATED on Hugging Face. The weights download needs an HF token,
+# supplied via an ESO chain: Vault (scalable-llm/llama, key hf_token) →
+# ExternalSecret → Secret `llama-hf-token` → HF_TOKEN env, injected into the
+# model Pod by kubeai-values.yaml modelServerPods.jsonPatches.
 apiVersion: kubeai.org/v1
 kind: Model
 metadata:
-  name: tt-llama # rename to the real model id (used as the OpenAI `model` name)
+  name: tt-llama # OpenAI `model` name; keep in sync with litellm/config.yaml
   namespace: scalable-llm
 spec:
   features: [TextGeneration]
 
-  # ⚠️ The TT fork may not run from a raw HF download — it can require a
-  # TT-Metal conversion/compile step. Decide in Phase 0/2 whether `hf://...`
-  # works directly or whether pre-converted weights are read from the mounted
-  # cache (then point url at that local path). Keep the compile output on the
-  # hostPath cache so it is reused on restart / scale-from-zero (R4).
-  url: hf://REPLACE_ORG/REPLACE_MODEL
+  # The tt-inference-server image resolves this short name to its model spec
+  # (HF repo meta-llama/Llama-3.1-8B) and downloads the weights on first start
+  # using HF_TOKEN, persisting them under the mounted cache (CACHE_ROOT). vLLM's
+  # url is informational here; the TT image owns the actual load.
+  url: hf://meta-llama/Llama-3.1-8B
 
   engine: VLLM
 
-  # name:count — count 1 = the single allocation unit = both linked cards
-  # (device-plugin.yaml + kubeai-values.yaml resourceProfiles).
+  # count 1 = one p150a card (device-plugin advertises 2 units total).
   resourceProfile: tenstorrent-blackhole:1
 
-  # Pin the TT fork image on the Model so it overrides the profile's imageName
-  # if needed. Keep in sync with modelServers.VLLM.images.tt-vllm in values.
-  image: "REPLACE_ME/tt-vllm:REPLACE_TAG"
+  image: "ghcr.io/tenstorrent/tt-inference-server/vllm-tt-metal-src-release-ubuntu-22.04-amd64:0.10.0-555f240-22be241"
 
-  # PoC runs warm to take cold start (weight load + TT-Metal compile) off the
-  # request path. Measure the real cold start in Phase 7 before considering
-  # minReplicas: 0.
+  # PoC runs warm so the TT-Metal compile + weight load stays off the request
+  # path. With two cards available, maxReplicas: 2 is possible later.
   minReplicas: 1
   maxReplicas: 1
 
   env:
-    # ⚠️ Set the TT runtime's cache env var to the mounted hostPath so program/
-    # kernel compilation is cached on s2605 across restarts. Confirm the exact
-    # variable name in the TT docs (e.g. TT_METAL_CACHE) — this is a guess.
-    TT_METAL_CACHE: "/cache/tt"
+    # The tt-inference-server launcher (run_vllm_api_server.py) asserts these.
+    # TT_CACHE_PATH is the real compile-cache var (NOT TT_METAL_CACHE); it points
+    # at the hostPath cache mounted by kubeai-values.yaml so kernel compilation
+    # is reused across restarts / scale-from-zero.
+    TT_CACHE_PATH: "/cache/tt"
+    CACHE_ROOT: "/cache/tt"
+    MESH_DEVICE: "p150" # single card; no p150x2 exists for this model
 
-  args:
-    # ⚠️ Replace with the exact flags from the Phase 2 working launch command.
-    # Standard vLLM GPU flags do NOT map to the TT fork. Examples of what likely
-    # belongs here (names per the TT vLLM fork / tt-inference-server docs):
-    # - "--mesh-shape=1x2"        # use both linked cards as one mesh
-    # - "--max-model-len=4096"
-    []
+  # The TT image's entrypoint runs run_vllm_api_server.py for --tt-device p150;
+  # it does not take upstream vLLM GPU flags. Keep KubeAI from appending its
+  # default vLLM args by leaving this empty and letting the image entrypoint +
+  # env (above) drive the launch.
+  args: []

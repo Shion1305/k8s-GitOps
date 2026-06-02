@@ -1,0 +1,28 @@
+# HF token for the gated Llama-3.1-8B weight download. Written to Vault
+# out-of-band (public repo — never commit the value):
+#   vault kv put scalable-llm/llama hf_token=hf_xxx
+# Reuses the namespace `vault` SecretStore created in litellm/vault-secret-store.yaml
+# (mount scalable-llm/, role eso-scalable-llm).
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: llama-hf-token
+  namespace: scalable-llm
+spec:
+  refreshInterval: 5m
+  secretStoreRef:
+    name: vault
+    kind: SecretStore
+  target:
+    name: llama-hf-token
+    creationPolicy: Owner
+    template:
+      type: Opaque
+      metadata:
+        labels:
+          managed-by: external-secrets
+  data:
+    - secretKey: HF_TOKEN
+      remoteRef:
+        key: llama
+        property: hf_token
