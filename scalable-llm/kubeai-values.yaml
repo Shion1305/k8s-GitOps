@@ -111,6 +111,19 @@ modelServerPods:
           secretKeyRef:
             name: llama-hf-token
             key: HF_TOKEN
+    # Run the vLLM server in the TT fork's venv. KubeAI sets the container
+    # command to `python3 -m vllm.entrypoints.openai.api_server`, but that picks
+    # the base interpreter where vllm is not importable (ModuleNotFoundError).
+    # The tenstorrent/vllm fork lives in ${PYTHON_ENV_DIR}; source it, then exec
+    # the same module. KubeAI's generated args (--model, --served-model-name,
+    # --max-num-seqs=32) are appended by the chart and arrive as "$@".
+    - op: replace
+      path: /spec/containers/0/command
+      value:
+        - bash
+        - -lc
+        - 'source ${PYTHON_ENV_DIR}/bin/activate && exec python -m vllm.entrypoints.openai.api_server "$@"'
+        - "vllm-tt" # $0 for `bash -c`; KubeAI's args follow as "$@"
     # FALLBACK (commented): if the device-plugin device files are not enough
     # and the TT runtime needs /dev/tenstorrent/by-id or sysfs/PCIe resources,
     # promote the container to privileged with the whole device dir. Not for

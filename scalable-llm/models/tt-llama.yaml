@@ -1,15 +1,18 @@
 # Phase 6: the KubeAI Model served on a single Blackhole p150a card.
 #
-# Confirmed for this node (2x Blackhole p150a, tt-kmd 2.8.0, FW 19.6.0.0):
-#   - Llama-3.1-8B is the only LLM tt-inference-server supports on p150
-#     (experimental); 8B fits one card's 32GB → single-card (--tt-device p150).
-#   - There is no p150x2 mesh, so one replica = one card. With two cards the
-#     device-plugin advertises squat.io/tenstorrent: 2, so maxReplicas can be 2.
+# Verified end-to-end on the node (2x Blackhole p150a, tt-kmd 2.8.0, FW 19.6.0.0)
+# by smoke-testing the official image directly. The image bundles the
+# tenstorrent/vllm fork (platform "tt") in venv ${PYTHON_ENV_DIR}, so the
+# standard `python -m vllm.entrypoints.openai.api_server` works — once you source
+# that venv (kubeai-values.yaml overrides KubeAI's command to do so) and set the
+# TT env vars below.
 #
-# Llama-3.1-8B is GATED on Hugging Face. The weights download needs an HF token,
-# supplied via an ESO chain: Vault (scalable-llm/llama, key hf_token) →
-# ExternalSecret → Secret `llama-hf-token` → HF_TOKEN env, injected into the
-# model Pod by kubeai-values.yaml modelServerPods.jsonPatches.
+# Model: NousResearch/Meta-Llama-3.1-8B-Instruct — a NON-GATED mirror of Meta's
+# weights. The Instruct variant (not base) ships a chat template, which the
+# OpenAI /v1/chat/completions path (LiteLLM → KubeAI) requires. The Vault HF
+# token's account is not on Meta's gated allowlist (403), and this mirror needs
+# no approval. Switch url/HF_MODEL to meta-llama/Llama-3.1-8B-Instruct once that
+# account is approved on huggingface.co.
 apiVersion: kubeai.org/v1
 kind: Model
 metadata:
@@ -18,11 +21,9 @@ metadata:
 spec:
   features: [TextGeneration]
 
-  # The tt-inference-server image resolves this short name to its model spec
-  # (HF repo meta-llama/Llama-3.1-8B) and downloads the weights on first start
-  # using HF_TOKEN, persisting them under the mounted cache (CACHE_ROOT). vLLM's
-  # url is informational here; the TT image owns the actual load.
-  url: hf://meta-llama/Llama-3.1-8B
+  # Non-gated Llama-3.1-8B-Instruct mirror; the fork downloads it on first start
+  # and caches weights + compiled kernels under CACHE_ROOT (the hostPath cache).
+  url: hf://NousResearch/Meta-Llama-3.1-8B-Instruct
 
   engine: VLLM
 
@@ -37,16 +38,27 @@ spec:
   maxReplicas: 1
 
   env:
-    # The tt-inference-server launcher (run_vllm_api_server.py) asserts these.
-    # TT_CACHE_PATH is the real compile-cache var (NOT TT_METAL_CACHE); it points
-    # at the hostPath cache mounted by kubeai-values.yaml so kernel compilation
-    # is reused across restarts / scale-from-zero.
-    TT_CACHE_PATH: "/cache/tt"
+    # The tenstorrent/vllm fork asserts HF_MODEL (separately from --model) and a
+    # MESH_DEVICE that is a key in tt_worker.py's mesh_grid_dict. P150 (UPPERCASE)
+    # = one card; lowercase fails. CACHE_ROOT must be writable (the hostPath
+    # cache) so weights + TT-Metal kernel compilation persist across restarts.
+    HF_MODEL: "NousResearch/Meta-Llama-3.1-8B-Instruct"
+    MESH_DEVICE: "P150"
     CACHE_ROOT: "/cache/tt"
-    MESH_DEVICE: "p150" # single card; no p150x2 exists for this model
+    # Without HF_HOME, the weights download to /root/.cache/huggingface (pod-local,
+    # lost on restart). Point it at the persistent hostPath cache so the ~16GB
+    # download happens once.
+    HF_HOME: "/cache/tt/huggingface"
 
-  # The TT image's entrypoint runs run_vllm_api_server.py for --tt-device p150;
-  # it does not take upstream vLLM GPU flags. Keep KubeAI from appending its
-  # default vLLM args by leaving this empty and letting the image entrypoint +
-  # env (above) drive the launch.
-  args: []
+  # These match what the TT wrapper (examples/server_example_tt.py) sets before
+  # forwarding to vllm.entrypoints.openai.api_server. KubeAI appends them to the
+  # server command (which kubeai-values.yaml overrides to run in the TT venv):
+  #  - max-num-seqs 32: TT supports batch ∈ {1,2,4,8,16,32} (default 256 fails).
+  #  - block-size 64: the TT KV-cache block size; without it cache_config.block_size
+  #    is None and sizing crashes (TypeError: None * int).
+  #  - max-model-len 32768: one p150a's KV cache can't hold the model's full
+  #    131072 context; the TT Llama-3.1-8B docs require capping it.
+  args:
+    - "--max-num-seqs=32"
+    - "--block-size=64"
+    - "--max-model-len=32768"
