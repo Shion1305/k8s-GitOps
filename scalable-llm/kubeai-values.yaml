@@ -7,6 +7,12 @@ replicaCount: 1
 
 # Istio / Knative / Prometheus-adapter are not used. Default messaging off.
 
+# The KubeAI chart bundles an Open WebUI subchart, enabled by default. This
+# cluster already runs Open WebUI as its own `openwebui` app, so disable the
+# bundled one to avoid a duplicate StatefulSet/PVC/Service in this namespace.
+open-webui:
+  enabled: false
+
 resourceProfiles:
   # The one profile this PoC uses. A Model references it as
   # `resourceProfile: tenstorrent-blackhole:1`, where `1` = one allocation
