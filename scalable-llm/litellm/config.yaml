@@ -1,0 +1,28 @@
+# LiteLLM proxy config. Registers the KubeAI-served model as an OpenAI backend.
+# The capture point for per-user keys / budgets / audit is LiteLLM regardless of
+# the TT backend.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: litellm-config
+  namespace: scalable-llm
+data:
+  config.yaml: |
+    model_list:
+      # Keep model_name in sync with the Model CR metadata.name (the OpenAI
+      # `model` clients pass). api_base is the in-cluster KubeAI OpenAI endpoint.
+      - model_name: tt-llama
+        litellm_params:
+          model: openai/tt-llama
+          api_base: http://kubeai.scalable-llm.svc.cluster.local/openai/v1
+          api_key: "ignored" # KubeAI does not auth; LiteLLM is the gate
+          timeout: 600 # large: cold start = weight load + TT-Metal compile (R4)
+
+    general_settings:
+      # Body audit off by default; opt-in with consent (CLAUDE.md: public repo).
+      store_prompts_in_spend_logs: false
+
+    litellm_settings:
+      # Don't let LiteLLM's own retry storm during a long cold start.
+      num_retries: 0
+      request_timeout: 600

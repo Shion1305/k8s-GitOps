@@ -27,6 +27,7 @@ spec:
                 - nc-press-chotatsu
                 - openwebui
                 - postgres-operator
+                - scalable-llm
       toPorts:
         - ports:
             - port: "5432"

@@ -95,6 +95,17 @@ path "claude-code/metadata/*" {
 EOF
 echo "✓ Created policy: eso-claude-code"
 
+# Policy for scalable-llm namespace (separate KV v2 engine mounted at scalable-llm/)
+vault policy write eso-scalable-llm - <<EOF
+path "scalable-llm/data/*" {
+  capabilities = ["read"]
+}
+path "scalable-llm/metadata/*" {
+  capabilities = ["read", "list"]
+}
+EOF
+echo "✓ Created policy: eso-scalable-llm"
+
 # Policy for cert-manager namespace (system/ KV v2 mount, cert-manager only)
 vault policy write eso-cert-manager - <<EOF
 path "system/data/cert-manager" {
@@ -272,6 +283,14 @@ vault write auth/kubernetes/role/eso-claude-code \
   ttl=1h
 echo "✓ Created role: eso-claude-code"
 
+# scalable-llm
+vault write auth/kubernetes/role/eso-scalable-llm \
+  bound_service_account_names=eso \
+  bound_service_account_namespaces=scalable-llm \
+  policies=eso-scalable-llm \
+  ttl=1h
+echo "✓ Created role: eso-scalable-llm"
+
 # cert-manager
 vault write auth/kubernetes/role/eso-cert-manager \
   bound_service_account_names=eso \
@@ -441,6 +460,7 @@ echo "  eso-atc         → SA eso/atc             → atc/data/*"
 echo "  eso-lumos-bot   → SA eso/lumos-bot       → lumos-bot/data/*"
 echo "  eso-freqtrade   → SA eso/freqtrade       → freqtrade/data/*"
 echo "  eso-claude-code → SA eso/claude-code     → claude-code/data/*"
+echo "  eso-scalable-llm→ SA eso/scalable-llm    → scalable-llm/data/*"
 echo "  eso-cert-manager→ SA eso/cert-manager    → system/data/cert-manager"
 echo "  eso-zot         → SA eso/zot             → zot/data/*"
 echo "  eso-harbor      → SA eso/harbor          → harbor/data/*"

@@ -1,0 +1,57 @@
+# Phase 6: the KubeAI Model served on Blackhole.
+#
+# ⚠️ This is a template. Before it serves traffic you MUST fill in, from the
+# Phase 2 single-container run that succeeded:
+#   - metadata.name / url            -> the actual model + how the TT fork loads it
+#   - spec.image                     -> the tt-vllm tag built & loaded on s2605
+#   - spec.args                      -> the TT-fork launch flags (mesh-shape, etc.)
+#   - spec.env TT cache var          -> point at the mounted /cache/tt (see values)
+#
+# The KubeAI default args for `engine: VLLM` assume upstream vLLM (GPU flags like
+# --gpu-memory-utilization) which the TT fork does NOT accept. Override them all
+# via spec.args, or absorb the TT launch in the image ENTRYPOINT and keep args
+# minimal. Whatever launched the container in Phase 2 is the source of truth.
+apiVersion: kubeai.org/v1
+kind: Model
+metadata:
+  name: tt-llama # rename to the real model id (used as the OpenAI `model` name)
+  namespace: scalable-llm
+spec:
+  features: [TextGeneration]
+
+  # ⚠️ The TT fork may not run from a raw HF download — it can require a
+  # TT-Metal conversion/compile step. Decide in Phase 0/2 whether `hf://...`
+  # works directly or whether pre-converted weights are read from the mounted
+  # cache (then point url at that local path). Keep the compile output on the
+  # hostPath cache so it is reused on restart / scale-from-zero (R4).
+  url: hf://REPLACE_ORG/REPLACE_MODEL
+
+  engine: VLLM
+
+  # name:count — count 1 = the single allocation unit = both linked cards
+  # (device-plugin.yaml + kubeai-values.yaml resourceProfiles).
+  resourceProfile: tenstorrent-blackhole:1
+
+  # Pin the TT fork image on the Model so it overrides the profile's imageName
+  # if needed. Keep in sync with modelServers.VLLM.images.tt-vllm in values.
+  image: "REPLACE_ME/tt-vllm:REPLACE_TAG"
+
+  # PoC runs warm to take cold start (weight load + TT-Metal compile) off the
+  # request path. Measure the real cold start in Phase 7 before considering
+  # minReplicas: 0.
+  minReplicas: 1
+  maxReplicas: 1
+
+  env:
+    # ⚠️ Set the TT runtime's cache env var to the mounted hostPath so program/
+    # kernel compilation is cached on s2605 across restarts. Confirm the exact
+    # variable name in the TT docs (e.g. TT_METAL_CACHE) — this is a guess.
+    TT_METAL_CACHE: "/cache/tt"
+
+  args:
+    # ⚠️ Replace with the exact flags from the Phase 2 working launch command.
+    # Standard vLLM GPU flags do NOT map to the TT fork. Examples of what likely
+    # belongs here (names per the TT vLLM fork / tt-inference-server docs):
+    # - "--mesh-shape=1x2"        # use both linked cards as one mesh
+    # - "--max-model-len=4096"
+    []

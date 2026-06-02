@@ -1,0 +1,124 @@
+# KubeAI controller config for the Tenstorrent Blackhole PoC.
+# Rendered by the scalable-llm ArgoCD app (Helm source, skipCrds=true).
+# The models.kubeai.org CRD is owned by the kube-ai-crd app.
+
+# Single-replica controller; this is a PoC on one TT node.
+replicaCount: 1
+
+# Istio / Knative / Prometheus-adapter are not used. Default messaging off.
+
+resourceProfiles:
+  # The one profile this PoC uses. A Model references it as
+  # `resourceProfile: tenstorrent-blackhole:1`, where `1` = one allocation
+  # unit = the two linked Blackhole cards (see device-plugin.yaml).
+  tenstorrent-blackhole:
+    imageName: "tt-vllm" # -> modelServers.VLLM.images.tt-vllm below
+    nodeSelector:
+      # Pins every TT model Pod to shion-ubuntu-2605, the only node with cards.
+      # Label applied in Phase 1-3: kubectl label node shion-ubuntu-2605 \
+      #   tenstorrent.com/blackhole=true
+      tenstorrent.com/blackhole: "true"
+    limits:
+      # Must match the resource name advertised by device-plugin.yaml exactly.
+      # One unit = both linked cards handed to a single vLLM instance.
+      squat.io/tenstorrent: "1"
+    requests:
+      squat.io/tenstorrent: "1"
+      cpu: "4"
+      memory: "32Gi" # headroom for the 2-card mesh weight load
+    # shion-ubuntu-2605 carries no TT-specific taint today. If one is added,
+    # mirror it here (confirm with `kubectl describe node shion-ubuntu-2605`):
+    # tolerations:
+    #   - key: "<taint-key>"
+    #     operator: "Exists"
+    #     effect: "NoSchedule"
+
+modelServers:
+  VLLM:
+    images:
+      # Phase 2 image: the Tenstorrent vLLM fork (TT-Metal / TT-NN) serving an
+      # OpenAI-compatible API. Replace the placeholder with the tag built and
+      # loaded onto shion-ubuntu-2605 (Phase 1-3 / Phase 2). If the image is
+      # imported directly into containerd's k8s.io namespace (not pulled from a
+      # registry), the Model must also set imagePullPolicy via its `image`
+      # field's pull behaviour — KubeAI defaults to IfNotPresent, which works
+      # for a locally-imported image:tag that matches exactly.
+      tt-vllm: "REPLACE_ME/tt-vllm:REPLACE_TAG"
+      # `default` is required by the chart even though we never schedule on it.
+      default: "REPLACE_ME/tt-vllm:REPLACE_TAG"
+
+# Applied to every model server Pod. Because the only resourceProfile in this
+# PoC pins Pods to shion-ubuntu-2605, these patches only ever land on the TT
+# node. They attach the TT compile/program cache and the device directory.
+modelServerPods:
+  securityContext:
+    readOnlyRootFilesystem: false
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - ALL
+  # NOTE: `add /spec/volumes/-` (append) requires spec.volumes to already exist.
+  # KubeAI's vLLM engine always adds a `dshm` volume + the server container's
+  # volumeMount, so both arrays exist on every model Pod and these appends are
+  # valid. KubeAI *ignores invalid patches silently* — if a future chart drops
+  # dshm, the cache mount would vanish without error. Re-check on chart bumps.
+  jsonPatches:
+    # Node-local hostPath cache for TT-Metal program/kernel compilation +
+    # downloaded/converted weights. Persisting this across Pod restarts and
+    # scale-from-zero is what keeps cold starts from re-compiling (Phase 2 / R4).
+    # The cache lives on shion-ubuntu-2605 only; pre-create the dir on the host:
+    #   sudo mkdir -p /var/local-storage/tt-cache && sudo chmod 1777 /var/local-storage/tt-cache
+    - op: add
+      path: /spec/volumes/-
+      value:
+        name: tt-cache
+        hostPath:
+          path: /var/local-storage/tt-cache
+          type: DirectoryOrCreate
+    - op: add
+      path: /spec/containers/0/volumeMounts/-
+      value:
+        name: tt-cache
+        # ⚠️ Point this at the TT runtime's actual cache dir, and set the
+        # matching env var on the Model (TT_METAL_CACHE / program-cache path).
+        # Confirm the path/var in the TT docs (Phase 0/2).
+        mountPath: /cache/tt
+    # HugePages: TT-Metal maps hugetlbfs. The host enables it via tt-installer
+    # (tenstorrent-tools). Expose /dev/hugepages into the model Pod.
+    - op: add
+      path: /spec/volumes/-
+      value:
+        name: hugepages
+        hostPath:
+          path: /dev/hugepages
+          type: Directory
+    - op: add
+      path: /spec/containers/0/volumeMounts/-
+      value:
+        name: hugepages
+        mountPath: /dev/hugepages
+    # FALLBACK (commented): if the device-plugin device files are not enough
+    # and the TT runtime needs /dev/tenstorrent/by-id or sysfs/PCIe resources,
+    # promote the container to privileged with the whole device dir. Not for
+    # production — try the device-plugin path (squat.io/tenstorrent) first.
+    # - op: add
+    #   path: /spec/containers/0/securityContext/privileged
+    #   value: true
+    # - op: add
+    #   path: /spec/volumes/-
+    #   value:
+    #     name: tt-dev
+    #     hostPath: { path: /dev/tenstorrent, type: Directory }
+    # - op: add
+    #   path: /spec/containers/0/volumeMounts/-
+    #   value:
+    #     name: tt-dev
+    #     mountPath: /dev/tenstorrent
+
+# The controller itself does not need the TT node; let it schedule anywhere.
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    memory: 512Mi

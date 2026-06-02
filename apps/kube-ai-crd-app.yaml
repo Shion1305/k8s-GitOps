@@ -1,0 +1,30 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kube-ai-crd
+  namespace: argocd
+  annotations:
+    # Install the KubeAI CRD (models.kubeai.org) before the controller and any
+    # Model CRs. scalable-llm renders the controller Helm chart with skipCrds,
+    # so the CRD must already exist when its Model manifests sync.
+    argocd.argoproj.io/sync-wave: "-1"
+spec:
+  project: default
+  source:
+    # Vendored from the kubeai chart at the version pinned in scalable-llm-app.yaml:
+    #   helm template kubeai kubeai/kubeai --version 0.23.2 --include-crds \
+    #     | yq 'select(.kind=="CustomResourceDefinition")' > apps/kube-ai-crd/crds.yaml
+    # Keep in lockstep with the chart targetRevision in scalable-llm-app.yaml.
+    repoURL: https://github.com/Shion1305/k8s-GitOps.git
+    targetRevision: HEAD
+    path: apps/kube-ai-crd
+  destination:
+    # CRDs are cluster-scoped.
+    server: https://kubernetes.default.svc
+    namespace: kube-system
+  syncPolicy:
+    automated:
+      prune: false # never auto-delete the CRD (would cascade-delete Models)
+      selfHeal: true
+    syncOptions:
+      - ServerSideApply=true # KubeAI CRD exceeds the client-side apply size limit

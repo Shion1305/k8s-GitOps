@@ -1,0 +1,34 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: scalable-llm
+  namespace: argocd
+spec:
+  project: default
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: scalable-llm
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+  sources:
+    # 1) KubeAI controller (Helm, version-pinned). The CRD is owned by the
+    #    kube-ai-crd app (sync-wave -1), so skip it here to avoid a collision.
+    - repoURL: https://www.kubeai.org
+      chart: kubeai
+      targetRevision: 0.23.2
+      helm:
+        skipCrds: true
+        valueFiles:
+          - $values/scalable-llm/kubeai-values.yaml
+    # 2) Self-authored manifests: namespace, generic-device-plugin DaemonSet,
+    #    Model CRs, LiteLLM front, ESO/DB/Vault wiring, HTTPRoute. The KubeAI
+    #    Helm release does not own these.
+    - repoURL: https://github.com/Shion1305/k8s-GitOps.git
+      targetRevision: HEAD
+      path: scalable-llm
+      ref: values
