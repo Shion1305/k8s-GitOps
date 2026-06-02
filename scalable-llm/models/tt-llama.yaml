@@ -32,12 +32,14 @@ spec:
 
   image: "ghcr.io/tenstorrent/tt-inference-server/vllm-tt-metal-src-release-ubuntu-22.04-amd64:0.10.0-555f240-22be241"
 
-  # PoC runs warm (minReplicas 1) so the TT-Metal compile + weight load stays off
-  # the request path. The node has two p150a cards, so scale out to a second
-  # replica (the second card) under load. targetRequests is the per-replica
-  # in-flight target before KubeAI adds a replica; TT serves a small batch, so
-  # keep it low (default 100 would never scale here).
-  minReplicas: 1
+  # scale-from-zero: idle → 0 replicas (both cards free), and KubeAI holds the
+  # first request while it spins a replica back up. This is viable because the
+  # weights + TT-Metal kernels persist on the hostPath cache, so a cached cold
+  # start is ~2-2.5 min (vs ~10 min the very first time) — see README. The node
+  # has two p150a cards, so scale out to a second replica under load.
+  # targetRequests is the per-replica in-flight target before KubeAI adds a
+  # replica; TT serves a small batch, so keep it low (default 100 never scales).
+  minReplicas: 0
   maxReplicas: 2
   targetRequests: 4
 
