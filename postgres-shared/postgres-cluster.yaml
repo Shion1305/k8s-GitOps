@@ -16,6 +16,7 @@ spec:
     mlflow: []
     nc_press_chotatsu: []
     harbor: []
+    litellm: [] # LiteLLM front for scalable-llm (KubeAI on Tenstorrent)
   databases:
     openwebui: openwebui
     langfuse: langfuse
@@ -23,6 +24,7 @@ spec:
     mlflow: mlflow
     nc_press_chotatsu: nc_press_chotatsu
     harbor: harbor
+    litellm: litellm
   postgresql:
     version: "17"
   resources:

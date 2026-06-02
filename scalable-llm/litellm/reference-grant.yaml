@@ -1,0 +1,15 @@
+# Lets the Gateway in envoy-gateway-system dial Services in scalable-llm
+# (cross-namespace backendRef from the internal Gateway's HTTPRoute).
+apiVersion: gateway.networking.k8s.io/v1
+kind: ReferenceGrant
+metadata:
+  name: allow-envoy-gateway
+  namespace: scalable-llm
+spec:
+  from:
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      namespace: envoy-gateway-system
+  to:
+    - group: ""
+      kind: Service
