@@ -227,16 +227,23 @@ tick (~5s) it reads:
   it prints this every autoscale interval.
 
 When a model needs a card and none is free, it evicts the **idlest** holder
-(longest with `sum==0`, i.e. LRU) by pinning that Model's `minReplicas` **and**
-`maxReplicas` to 0. KubeAI's own autoscaler then scales it to 0 and releases the
-card; the waiter schedules. When the pressure clears, both bounds are restored.
+(longest with `sum==0`, i.e. LRU) by pinning that Model's bounds to
+`minReplicas: 0` / `maxReplicas: 1`. KubeAI's own autoscaler then scales the idle
+holder to 0 and releases the card; the waiter schedules. When the pressure
+clears, the holder's original bounds are restored.
+
+Why `maxReplicas: 1` and not 0: the Model CRD enforces `maxReplicas >= 1` — a 0
+is rejected with **HTTP 422** (an earlier revision pinned `(0, 0)` and the patch
+silently failed every tick, so no card ever freed). With `minReplicas: 0` the
+cap of 1 is enough: an idle holder's desired replicas is `ceil(0/target) = 0`,
+which sits inside `[0, 1]`, so it still drops to 0 and frees its card.
 
 Why **both** bounds, not `spec.replicas`: KubeAI owns `spec.replicas` and
 rewrites it every loop, but clamps its target to the Model's bounds. Its
 `enforceReplicaBounds` applies `maxReplicas` *before* `minReplicas`, so **min
-wins** — pinning only `maxReplicas:0` leaves a warm holder (`minReplicas ≥ 1`)
-re-clamped back up, never releasing its card. Pinning both to 0 sticks for any
-holder. ArgoCD self-heal would otherwise revert the live patch within seconds, so
+wins** — lowering only `maxReplicas` leaves a warm holder (`minReplicas ≥ 1`)
+re-clamped back up, never releasing its card. Lowering `minReplicas` to 0 too
+makes it stick for any holder. ArgoCD self-heal would otherwise revert the live patch within seconds, so
 `apps/scalable-llm-app.yaml` lists Model `spec.minReplicas`/`maxReplicas`/`replicas`
 under `ignoreDifferences`; the git bounds stay the normal-operation values the
 arbiter restores to.

@@ -10,19 +10,28 @@ KubeAI never scales another Model down to make room.
 This controller closes that gap. Each tick it asks: is some Model's Pod Pending
 for a card while every card is held, and is one of the card-holding Models
 idle (no in-flight requests)? If so it evicts the *idlest* holder (LRU) by
-pinning its maxReplicas to 0, which makes KubeAI's own autoscaler scale it to 0
-and release the card; the waiting Pod then schedules. When the pressure clears
-the holder's maxReplicas is restored so it can serve again.
+pinning its bounds to minReplicas:0 / maxReplicas:1, which makes KubeAI's own
+autoscaler scale the idle holder to 0 and release the card; the waiting Pod then
+schedules. When the pressure clears the holder's original bounds are restored so
+it can serve again.
+
+The eviction cap is 1, not 0: the Model CRD enforces maxReplicas >= 1 (a 0 is
+rejected with HTTP 422). With minReplicas:0 that is enough — an idle holder's
+desired replicas is ceil(0/target) = 0, which sits inside [0, 1], so it still
+drops to 0 and frees its card. Lowering minReplicas matters too: KubeAI's
+enforceReplicaBounds applies max before min, so a warm holder (minReplicas >= 1)
+would re-clamp straight back up if only max were touched.
 
 Idleness comes from KubeAI's own per-model in-flight count, which the autoscaler
 prints every interval (KubeAI exposes no metrics endpoint):
     Calculated target replicas for model "X": ceil(0/4) = 0, current requests: sum([0]) = 0
 The `sum([...])` is the live in-flight request total for that model.
 
-Actuation is maxReplicas (not spec.replicas): KubeAI owns spec.replicas and
-rewrites it every loop, but it clamps its target to maxReplicas, so 0 sticks.
-ArgoCD self-heal would otherwise revert the live patch, so the scalable-llm app
-lists Model spec.maxReplicas/replicas under ignoreDifferences.
+Actuation is min/maxReplicas (not spec.replicas): KubeAI owns spec.replicas and
+rewrites it every loop, but it clamps its target into [minReplicas, maxReplicas],
+so the bounds stick. ArgoCD self-heal would otherwise revert the live patch, so
+the scalable-llm app lists Model spec.minReplicas/maxReplicas/replicas under
+ignoreDifferences.
 
 Talks to the Kubernetes API directly over HTTPS with the in-cluster
 ServiceAccount token — no kubectl, so the image is plain python:alpine. All
@@ -61,6 +70,11 @@ IDLE_GRACE = float(os.environ.get("ARBITER_IDLE_GRACE_SECONDS", "20"))
 # After eviction, keep the holder pinned at 0 at least this long so the freed
 # card is actually consumed by the waiter before the victim can reclaim it.
 EVICT_HOLD = float(os.environ.get("ARBITER_EVICT_HOLD_SECONDS", "120"))
+# maxReplicas the arbiter pins an evicted holder to. The Model CRD enforces
+# maxReplicas >= 1 (0 is rejected with HTTP 422), so eviction caps at 1, not 0.
+# Combined with minReplicas:0 that is enough: an idle holder still scales to 0
+# and frees its card, because desired = ceil(0/target) = 0 sits within [0, 1].
+EVICT_MAX = 1
 # How many log lines to scan for the latest per-model in-flight counts.
 LOG_TAIL_LINES = os.environ.get("ARBITER_LOG_TAIL_LINES", "40")
 
@@ -187,6 +201,8 @@ def set_bounds(model, minr, maxr):
     # enforceReplicaBounds applies max first then min, so min wins — a warm
     # holder (minReplicas>=1) re-clamps back up and never releases its card
     # unless minReplicas is lowered too. Restoring puts both back.
+    # NOTE: the Model CRD requires maxReplicas >= 1; passing 0 is rejected with
+    # HTTP 422. Evict to (0, EVICT_MAX=1), not (0, 0).
     api(
         f"/apis/kubeai.org/v1/namespaces/{NS}/models/{model}",
         method="PATCH",
@@ -289,15 +305,18 @@ def tick(idle_since, evicted):
         log(f"victim={victim}: could not read bounds; skip")
         return
     orig_min, orig_max = bounds
-    if orig_max == 0:
-        log(f"victim={victim} already has maxReplicas=0; skip")
+    # Nothing to gain if the holder is already at (or below) our eviction floor:
+    # min:0 lets it scale to 0 and max<=EVICT_MAX caps it at one card already.
+    if orig_min == 0 and orig_max is not None and orig_max <= EVICT_MAX:
+        log(f"victim={victim} already at (0,{orig_max}) <= evict floor; skip")
         return
     log(
         f"EVICT victim={victim} (idle {round(idle_for)}s) "
-        f"bounds (min={orig_min},max={orig_max})->(0,0) to free a card for {pending_for_card}"
+        f"bounds (min={orig_min},max={orig_max})->(0,{EVICT_MAX}) "
+        f"to free a card for {pending_for_card}"
     )
     try:
-        set_bounds(victim, 0, 0)
+        set_bounds(victim, 0, EVICT_MAX)
         evicted[victim] = (orig_min, orig_max, now)
     except Exception as e:
         log(f"evict failed for {victim}: {e!r}")
