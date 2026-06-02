@@ -58,9 +58,12 @@ spec:
           resources:
             requests:
               cpu: 100m
-              memory: 256Mi
+              # LiteLLM v1.86.x loads the full provider map + a Prisma engine and
+              # runs DB migrations at startup; it OOMKills (exit 137) under ~1Gi
+              # before it can even log. Reserve enough so the scheduler places it.
+              memory: 512Mi
             limits:
-              memory: 1Gi
+              memory: 2Gi
       volumes:
         - name: config
           configMap:
