@@ -1,0 +1,65 @@
+# RBAC for the card-arbiter: read model Pods + the KubeAI controller log to
+# judge idleness, read the card node's allocatable capacity, and patch Model
+# maxReplicas to evict/restore an idle card-holder. Namespaced except the node
+# read, which needs a ClusterRole.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: card-arbiter
+  namespace: scalable-llm
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: card-arbiter
+  namespace: scalable-llm
+rules:
+  # Detect Pending model Pods and which models hold a card.
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list"]
+  # Read the KubeAI controller log (the per-model in-flight signal).
+  - apiGroups: [""]
+    resources: ["pods/log"]
+    verbs: ["get"]
+  # Read Model state and patch maxReplicas to evict/restore.
+  - apiGroups: ["kubeai.org"]
+    resources: ["models"]
+    verbs: ["get", "list", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: card-arbiter
+  namespace: scalable-llm
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: card-arbiter
+subjects:
+  - kind: ServiceAccount
+    name: card-arbiter
+    namespace: scalable-llm
+---
+# Node allocatable (card capacity) is cluster-scoped — minimal get/list on nodes.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: card-arbiter-node-reader
+rules:
+  - apiGroups: [""]
+    resources: ["nodes"]
+    verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: card-arbiter-node-reader
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: card-arbiter-node-reader
+subjects:
+  - kind: ServiceAccount
+    name: card-arbiter
+    namespace: scalable-llm

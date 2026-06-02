@@ -17,6 +17,14 @@ data:
           api_base: http://kubeai.scalable-llm.svc.cluster.local/openai/v1
           api_key: "ignored" # KubeAI does not auth; LiteLLM is the gate
           timeout: 600 # large: cold start = weight load + TT-Metal compile (R4)
+      # Second model sharing the 2 cards; the card-arbiter frees a card for it
+      # under contention. Same KubeAI endpoint, distinct served model name.
+      - model_name: tt-llama-b
+        litellm_params:
+          model: openai/tt-llama-b
+          api_base: http://kubeai.scalable-llm.svc.cluster.local/openai/v1
+          api_key: "ignored"
+          timeout: 600
 
     general_settings:
       # Body audit off by default; opt-in with consent (CLAUDE.md: public repo).

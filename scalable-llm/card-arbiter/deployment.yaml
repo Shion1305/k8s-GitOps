@@ -1,0 +1,66 @@
+# Single-replica controller that frees a Tenstorrent card for a model waiting on
+# one, by evicting the idlest card-holder (see arbiter.py for the full rationale).
+# One replica only: two arbiters would race on eviction decisions. Talks to the
+# API server with the card-arbiter ServiceAccount token; no kubectl in the image.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: card-arbiter
+  namespace: scalable-llm
+  labels:
+    app: card-arbiter
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: card-arbiter
+  template:
+    metadata:
+      labels:
+        app: card-arbiter
+    spec:
+      serviceAccountName: card-arbiter
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        runAsGroup: 65534
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: arbiter
+          image: python:3.12-alpine
+          command: ["python3", "/app/arbiter.py"]
+          env:
+            - name: ARBITER_NAMESPACE
+              value: scalable-llm
+            - name: ARBITER_CARD_RESOURCE
+              value: squat.io/tenstorrent
+            - name: ARBITER_CARD_NODE
+              value: shion-ubuntu-2605
+            - name: ARBITER_INTERVAL_SECONDS
+              value: "5"
+            - name: ARBITER_IDLE_GRACE_SECONDS
+              value: "60"
+            - name: ARBITER_EVICT_HOLD_SECONDS
+              value: "120"
+          resources:
+            requests:
+              cpu: 25m
+              memory: 64Mi
+            limits:
+              memory: 128Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          volumeMounts:
+            - name: script
+              mountPath: /app
+              readOnly: true
+      volumes:
+        - name: script
+          configMap:
+            name: card-arbiter-script

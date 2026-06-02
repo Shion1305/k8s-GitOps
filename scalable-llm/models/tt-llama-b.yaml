@@ -1,0 +1,46 @@
+# Second KubeAI Model, identical to tt-llama, used to exercise multi-model card
+# sharing on the 2-card node. The single p150 officially serves only one LLM —
+# Llama-3.1-8B (tenstorrent/tt-inference-server model support matrix) — so a
+# genuinely different architecture isn't a safe second model on this hardware.
+# Running the SAME proven Llama-3.1-8B under a distinct name is still a distinct
+# Model that competes for a card, which is exactly what the card-arbiter
+# (scalable-llm/card-arbiter) arbitrates: when both cards are busy and this model
+# gets a request, the arbiter evicts the idlest holder to free a card for it.
+#
+# It shares tt-llama's hostPath weight/kernel cache (same weights), so its cold
+# start is the fast cached path. See models/tt-llama.yaml for the full rationale
+# behind every field; this file only differs in metadata.name.
+apiVersion: kubeai.org/v1
+kind: Model
+metadata:
+  name: tt-llama-b # OpenAI `model` name; keep in sync with litellm/config.yaml
+  namespace: scalable-llm
+spec:
+  features: [TextGeneration]
+
+  url: hf://NousResearch/Meta-Llama-3.1-8B-Instruct
+
+  engine: VLLM
+
+  resourceProfile: tenstorrent-blackhole:1
+
+  image: "ghcr.io/tenstorrent/tt-inference-server/vllm-tt-metal-src-release-ubuntu-22.04-amd64:0.10.0-555f240-22be241"
+
+  # Sleep-mode by default (scale-to-zero). maxReplicas:1 so it never claims both
+  # cards on its own — in a 2-card / many-model world each model gets at most one
+  # card unless it is the only active one. (tt-llama keeps maxReplicas:2 as the
+  # warm primary; tune per-model as more models are added.)
+  minReplicas: 0
+  maxReplicas: 1
+  targetRequests: 4
+
+  env:
+    HF_MODEL: "NousResearch/Meta-Llama-3.1-8B-Instruct"
+    MESH_DEVICE: "P150"
+    CACHE_ROOT: "/cache/tt"
+    HF_HOME: "/cache/tt/huggingface"
+
+  args:
+    - "--max-num-seqs=32"
+    - "--block-size=64"
+    - "--max-model-len=32768"

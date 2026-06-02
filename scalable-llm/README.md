@@ -39,7 +39,9 @@ scalable-llm/
 ├── device-plugin.yaml      # generic-device-plugin: 1 card = 1 unit -> squat.io/tenstorrent:2
 ├── kubeai-values.yaml      # KubeAI Helm values: resourceProfile + tt image + cache/HF/hugepages patches
 ├── llama-hf-token.yaml     # ESO: Vault scalable-llm/llama → HF_TOKEN Secret (gated Llama-3.1-8B)
-├── models/tt-llama.yaml    # KubeAI Model: Llama-3.1-8B on one p150 card
+├── models/tt-llama.yaml    # KubeAI Model: Llama-3.1-8B on one p150 card (warm primary, max 2)
+├── models/tt-llama-b.yaml  # KubeAI Model: same Llama-3.1-8B, second name (sleep-mode, max 1)
+├── card-arbiter/           # frees an idle model's card for a model waiting on one
 └── litellm/                # LiteLLM front + DB (shared Postgres) + Vault key + HTTPRoute
 ```
 
@@ -200,6 +202,53 @@ scale-from-zero viable.
 a replica per card under load. The memory request is **8Gi** (a replica uses only
 ~3.3Gi of host RAM — weights live in card VRAM); the old 32Gi request was ~10×
 reality and blocked the second replica from scheduling (2×32Gi > the node's ~52Gi).
+
+## Multi-model card sharing (card-arbiter)
+
+The goal is to host several models that mostly sleep (`minReplicas: 0`) and run
+1–2 at a time on the 2 cards, scaling by load. The hard part: **KubeAI has no
+global accelerator arbitration** (verified against v0.23.2). It autoscales every
+Model independently — desired replicas = `ceil(avgActiveRequests / targetRequests)`
+clamped to that model's min/max, with no awareness of free cards or other models.
+So when both cards are busy and a third model gets a request, its Pod sits
+`Pending` (Insufficient `squat.io/tenstorrent`) forever; KubeAI never scales
+another model down to make room. Its only priority lever, `priorityClassName`,
+delegates to the Kubernetes scheduler, which preempts by *priority* and is blind
+to *idleness* — it would evict a low-priority pod that is actively serving and
+never evict an equal-priority idle one. That does not match the requirement.
+
+`card-arbiter/` is a small single-replica controller that closes the gap. Each
+tick (~5s) it reads:
+
+- **Pending-for-card model Pods** (the waiters), from the pod list.
+- **Card-holders** (Running model Pods) and the node's card capacity.
+- **Per-model in-flight requests**, parsed from the KubeAI controller's own log
+  line (`current requests: sum([N])`) — KubeAI exposes no metrics endpoint, but
+  it prints this every autoscale interval.
+
+When a model needs a card and none is free, it evicts the **idlest** holder
+(longest with `sum==0`, i.e. LRU) by patching that Model's `maxReplicas` to 0.
+KubeAI's own autoscaler then scales it to 0 and releases the card; the waiter
+schedules. When the pressure clears, the holder's `maxReplicas` is restored.
+
+Why `maxReplicas`, not `spec.replicas`: KubeAI owns `spec.replicas` and rewrites
+it every loop, but it clamps its target to `maxReplicas`, so pinning that to 0
+sticks. ArgoCD self-heal would otherwise revert the live patch within seconds, so
+`apps/scalable-llm-app.yaml` lists Model `spec.maxReplicas`/`spec.replicas` under
+`ignoreDifferences`; the git value of `maxReplicas` stays the normal-operation
+ceiling the arbiter restores to.
+
+Guards: a holder must be idle ≥ `IDLE_GRACE` (60s) before it's evictable (so a
+bursty-but-active client isn't cut off between requests), and an evicted holder
+stays pinned ≥ `EVICT_HOLD` (120s) so the freed card is actually taken by the
+waiter before it can reclaim. The arbiter talks to the API server directly with
+its ServiceAccount token (no kubectl; image is plain `python:alpine`).
+
+> Hardware note: the single p150 officially serves only **Llama-3.1-8B**
+> (tenstorrent/tt-inference-server model support matrix). `tt-llama-b` is the
+> same model under a second name — a distinct Model that competes for a card,
+> which is what the arbiter arbitrates. Swap in genuinely different models here
+> once the TT stack supports more on a single Blackhole card.
 
 ## Network model
 
