@@ -32,10 +32,14 @@ spec:
 
   image: "ghcr.io/tenstorrent/tt-inference-server/vllm-tt-metal-src-release-ubuntu-22.04-amd64:0.10.0-555f240-22be241"
 
-  # PoC runs warm so the TT-Metal compile + weight load stays off the request
-  # path. With two cards available, maxReplicas: 2 is possible later.
+  # PoC runs warm (minReplicas 1) so the TT-Metal compile + weight load stays off
+  # the request path. The node has two p150a cards, so scale out to a second
+  # replica (the second card) under load. targetRequests is the per-replica
+  # in-flight target before KubeAI adds a replica; TT serves a small batch, so
+  # keep it low (default 100 would never scale here).
   minReplicas: 1
-  maxReplicas: 1
+  maxReplicas: 2
+  targetRequests: 4
 
   env:
     # The tenstorrent/vllm fork asserts HF_MODEL (separately from --model) and a

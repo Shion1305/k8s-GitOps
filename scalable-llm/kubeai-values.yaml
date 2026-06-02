@@ -32,9 +32,12 @@ resourceProfiles:
     requests:
       squat.io/tenstorrent: "1"
       cpu: "4"
-      # 8B BF16 weights ≈ 16GB + TT runtime. 32Gi fits the node's ~50Gi
-      # allocatable alongside the existing pods; 48Gi did not (Insufficient memory).
-      memory: "32Gi"
+      # The model weights load into the CARD's VRAM, not host RAM — a running
+      # replica uses only ~3.3Gi of node memory (measured via kubectl top). The
+      # old 32Gi request was ~10x reality and blocked a 2nd replica from
+      # scheduling (2×32Gi > the node's ~52Gi). 8Gi gives ample headroom and lets
+      # both p150a cards run a replica for horizontal scale.
+      memory: "8Gi"
     # shion-ubuntu-2605 carries no TT-specific taint today. If one is added,
     # mirror it here (confirm with `kubectl describe node shion-ubuntu-2605`):
     # tolerations:
