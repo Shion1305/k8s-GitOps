@@ -227,22 +227,32 @@ tick (~5s) it reads:
   it prints this every autoscale interval.
 
 When a model needs a card and none is free, it evicts the **idlest** holder
-(longest with `sum==0`, i.e. LRU) by patching that Model's `maxReplicas` to 0.
-KubeAI's own autoscaler then scales it to 0 and releases the card; the waiter
-schedules. When the pressure clears, the holder's `maxReplicas` is restored.
+(longest with `sum==0`, i.e. LRU) by pinning that Model's `minReplicas` **and**
+`maxReplicas` to 0. KubeAI's own autoscaler then scales it to 0 and releases the
+card; the waiter schedules. When the pressure clears, both bounds are restored.
 
-Why `maxReplicas`, not `spec.replicas`: KubeAI owns `spec.replicas` and rewrites
-it every loop, but it clamps its target to `maxReplicas`, so pinning that to 0
-sticks. ArgoCD self-heal would otherwise revert the live patch within seconds, so
-`apps/scalable-llm-app.yaml` lists Model `spec.maxReplicas`/`spec.replicas` under
-`ignoreDifferences`; the git value of `maxReplicas` stays the normal-operation
-ceiling the arbiter restores to.
+Why **both** bounds, not `spec.replicas`: KubeAI owns `spec.replicas` and
+rewrites it every loop, but clamps its target to the Model's bounds. Its
+`enforceReplicaBounds` applies `maxReplicas` *before* `minReplicas`, so **min
+wins** — pinning only `maxReplicas:0` leaves a warm holder (`minReplicas ≥ 1`)
+re-clamped back up, never releasing its card. Pinning both to 0 sticks for any
+holder. ArgoCD self-heal would otherwise revert the live patch within seconds, so
+`apps/scalable-llm-app.yaml` lists Model `spec.minReplicas`/`maxReplicas`/`replicas`
+under `ignoreDifferences`; the git bounds stay the normal-operation values the
+arbiter restores to.
 
-Guards: a holder must be idle ≥ `IDLE_GRACE` (60s) before it's evictable (so a
+Guards: a holder must be idle ≥ `IDLE_GRACE` before it's evictable (so a
 bursty-but-active client isn't cut off between requests), and an evicted holder
 stays pinned ≥ `EVICT_HOLD` (120s) so the freed card is actually taken by the
-waiter before it can reclaim. The arbiter talks to the API server directly with
-its ServiceAccount token (no kubectl; image is plain `python:alpine`).
+waiter before it can reclaim. **`IDLE_GRACE` defaults to 20s, deliberately below
+KubeAI's own idle scale-down (~60–70s = `timeWindow` 60s + `scaleDownDelay` 30s).**
+That matters: a `minReplicas:0` holder that just went idle self-scales to 0 on
+KubeAI's schedule and frees its own card, so a *longer* grace would mean the
+arbiter never needs to act for idle holders — its real value is freeing a card
+from a holder that stays Running while idle (a warm/pinned model, or one under
+trickle load) and winning the race when a card is genuinely contended. The
+arbiter talks to the API server directly with its ServiceAccount token (no
+kubectl; image is plain `python:alpine`).
 
 > Hardware note: the single p150 officially serves only **Llama-3.1-8B**
 > (tenstorrent/tt-inference-server model support matrix). `tt-llama-b` is the
