@@ -1,0 +1,63 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tt-exporter
+  namespace: grafana
+  labels:
+    app: tt-exporter
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: tt-exporter
+  template:
+    metadata:
+      labels:
+        app: tt-exporter
+    spec:
+      hostPID: true
+      hostIPC: true
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      nodeSelector:
+        tenstorrent.com/blackhole: "true"
+      tolerations:
+        - operator: "Exists"
+      containers:
+        - name: tt-exporter
+          image: ghcr.io/shion1305/tt-exporter:latest
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            privileged: true
+          ports:
+            - containerPort: 9400
+              name: metrics
+              protocol: TCP
+          volumeMounts:
+            - name: dev
+              mountPath: /dev
+            - name: tt-smi
+              mountPath: /usr/bin/tt-smi
+              readOnly: true
+            - name: usr-lib
+              mountPath: /usr/lib
+              readOnly: true
+          resources:
+            limits:
+              cpu: 200m
+              memory: 256Mi
+            requests:
+              cpu: 50m
+              memory: 128Mi
+      volumes:
+        - name: dev
+          hostPath:
+            path: /dev
+        - name: tt-smi
+          hostPath:
+            path: /usr/bin/tt-smi
+            type: File
+        - name: usr-lib
+          hostPath:
+            path: /usr/lib
+            type: DirectoryOrCreate

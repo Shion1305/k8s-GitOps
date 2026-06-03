@@ -1,0 +1,327 @@
+apiVersion: grafana.integreatly.org/v1beta1
+kind: GrafanaDashboard
+metadata:
+  name: tenstorrent-blackhole
+  namespace: grafana
+spec:
+  instanceSelector:
+    matchLabels:
+      dashboards: main-grafana
+  folderRef: tenstorrent
+  resyncPeriod: 5m
+  json: |
+    {
+      "title": "Tenstorrent Blackhole",
+      "uid": "tenstorrent-blackhole",
+      "schemaVersion": 39,
+      "version": 1,
+      "editable": true,
+      "graphTooltip": 1,
+      "tags": ["tenstorrent", "blackhole", "hardware"],
+      "time": { "from": "now-6h", "to": "now" },
+      "refresh": "30s",
+      "timepicker": {
+        "refresh_intervals": ["10s", "30s", "1m", "5m"],
+        "time_options": ["1h", "6h", "12h", "24h"]
+      },
+      "templating": {
+        "list": [
+          {
+            "name": "device_id",
+            "type": "query",
+            "datasource": { "type": "prometheus", "uid": "prometheus" },
+            "query": "label_values(tenstorrent_temperature_celsius, device_id)",
+            "refresh": 1,
+            "multi": true,
+            "includeAll": true,
+            "allValue": ".*",
+            "label": "Device",
+            "current": { "selected": true, "text": "All", "value": ".*" }
+          }
+        ]
+      },
+      "annotations": { "list": [] },
+      "panels": [
+        {
+          "type": "text",
+          "id": 100,
+          "transparent": true,
+          "gridPos": { "h": 3, "w": 24, "x": 0, "y": 0 },
+          "options": {
+            "mode": "markdown",
+            "content": "## Tenstorrent Blackhole Hardware Metrics\n\nMetrics for Blackhole accelerator boards including temperature, power, clock speed, fan speed, and utilization."
+          }
+        },
+        {
+          "type": "row",
+          "id": 1,
+          "title": "Temperature",
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 4 },
+          "collapsed": false
+        },
+        {
+          "type": "timeseries",
+          "id": 110,
+          "title": "ASIC Temperature (°C)",
+          "description": "Blackhole chip temperature. Safe operating range: 0-85°C",
+          "gridPos": { "h": 8, "w": 6, "x": 0, "y": 5 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "tenstorrent_temperature_celsius{device_id=~\"$device_id\"}"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "celsius",
+              "decimals": 1,
+              "custom": {
+                "lineWidth": 2,
+                "fillOpacity": 10,
+                "showPoints": "never"
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 70 },
+                  { "color": "orange", "value": 80 },
+                  { "color": "red", "value": 90 }
+                ]
+              }
+            }
+          },
+          "options": {
+            "legend": { "displayMode": "list", "placement": "bottom", "calcs": [] },
+            "tooltip": { "mode": "single" }
+          }
+        },
+        {
+          "type": "stat",
+          "id": 111,
+          "title": "Current Temperature (°C)",
+          "description": "Latest temperature value",
+          "gridPos": { "h": 8, "w": 4, "x": 6, "y": 5 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "tenstorrent_temperature_celsius{device_id=~\"$device_id\"}",
+              "instant": true
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "celsius",
+              "decimals": 1,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 70 },
+                  { "color": "orange", "value": 80 },
+                  { "color": "red", "value": 90 }
+                ]
+              }
+            }
+          },
+          "options": {
+            "reduceOptions": { "calcs": ["lastNotNull"], "fields": "" },
+            "colorMode": "background",
+            "textMode": "value"
+          }
+        },
+        {
+          "type": "row",
+          "id": 2,
+          "title": "Power & Utilization",
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 14 },
+          "collapsed": false
+        },
+        {
+          "type": "timeseries",
+          "id": 210,
+          "title": "Power Consumption (W)",
+          "description": "Blackhole power draw",
+          "gridPos": { "h": 8, "w": 6, "x": 0, "y": 15 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "tenstorrent_power_watts{device_id=~\"$device_id\"}"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "watt",
+              "decimals": 1,
+              "custom": {
+                "lineWidth": 2,
+                "fillOpacity": 10,
+                "showPoints": "never"
+              }
+            }
+          },
+          "options": {
+            "legend": { "displayMode": "list", "placement": "bottom", "calcs": [] },
+            "tooltip": { "mode": "single" }
+          }
+        },
+        {
+          "type": "stat",
+          "id": 211,
+          "title": "Current Power (W)",
+          "description": "Latest power draw",
+          "gridPos": { "h": 8, "w": 4, "x": 6, "y": 15 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "tenstorrent_power_watts{device_id=~\"$device_id\"}",
+              "instant": true
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "watt",
+              "decimals": 1
+            }
+          },
+          "options": {
+            "reduceOptions": { "calcs": ["lastNotNull"], "fields": "" },
+            "colorMode": "value",
+            "textMode": "value"
+          }
+        },
+        {
+          "type": "timeseries",
+          "id": 220,
+          "title": "Estimated Utilization (%)",
+          "description": "Estimated utilization based on power",
+          "gridPos": { "h": 8, "w": 6, "x": 10, "y": 15 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "tenstorrent_utilization_percent{device_id=~\"$device_id\"}"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percent",
+              "decimals": 1,
+              "custom": {
+                "lineWidth": 2,
+                "fillOpacity": 10,
+                "showPoints": "never"
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 50 },
+                  { "color": "orange", "value": 75 },
+                  { "color": "red", "value": 90 }
+                ]
+              }
+            }
+          },
+          "options": {
+            "legend": { "displayMode": "list", "placement": "bottom", "calcs": [] },
+            "tooltip": { "mode": "single" }
+          }
+        },
+        {
+          "type": "stat",
+          "id": 221,
+          "title": "Active Workers",
+          "description": "Number of processes actively using device",
+          "gridPos": { "h": 8, "w": 4, "x": 16, "y": 15 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "tenstorrent_active_workers{device_id=~\"$device_id\"}",
+              "instant": true
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "none",
+              "decimals": 0
+            }
+          },
+          "options": {
+            "reduceOptions": { "calcs": ["lastNotNull"], "fields": "" },
+            "colorMode": "background",
+            "textMode": "value"
+          }
+        },
+        {
+          "type": "row",
+          "id": 3,
+          "title": "Clock & Fan",
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 24 },
+          "collapsed": false
+        },
+        {
+          "type": "timeseries",
+          "id": 310,
+          "title": "AI Clock (MHz)",
+          "description": "Chip clock frequency",
+          "gridPos": { "h": 8, "w": 6, "x": 0, "y": 25 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "tenstorrent_aiclk_mhz{device_id=~\"$device_id\"}"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "hz",
+              "decimals": 0,
+              "custom": {
+                "lineWidth": 2,
+                "fillOpacity": 10,
+                "showPoints": "never"
+              }
+            }
+          },
+          "options": {
+            "legend": { "displayMode": "list", "placement": "bottom", "calcs": [] },
+            "tooltip": { "mode": "single" }
+          }
+        },
+        {
+          "type": "timeseries",
+          "id": 320,
+          "title": "Fan Speed (%)",
+          "description": "Cooling fan speed",
+          "gridPos": { "h": 8, "w": 6, "x": 6, "y": 25 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "tenstorrent_fan_speed_percent{device_id=~\"$device_id\"}"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percent",
+              "decimals": 0,
+              "custom": {
+                "lineWidth": 2,
+                "fillOpacity": 10,
+                "showPoints": "never"
+              }
+            }
+          },
+          "options": {
+            "legend": { "displayMode": "list", "placement": "bottom", "calcs": [] },
+            "tooltip": { "mode": "single" }
+          }
+        }
+      ]
+    }
