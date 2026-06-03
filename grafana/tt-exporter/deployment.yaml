@@ -16,9 +16,6 @@ spec:
         app: tt-exporter
     spec:
       hostPID: true
-      hostIPC: true
-      hostNetwork: true
-      dnsPolicy: ClusterFirstWithHostNet
       nodeSelector:
         tenstorrent.com/blackhole: "true"
       tolerations:
@@ -26,7 +23,7 @@ spec:
       containers:
         - name: tt-exporter
           image: ghcr.io/shion1305/tt-exporter:latest
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Always
           securityContext:
             privileged: true
           ports:
@@ -34,8 +31,8 @@ spec:
               name: metrics
               protocol: TCP
           volumeMounts:
-            - name: dev
-              mountPath: /dev
+            - name: tenstorrent-devices
+              mountPath: /dev/tenstorrent
             - name: tt-smi
               mountPath: /usr/bin/tt-smi
               readOnly: true
@@ -50,9 +47,10 @@ spec:
               cpu: 50m
               memory: 128Mi
       volumes:
-        - name: dev
+        - name: tenstorrent-devices
           hostPath:
-            path: /dev
+            path: /dev/tenstorrent
+            type: Directory
         - name: tt-smi
           hostPath:
             path: /usr/bin/tt-smi
@@ -60,4 +58,4 @@ spec:
         - name: usr-lib
           hostPath:
             path: /usr/lib
-            type: DirectoryOrCreate
+            type: Directory
