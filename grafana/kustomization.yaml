@@ -12,3 +12,7 @@ resources:
   - dashboards/node-metrics.yaml
   - dashboards/monitoring.yaml
   - networkpolicy.yaml
+  - tt-exporter/deployment.yaml
+  - tt-exporter/service.yaml
+  - tt-exporter/servicemonitor.yaml
+  - tt-exporter/dashboard.yaml

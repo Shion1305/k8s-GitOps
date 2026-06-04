@@ -19,3 +19,14 @@ spec:
     matchLabels:
       dashboards: main-grafana
   title: "Kubernetes"
+---
+apiVersion: grafana.integreatly.org/v1beta1
+kind: GrafanaFolder
+metadata:
+  name: tenstorrent
+  namespace: grafana
+spec:
+  instanceSelector:
+    matchLabels:
+      dashboards: main-grafana
+  title: "Tenstorrent"

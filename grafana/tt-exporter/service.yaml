@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: tt-exporter
+  namespace: grafana
+  labels:
+    app: tt-exporter
+    app.kubernetes.io/name: tt-exporter
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "9400"
+    prometheus.io/path: "/metrics"
+spec:
+  type: ClusterIP
+  ports:
+    - port: 9400
+      targetPort: metrics
+      name: http
+      protocol: TCP
+  selector:
+    app: tt-exporter
