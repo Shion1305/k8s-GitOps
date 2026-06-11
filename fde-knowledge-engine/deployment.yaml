@@ -1,0 +1,68 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fde-knowledge-engine-web
+  namespace: fde-knowledge-engine
+  labels:
+    app: fde-knowledge-engine-web
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: fde-knowledge-engine-web
+  template:
+    metadata:
+      labels:
+        app: fde-knowledge-engine-web
+    spec:
+      nodeSelector:
+        kubernetes.io/arch: amd64
+      containers:
+        - name: web
+          # Harbor robot-account pull creds are auto-injected by the Kyverno
+          # `harbor-pull-injection` ClusterPolicy on admission — no manual
+          # imagePullSecrets needed.
+          image: harbor.shion1305.com/shion1305/fde-knowledge-engine-web:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 3000
+              name: http
+              protocol: TCP
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: fde-knowledge-engine-db-credentials
+                  key: DATABASE_URL
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          readinessProbe:
+            tcpSocket:
+              port: 3000
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            tcpSocket:
+              port: 3000
+            initialDelaySeconds: 15
+            periodSeconds: 20
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: fde-knowledge-engine-web
+  namespace: fde-knowledge-engine
+  labels:
+    app: fde-knowledge-engine-web
+spec:
+  selector:
+    app: fde-knowledge-engine-web
+  ports:
+    - name: http
+      port: 3000
+      targetPort: 3000
