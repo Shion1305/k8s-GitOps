@@ -20,6 +20,7 @@ spec:
               operator: In
               values:
                 - adminer
+                - fde-knowledge-engine
                 - harbor
                 - keycloak
                 - langfuse
