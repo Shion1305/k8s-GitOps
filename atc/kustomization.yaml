@@ -17,6 +17,7 @@ resources:
   - vault-secret-store.yaml
   - external-secret.yaml
   - deployment-gmocoin-exec-alert.yaml
+  - reprice-deployment.yaml
   - seaweedfs-external-secret.yaml
   - seaweedfs-statefulset.yaml
   - seaweedfs-service.yaml
