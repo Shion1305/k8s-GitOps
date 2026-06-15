@@ -5,6 +5,8 @@ resources:
   - namespace.yaml
   - vault-secret-store.yaml
   - external-secret.yaml
+  - rbac.yaml
+  - codex-home-pvc.yaml
   - deployment.yaml
   - httproute-internal.yaml
   - reference-grant.yaml
