@@ -128,13 +128,19 @@ outputs:
 runs:
   using: composite
   steps:
-    # QEMU registers arm64 emulation on the amd64 GitHub-hosted runner so
-    # buildx can produce arm64 layers from the same Dockerfile.
-    - uses: docker/setup-qemu-action@v4
+    # setup-qemu / setup-buildx talk to a local Docker daemon, which the
+    # self-hosted shion1305 runners don't have. There QEMU is already
+    # registered cluster-wide by the binfmt DaemonSet and a remote buildx
+    # builder (pointed at the in-cluster rootless BuildKit) is pre-registered
+    # at runner startup, so both steps would only fail. Run them on
+    # GitHub-hosted runners only; the build step below works on both.
+    - if: runner.environment == 'github-hosted'
+      uses: docker/setup-qemu-action@v4
       with:
         platforms: arm64
 
-    - uses: docker/setup-buildx-action@v4
+    - if: runner.environment == 'github-hosted'
+      uses: docker/setup-buildx-action@v4
 
     # cosign signs the image keyless via Fulcio + Rekor. SBOM generation
     # is intentionally NOT done in CI — Harbor v2.15's UI does not surface
