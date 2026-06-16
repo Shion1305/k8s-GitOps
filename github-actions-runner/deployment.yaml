@@ -1,0 +1,184 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: garm-server
+  namespace: github-actions-runner
+  labels:
+    app.kubernetes.io/name: garm-server
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: garm-server
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: garm-server
+    spec:
+      serviceAccountName: garm-server
+      initContainers:
+        - name: download-garm
+          image: curlimages/curl:8.11.1
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            runAsUser: 0
+          command:
+            - sh
+            - -ec
+            - |
+              case "$(uname -m)" in
+                x86_64) garm_arch="amd64"; provider_arch="x86_64" ;;
+                aarch64|arm64) garm_arch="arm64"; provider_arch="arm64" ;;
+                *) echo "unsupported architecture: $(uname -m)" >&2; exit 1 ;;
+              esac
+
+              curl -fsSL "https://github.com/cloudbase/garm/releases/download/v0.2.1/garm-linux-${garm_arch}.tgz" \
+                | tar -xz -C /opt/garm/bin
+              curl -fsSL "https://github.com/cloudbase/garm/releases/download/v0.2.1/garm-cli-linux-${garm_arch}.tgz" \
+                | tar -xz -C /opt/garm/bin
+              curl -fsSL "https://github.com/mercedes-benz/garm-provider-k8s/releases/download/v0.3.2/garm-provider-k8s_Linux_${provider_arch}.tar.gz" \
+                | tar -xz -C /opt/garm/bin
+              chmod 0755 /opt/garm/bin/garm /opt/garm/bin/garm-cli /opt/garm/bin/garm-provider-k8s
+          volumeMounts:
+            - name: garm-bin
+              mountPath: /opt/garm/bin
+      containers:
+        - name: garm-server
+          image: alpine:3.22
+          imagePullPolicy: IfNotPresent
+          command:
+            - sh
+            - -ec
+            - |
+              cat > /opt/garm/generated/config.toml <<EOF
+              [default]
+              enable_webhook_management = true
+
+              [logging]
+              enable_log_streamer = true
+              log_format = "json"
+              log_level = "info"
+              log_source = false
+
+              [metrics]
+              enable = true
+              disable_auth = false
+
+              [jwt_auth]
+              secret = "${GARM_JWT_SECRET}"
+              time_to_live = "8760h"
+
+              [apiserver]
+              bind = "0.0.0.0"
+              port = 9997
+              use_tls = false
+              cors_origins = ["https://garm.i.shion1305.com"]
+                [apiserver.webui]
+                enable = true
+
+              [database]
+              backend = "sqlite3"
+              passphrase = "${GARM_DATABASE_PASSPHRASE}"
+                [database.sqlite3]
+                db_file = "/opt/garm/data/garm.db"
+
+              [[provider]]
+              name = "kubernetes_amd64"
+              description = "Kubernetes provider for amd64 runner pods"
+              provider_type = "external"
+                [provider.external]
+                config_file = "/opt/garm/provider-config/garm-provider-k8s-amd64.yaml"
+                provider_executable = "/opt/garm/bin/garm-provider-k8s"
+                environment_variables = ["KUBERNETES_"]
+
+              [[provider]]
+              name = "kubernetes_arm64"
+              description = "Kubernetes provider for arm64 runner pods"
+              provider_type = "external"
+                [provider.external]
+                config_file = "/opt/garm/provider-config/garm-provider-k8s-arm64.yaml"
+                provider_executable = "/opt/garm/bin/garm-provider-k8s"
+                environment_variables = ["KUBERNETES_"]
+              EOF
+
+              exec /opt/garm/bin/garm -config /opt/garm/generated/config.toml
+          env:
+            - name: GARM_DATABASE_PASSPHRASE
+              valueFrom:
+                secretKeyRef:
+                  name: garm-secrets
+                  key: database_passphrase
+            - name: GARM_JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: garm-secrets
+                  key: jwt_secret
+            - name: GARM_ADMIN_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: garm-secrets
+                  key: admin_username
+            - name: GARM_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: garm-secrets
+                  key: admin_password
+            - name: GITHUB_APP_ID
+              valueFrom:
+                secretKeyRef:
+                  name: garm-secrets
+                  key: github_app_id
+            - name: GITHUB_APP_INSTALLATION_ID
+              valueFrom:
+                secretKeyRef:
+                  name: garm-secrets
+                  key: github_app_installation_id
+            - name: GITHUB_APP_PRIVATE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: garm-secrets
+                  key: github_app_private_key
+          ports:
+            - name: http
+              containerPort: 9997
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 30
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              memory: 1Gi
+          volumeMounts:
+            - name: garm-bin
+              mountPath: /opt/garm/bin
+            - name: garm-data
+              mountPath: /opt/garm/data
+            - name: garm-generated
+              mountPath: /opt/garm/generated
+            - name: garm-provider-config
+              mountPath: /opt/garm/provider-config
+              readOnly: true
+      volumes:
+        - name: garm-bin
+          emptyDir: {}
+        - name: garm-generated
+          emptyDir: {}
+        - name: garm-provider-config
+          configMap:
+            name: garm-provider-config
+        - name: garm-data
+          persistentVolumeClaim:
+            claimName: garm-data
