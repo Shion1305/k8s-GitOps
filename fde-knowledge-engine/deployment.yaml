@@ -17,6 +17,9 @@ spec:
     spec:
       nodeSelector:
         kubernetes.io/arch: amd64
+      # The web app creates research/codex-login Jobs via the K8s API; this SA
+      # grants exactly that (see rbac.yaml).
+      serviceAccountName: web-job-creator
       containers:
         - name: web
           # Harbor robot-account pull creds are auto-injected by the Kyverno
@@ -34,6 +37,25 @@ spec:
                 secretKeyRef:
                   name: fde-knowledge-engine-db-credentials
                   key: DATABASE_URL
+            # --- research/codex-login Job orchestration (web/lib/k8s) ---
+            # The namespace the web app creates Jobs in. Downward API so it
+            # always matches where the Pod actually runs.
+            - name: FDE_JOB_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            # The runner image the Jobs run (Go binary + codex CLI).
+            - name: FDE_RUNNER_IMAGE
+              value: harbor.shion1305.com/shion1305/fde-knowledge-engine-runner:latest
+            # The PVC mounted at CODEX_HOME in every research/codex-login Job.
+            - name: FDE_CODEX_HOME_PVC
+              value: codex-home
+            # The Secret the Jobs read DATABASE_URL from (wired by reference into
+            # the Job spec — the web app never reads the secret value itself).
+            - name: FDE_DB_SECRET_NAME
+              value: fde-knowledge-engine-db-credentials
+            - name: FDE_DB_SECRET_KEY
+              value: DATABASE_URL
           resources:
             requests:
               cpu: 50m
