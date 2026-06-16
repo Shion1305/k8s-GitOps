@@ -10,6 +10,7 @@ RUN apt-get update \
       cmake \
       curl \
       file \
+      gettext-base \
       git-lfs \
       gzip \
       jq \
