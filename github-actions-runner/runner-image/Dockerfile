@@ -8,6 +8,7 @@ RUN apt-get update \
       build-essential \
       ca-certificates \
       cmake \
+      curl \
       file \
       git-lfs \
       gzip \
@@ -28,6 +29,14 @@ RUN apt-get update \
       zstd \
     && git lfs install --system \
     && rm -rf /var/lib/apt/lists/*
+
+# buildctl client for daemonless image builds against the in-cluster rootless
+# BuildKit (see ../../buildkit). No Docker daemon is bundled in these runners.
+ARG BUILDKIT_VERSION=v0.30.0
+ARG TARGETARCH
+RUN curl -fsSL "https://github.com/moby/buildkit/releases/download/${BUILDKIT_VERSION}/buildkit-${BUILDKIT_VERSION}.linux-${TARGETARCH}.tar.gz" \
+      | tar -xz -C /usr/local bin/buildctl \
+    && buildctl --version
 
 COPY --chown=runner:docker entrypoint.sh /entrypoint.sh
 

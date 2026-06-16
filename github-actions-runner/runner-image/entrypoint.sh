@@ -187,6 +187,17 @@ else
     set -e
 fi
 
+# Point Docker Buildx at the in-cluster rootless BuildKit (../../buildkit) so
+# workflows can run `docker build` / `docker buildx build --push` unchanged with
+# no Docker daemon in this pod. The remote driver only records the endpoint (it
+# starts nothing locally), and `buildx install` aliases `docker build` to buildx.
+# Failures here must never block runner startup.
+BUILDKIT_REMOTE_ENDPOINT=${BUILDKIT_REMOTE_ENDPOINT:-tcp://buildkitd.buildkit.svc.cluster.local:1234}
+if command -v docker >/dev/null 2>&1; then
+  docker buildx create --name incluster --driver remote "$BUILDKIT_REMOTE_ENDPOINT" --use >/dev/null 2>&1 || true
+  docker buildx install >/dev/null 2>&1 || true
+fi
+
 check_runner &
 
 ./run.sh "$@"
