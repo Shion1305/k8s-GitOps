@@ -1,0 +1,20 @@
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-garm-callbacks-from-runner-pods
+  namespace: github-actions-runner
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: garm-server
+  enableDefaultDeny:
+    ingress: false
+    egress: false
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: github-actions-runner-pods
+      toPorts:
+        - ports:
+            - port: "9997"
+              protocol: TCP

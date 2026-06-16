@@ -1,0 +1,50 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: garm-provider-config
+  namespace: github-actions-runner
+data:
+  garm-provider-k8s-amd64.yaml: |
+    kubeConfigPath: ""
+    runnerNamespace: "github-actions-runner-pods"
+    podTemplate:
+      metadata:
+        labels:
+          app.kubernetes.io/managed-by: garm
+      spec:
+        nodeSelector:
+          kubernetes.io/arch: amd64
+        # Re-pull the mutable image tag on every cold start so runners pick up
+        # image rebuilds (e.g. the buildx wiring) instead of a stale cached layer.
+        containers:
+          - name: runner
+            imagePullPolicy: Always
+    flavors:
+      default:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+        limits:
+          memory: 4Gi
+  garm-provider-k8s-arm64.yaml: |
+    kubeConfigPath: ""
+    runnerNamespace: "github-actions-runner-pods"
+    podTemplate:
+      metadata:
+        labels:
+          app.kubernetes.io/managed-by: garm
+      spec:
+        nodeSelector:
+          kubernetes.io/arch: arm64
+        # Re-pull the mutable image tag on every cold start so runners pick up
+        # image rebuilds (e.g. the buildx wiring) instead of a stale cached layer.
+        containers:
+          - name: runner
+            imagePullPolicy: Always
+    flavors:
+      default:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+        limits:
+          memory: 4Gi

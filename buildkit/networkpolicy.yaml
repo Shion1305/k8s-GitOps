@@ -1,0 +1,34 @@
+# BuildKit's TCP listener is unauthenticated, so access is restricted at the
+# network layer: only pods in the GARM runner-pods namespace may reach :1234.
+# This is additive to the Kyverno-generated default-deny-ingress.
+#
+# Egress stays open so buildkitd can pull base images and push to registries,
+# but the cloud metadata endpoint is explicitly denied: a malicious Dockerfile
+# executes inside this pod, so blocking 169.254.169.254 stops it from SSRF-ing
+# node credentials. Paired with automountServiceAccountToken:false on the pod,
+# this removes the two cheapest credential-theft paths. (A full egress allow-list
+# would also curb exfiltration, but is left as a follow-up to avoid breaking
+# base-image pulls.)
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-buildkit-from-runner-pods
+  namespace: buildkit
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: buildkitd
+  enableDefaultDeny:
+    ingress: false
+    egress: false
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: github-actions-runner-pods
+      toPorts:
+        - ports:
+            - port: "1234"
+              protocol: TCP
+  egressDeny:
+    - toCIDR:
+        - 169.254.169.254/32

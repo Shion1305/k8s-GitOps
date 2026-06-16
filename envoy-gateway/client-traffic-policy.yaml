@@ -1,0 +1,24 @@
+# Envoy Gateway defaults escapedSlashesAction to UnescapeAndRedirect, which
+# 307-redirects any path containing %2F and rewrites it to a literal slash.
+# ArgoCD encodes the repo URL into one path segment
+# (/api/v1/repositories/https%3A%2F%2F...), so the redirect splits it and the
+# request no longer matches the grpc-gateway {repo} route — every UI repo
+# disconnect/refresh 404s. KeepUnchanged forwards the path verbatim.
+#
+# Attached to the external Gateway's `https` section, not the whole Gateway:
+# mergeGateways merges the external+internal plain HTTP :80 listeners onto one
+# port, and Envoy Gateway rejects a policy touching multiple non-TLS listeners
+# on a shared port. TLS listeners are exempt, and all published apps are HTTPS.
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: ClientTrafficPolicy
+metadata:
+  name: keep-escaped-slashes
+  namespace: envoy-gateway-system
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: external
+      sectionName: https
+  path:
+    escapedSlashesAction: KeepUnchanged

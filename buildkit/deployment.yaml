@@ -1,0 +1,75 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: buildkitd
+  namespace: buildkit
+  labels:
+    app.kubernetes.io/name: buildkitd
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: buildkitd
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: buildkitd
+    spec:
+      # Single builder for both arches: amd64 builds natively, arm64 builds via
+      # QEMU emulation (binfmt registered on the node by binfmt-daemonset.yaml).
+      nodeSelector:
+        kubernetes.io/arch: amd64
+      # buildkitd talks only to registries (creds forwarded per-build) and the
+      # Actions cache — never the Kubernetes API. Drop the SA token so a
+      # malicious build cannot use it against the apiserver.
+      automountServiceAccountToken: false
+      containers:
+        - name: buildkitd
+          image: moby/buildkit:v0.30.0-rootless
+          args:
+            # Local socket plus an unauthenticated TCP listener. The TCP port is
+            # only reachable from the runner-pods namespace (see networkpolicy.yaml).
+            - --addr
+            - unix:///run/user/1000/buildkit/buildkitd.sock
+            - --addr
+            - tcp://0.0.0.0:1234
+            # Rootless mode cannot create a nested process sandbox without extra
+            # privileges; disable it so builds run unprivileged in this pod.
+            - --oci-worker-no-process-sandbox
+          readinessProbe:
+            exec:
+              command: ["buildctl", "debug", "workers"]
+            initialDelaySeconds: 5
+            periodSeconds: 30
+          livenessProbe:
+            exec:
+              command: ["buildctl", "debug", "workers"]
+            initialDelaySeconds: 5
+            periodSeconds: 30
+          securityContext:
+            # Rootless buildkitd needs unconfined seccomp/AppArmor to set up the
+            # user-namespaced OCI worker. It still runs as a non-root UID and the
+            # pod is not privileged.
+            runAsUser: 1000
+            runAsGroup: 1000
+            seccompProfile:
+              type: Unconfined
+            appArmorProfile:
+              type: Unconfined
+          ports:
+            - name: tcp
+              containerPort: 1234
+          resources:
+            requests:
+              cpu: 1000m
+              memory: 4Gi
+            limits:
+              memory: 8Gi
+          volumeMounts:
+            - name: buildkitd-cache
+              mountPath: /home/user/.local/share/buildkit
+      volumes:
+        - name: buildkitd-cache
+          emptyDir: {}
