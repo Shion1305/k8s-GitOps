@@ -32,7 +32,7 @@ RUN apt-get update \
 
 # buildctl client for daemonless image builds against the in-cluster rootless
 # BuildKit (see ../../buildkit). No Docker daemon is bundled in these runners.
-ARG BUILDKIT_VERSION=v0.18.2
+ARG BUILDKIT_VERSION=v0.30.0
 ARG TARGETARCH
 RUN curl -fsSL "https://github.com/moby/buildkit/releases/download/${BUILDKIT_VERSION}/buildkit-${BUILDKIT_VERSION}.linux-${TARGETARCH}.tar.gz" \
       | tar -xz -C /usr/local bin/buildctl \
