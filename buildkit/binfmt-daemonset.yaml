@@ -1,0 +1,60 @@
+# Registers QEMU binfmt_misc handlers on the amd64 build nodes so the single
+# rootless buildkitd can build arm64 images via emulation (multi-arch) — with no
+# privilege in the build path.
+#
+# Security model: the ONLY privileged component is the one-shot `install`
+# initContainer (fixed command, no build input, exits immediately). buildkitd and
+# the runner pods stay non-privileged, so a malicious build can never reach this
+# container. The image is digest-pinned to remove the tag-mutation supply-chain
+# vector, and the SA token is not mounted. See README "Security".
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: binfmt
+  namespace: buildkit
+  labels:
+    app.kubernetes.io/name: binfmt
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: binfmt
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: binfmt
+    spec:
+      # Only the amd64 build nodes (where buildkitd runs) need emulation.
+      nodeSelector:
+        kubernetes.io/arch: amd64
+      automountServiceAccountToken: false
+      initContainers:
+        - name: install
+          # Pinned by digest (qemu-v10.2.3). Renovate keeps the tag+digest in sync.
+          image: tonistiigi/binfmt:qemu-v10.2.3@sha256:400a4873b838d1b89194d982c45e5fb3cda4593fbfd7e08a02e76b03b21166f0
+          # Register only aarch64 — keep the emulator surface minimal.
+          args: ["--install", "arm64"]
+          securityContext:
+            # Registering binfmt_misc mounts the binfmt fs and writes host kernel
+            # state, which needs node privilege. Confined to this one-shot install;
+            # nothing in the build path is privileged.
+            privileged: true
+      containers:
+        # Non-privileged keepalive so the DaemonSet pod stays scheduled and the
+        # init re-registers binfmt after a node reboot.
+        - name: keepalive
+          image: registry.k8s.io/pause:3.10
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65535
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+            seccompProfile:
+              type: RuntimeDefault
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              memory: 32Mi
