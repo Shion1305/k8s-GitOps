@@ -38,6 +38,17 @@ RUN curl -fsSL "https://github.com/moby/buildkit/releases/download/${BUILDKIT_VE
       | tar -xz -C /usr/local bin/buildctl \
     && buildctl --version
 
+# Rust toolchain — parity with GitHub-hosted ubuntu-latest, which preinstalls it
+# (the actions-runner base image does not). Installed system-wide so every job
+# sees cargo/rustc on PATH; CARGO_HOME is world-writable for the runner user.
+ENV RUSTUP_HOME=/usr/local/rustup \
+    CARGO_HOME=/usr/local/cargo \
+    PATH=/usr/local/cargo/bin:$PATH
+RUN curl --proto '=https' --tlsv1.2 -fsSL https://sh.rustup.rs \
+      | sh -s -- -y --no-modify-path --profile minimal --default-toolchain stable \
+    && chmod -R a+w "$RUSTUP_HOME" "$CARGO_HOME" \
+    && rustc --version && cargo --version
+
 COPY --chown=runner:docker entrypoint.sh /entrypoint.sh
 
 RUN chmod 0755 /entrypoint.sh \
