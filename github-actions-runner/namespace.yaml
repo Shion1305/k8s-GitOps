@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: github-actions-runner
+  labels:
+    app.kubernetes.io/name: garm
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: github-actions-runner-pods
+  labels:
+    app.kubernetes.io/name: github-actions-runner-pods

@@ -1,0 +1,140 @@
+set dotenv-load := true
+set shell := ["bash", "-eu", "-o", "pipefail", "-c"]
+
+namespace := env_var_or_default("GARM_NAMESPACE", "github-actions-runner")
+deployment := env_var_or_default("GARM_DEPLOYMENT", "deploy/garm-server")
+owner := env_var_or_default("GARM_OWNER", "Shion1305")
+profile := env_var_or_default("GARM_PROFILE_NAME", "shion1305-k8s")
+credentials := env_var_or_default("GARM_CREDENTIALS_NAME", "shion1305-github-app")
+runner_image := env_var_or_default("GARM_RUNNER_IMAGE", "harbor.shion1305.com/shion1305/garm-runner:2.335.1-ubuntu24.04")
+max_runners := env_var_or_default("GARM_MAX_RUNNERS", "6")
+min_idle_runners := env_var_or_default("GARM_MIN_IDLE_RUNNERS", "0")
+amd_provider := env_var_or_default("GARM_AMD_PROVIDER", "kubernetes_amd64")
+arm_provider := env_var_or_default("GARM_ARM_PROVIDER", "kubernetes_arm64")
+amd_tags := env_var_or_default("GARM_AMD_TAGS", "shion1305-amd")
+arm_tags := env_var_or_default("GARM_ARM_TAGS", "shion1305-arm")
+flavor := env_var_or_default("GARM_FLAVOR", "default")
+api_url := env_var_or_default("GARM_API_URL", "http://127.0.0.1:9997")
+
+default:
+  @just --list
+
+# Run garm-cli inside the garm-server pod.
+cli *args:
+  kubectl exec -n {{namespace}} {{deployment}} -- /opt/garm/bin/garm-cli {{args}}
+
+# Add the local garm-cli profile inside the garm-server pod.
+profile-add:
+  kubectl exec -n {{namespace}} {{deployment}} -- sh -ec '\
+    /opt/garm/bin/garm-cli profile add \
+      --name {{profile}} \
+      --url {{api_url}} \
+      --username "$GARM_ADMIN_USERNAME" \
+      --password "$GARM_ADMIN_PASSWORD"'
+
+# Add the GitHub App credentials to GARM.
+credentials-add:
+  kubectl exec -n {{namespace}} {{deployment}} -- sh -ec '\
+    printf "%s" "$GITHUB_APP_PRIVATE_KEY" > /tmp/github-app.pem; \
+    /opt/garm/bin/garm-cli github credentials add \
+      --name {{credentials}} \
+      --description "GitHub App for {{owner}} repository runners" \
+      --endpoint github.com \
+      --auth-type app \
+      --app-id "$GITHUB_APP_ID" \
+      --app-installation-id "$GITHUB_APP_INSTALLATION_ID" \
+      --private-key-path /tmp/github-app.pem'
+
+# Add both the garm-cli profile and GitHub App credentials.
+init-github: profile-add credentials-add
+
+# Register GARM management for a repository and install its webhook.
+repo-add target:
+  #!/usr/bin/env bash
+  set -euo pipefail
+  target='{{target}}'
+  if [[ "$target" == */* ]]; then
+    target_owner="${target%%/*}"
+    target_repo="${target#*/}"
+  else
+    target_owner='{{owner}}'
+    target_repo="$target"
+  fi
+  if [[ -z "$target_owner" || -z "$target_repo" || "$target_repo" == */* ]]; then
+    echo "usage: just repo-add <repo|owner/repo>" >&2
+    exit 2
+  fi
+  kubectl exec -n {{namespace}} {{deployment}} -- /opt/garm/bin/garm-cli repo add \
+    --owner "$target_owner" \
+    --name "$target_repo" \
+    --credentials {{credentials}} \
+    --random-webhook-secret \
+    --install-webhook \
+    --pool-balancer-type roundrobin
+
+# Add the amd64 runner pool for a repository.
+pool-add-amd target:
+  #!/usr/bin/env bash
+  set -euo pipefail
+  target='{{target}}'
+  if [[ "$target" == */* ]]; then
+    target_owner="${target%%/*}"
+    target_repo="${target#*/}"
+  else
+    target_owner='{{owner}}'
+    target_repo="$target"
+  fi
+  if [[ -z "$target_owner" || -z "$target_repo" || "$target_repo" == */* ]]; then
+    echo "usage: just pool-add-amd <repo|owner/repo>" >&2
+    exit 2
+  fi
+  kubectl exec -n {{namespace}} {{deployment}} -- /opt/garm/bin/garm-cli pool add \
+    --repo "$target_owner/$target_repo" \
+    --enabled \
+    --provider-name {{amd_provider}} \
+    --flavor {{flavor}} \
+    --image "{{runner_image}}" \
+    --max-runners {{max_runners}} \
+    --min-idle-runners {{min_idle_runners}} \
+    --os-type linux \
+    --os-arch amd64 \
+    --tags {{amd_tags}}
+
+# Add the arm64 runner pool for a repository.
+pool-add-arm target:
+  #!/usr/bin/env bash
+  set -euo pipefail
+  target='{{target}}'
+  if [[ "$target" == */* ]]; then
+    target_owner="${target%%/*}"
+    target_repo="${target#*/}"
+  else
+    target_owner='{{owner}}'
+    target_repo="$target"
+  fi
+  if [[ -z "$target_owner" || -z "$target_repo" || "$target_repo" == */* ]]; then
+    echo "usage: just pool-add-arm <repo|owner/repo>" >&2
+    exit 2
+  fi
+  kubectl exec -n {{namespace}} {{deployment}} -- /opt/garm/bin/garm-cli pool add \
+    --repo "$target_owner/$target_repo" \
+    --enabled \
+    --provider-name {{arm_provider}} \
+    --flavor {{flavor}} \
+    --image "{{runner_image}}" \
+    --max-runners {{max_runners}} \
+    --min-idle-runners {{min_idle_runners}} \
+    --os-type linux \
+    --os-arch arm64 \
+    --tags {{arm_tags}}
+
+# Register one repository and add both amd64/arm64 pools.
+bootstrap-repo target: (repo-add target) (pool-add-amd target) (pool-add-arm target)
+
+# Show registered repositories.
+repo-list:
+  kubectl exec -n {{namespace}} {{deployment}} -- /opt/garm/bin/garm-cli repo list
+
+# Show runner pools.
+pool-list:
+  kubectl exec -n {{namespace}} {{deployment}} -- /opt/garm/bin/garm-cli pool list

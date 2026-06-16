@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: garm-server
+  namespace: github-actions-runner
+  labels:
+    app.kubernetes.io/name: garm-server
+spec:
+  selector:
+    app.kubernetes.io/name: garm-server
+  ports:
+    - name: http
+      port: 9997
+      targetPort: http
