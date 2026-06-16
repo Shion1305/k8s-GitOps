@@ -62,24 +62,48 @@ build and `--push` in one step.
   `endpoint: tcp://buildkitd.buildkit.svc.cluster.local:1234` on that step if
   you must keep it.
 
-## Security
-
-The TCP listener is **unauthenticated** (no TLS). Access is restricted at the
-network layer instead: `networkpolicy.yaml` (a `CiliumNetworkPolicy`, additive
-to the Kyverno-generated default-deny-ingress) allows ingress to `:1234` **only
-from the `github-actions-runner-pods` namespace**. If you ever need to reach the
-daemon from elsewhere, prefer enabling mTLS over widening the policy.
-
 ## Multi-arch
 
-This deploys a single **amd64** `buildkitd`, which builds amd64 images natively.
-For arm64:
+A single `buildkitd` on an amd64 node builds **both** arches:
 
-- **Native:** copy `deployment.yaml`/`service.yaml` to an `arm64` variant
-  (`nodeSelector: kubernetes.io/arch: arm64`, `name: buildkitd-arm64`) and set
-  `BUILDKIT_REMOTE_ENDPOINT` on the arm64 pool to that service.
-- **Emulated:** register binfmt on the nodes (e.g. a `tonistiigi/binfmt`
-  DaemonSet) and build with `--platform linux/amd64,linux/arm64`.
+- `linux/amd64` natively,
+- `linux/arm64` via **QEMU emulation**. `binfmt-daemonset.yaml` registers the
+  aarch64 `binfmt_misc` handler on the amd64 build nodes, so `buildkitd`
+  advertises both platforms and `--platform linux/amd64,linux/arm64` just works.
+
+The cluster's arm64 nodes (a control-plane box, the internal-gateway SPOF, and a
+Raspberry Pi) are unsuitable as build hosts, so emulation on the strong amd64
+worker is the deliberate choice over a native arm64 builder.
+
+## Security
+
+**Build path is non-privileged.** `buildkitd` runs rootless (non-root UID, no
+`privileged`, no added capabilities). It does need `seccomp`/`AppArmor:
+Unconfined` to set up its user-namespaced worker — that is *not* a privileged
+container, but it does relax syscall/LSM filtering (below PSS Baseline). A
+malicious `RUN` therefore tops out at this non-root pod; it cannot reach the node
+as root.
+
+**The only privileged component is binfmt registration**, confined to the
+one-shot `install` initContainer in `binfmt-daemonset.yaml` (fixed command, no
+build input, exits immediately, image digest-pinned). It is *out of the build
+path* — a malicious build can never reach it. This is categorically smaller than
+DinD, which would run privileged *in* the build path on every build.
+
+**Hardening applied** to limit a malicious `RUN`:
+
+- `automountServiceAccountToken: false` on `buildkitd` — no SA token to abuse
+  against the apiserver.
+- `egressDeny` to `169.254.169.254/32` — blocks cloud-metadata SSRF.
+- TCP listener is **unauthenticated**; reachable only from
+  `github-actions-runner-pods` (ingress policy). Prefer mTLS over widening it.
+
+**Still your responsibility:** the runner is shared with the **public**
+`k8s-GitOps` repo. Never run untrusted/fork PRs on the self-hosted runners
+(require approval for outside collaborators); a fork PR that builds here runs
+arbitrary code in this non-privileged—but networked—pod. A full egress
+allow-list (registries only) would further curb exfiltration and is a sensible
+follow-up.
 
 ## Advanced: buildctl directly
 

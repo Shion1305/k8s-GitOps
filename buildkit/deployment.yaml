@@ -17,11 +17,14 @@ spec:
       labels:
         app.kubernetes.io/name: buildkitd
     spec:
-      # Builds run natively on amd64. For native arm64 builds, run a second
-      # deployment+service pinned to arch arm64 (see README), or register
-      # binfmt on the nodes for emulated cross-builds.
+      # Single builder for both arches: amd64 builds natively, arm64 builds via
+      # QEMU emulation (binfmt registered on the node by binfmt-daemonset.yaml).
       nodeSelector:
         kubernetes.io/arch: amd64
+      # buildkitd talks only to registries (creds forwarded per-build) and the
+      # Actions cache — never the Kubernetes API. Drop the SA token so a
+      # malicious build cannot use it against the apiserver.
+      automountServiceAccountToken: false
       containers:
         - name: buildkitd
           image: moby/buildkit:v0.30.0-rootless
