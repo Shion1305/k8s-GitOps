@@ -6,3 +6,4 @@ resources:
   - certificates.yaml
   - gateway-internal.yaml
   - gateway-external.yaml
+  - client-traffic-policy.yaml
