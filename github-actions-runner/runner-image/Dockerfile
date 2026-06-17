@@ -1,4 +1,4 @@
-# syntax=docker/dockerfile:1.7
+# syntax=docker/dockerfile:1.24
 FROM ghcr.io/actions/actions-runner:2.335.1
 
 USER root
