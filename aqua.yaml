@@ -16,5 +16,5 @@ packages:
 # Used by scripts/render-validate.sh (.github/workflows/render-validate.yaml).
 - name: kubernetes-sigs/kustomize@kustomize/v5.8.1
 - name: yannh/kubeconform@v0.8.0
-- name: mikefarah/yq@v4.53.2
+- name: mikefarah/yq@v4.53.3
 - name: jqlang/jq@jq-1.8.1
