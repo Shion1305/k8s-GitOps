@@ -20,7 +20,7 @@ spec:
       serviceAccountName: garm-server
       initContainers:
         - name: download-garm
-          image: curlimages/curl:8.11.1
+          image: curlimages/curl:8.20.0
           imagePullPolicy: IfNotPresent
           securityContext:
             runAsUser: 0
