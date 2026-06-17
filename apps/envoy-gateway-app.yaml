@@ -8,7 +8,7 @@ spec:
   sources:
     - repoURL: docker.io/envoyproxy
       chart: gateway-helm
-      targetRevision: 1.8.0
+      targetRevision: 1.8.1
       helm:
         releaseName: envoy-gateway
         # Gateway API CRDs and Envoy Gateway's own CRDs are managed by the
