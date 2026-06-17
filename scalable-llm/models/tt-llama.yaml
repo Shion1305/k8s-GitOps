@@ -30,7 +30,7 @@ spec:
   # count 1 = one p150a card (device-plugin advertises 2 units total).
   resourceProfile: tenstorrent-blackhole:1
 
-  image: "ghcr.io/tenstorrent/tt-inference-server/vllm-tt-metal-src-release-ubuntu-22.04-amd64:0.10.0-555f240-22be241"
+  image: "ghcr.io/tenstorrent/tt-inference-server/vllm-tt-metal-src-release-ubuntu-22.04-amd64:0.11.0-555f240-22be241"
 
   # scale-from-zero: idle → 0 replicas (both cards free), and KubeAI holds the
   # first request while it spins a replica back up. This is viable because the

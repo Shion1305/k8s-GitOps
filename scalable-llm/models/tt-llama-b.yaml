@@ -24,7 +24,7 @@ spec:
 
   resourceProfile: tenstorrent-blackhole:1
 
-  image: "ghcr.io/tenstorrent/tt-inference-server/vllm-tt-metal-src-release-ubuntu-22.04-amd64:0.10.0-555f240-22be241"
+  image: "ghcr.io/tenstorrent/tt-inference-server/vllm-tt-metal-src-release-ubuntu-22.04-amd64:0.11.0-555f240-22be241"
 
   # Sleep-mode by default (scale-to-zero). maxReplicas:1 so it never claims both
   # cards on its own — in a 2-card / many-model world each model gets at most one
