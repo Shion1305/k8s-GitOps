@@ -1,0 +1,46 @@
+# Disposable Redis for Outline: backs the websocket/collaboration pub-sub and
+# the BullMQ job queue. No persistence — Postgres + the local volume hold the
+# source of truth, so a restart just drops in-flight queue state. Same-namespace
+# only (no NetworkPolicy needed; the generated default-deny allows same-ns
+# ingress).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: outline-redis
+  namespace: outline
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: outline-redis
+  template:
+    metadata:
+      labels:
+        app: outline-redis
+    spec:
+      containers:
+        - name: redis
+          image: redis:7.4-alpine
+          args: ["--save", "", "--appendonly", "no"]
+          ports:
+            - containerPort: 6379
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 250m
+              memory: 256Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: outline-redis
+  namespace: outline
+spec:
+  type: ClusterIP
+  selector:
+    app: outline-redis
+  ports:
+    - port: 6379
+      targetPort: 6379

@@ -1,0 +1,100 @@
+# Outline knowledge base — single web replica.
+#
+# Storage: FILE_STORAGE=local on a Longhorn RWO PVC mounted at
+# /var/lib/outline/data (see pvc.yaml). Because the PVC is ReadWriteOnce the
+# Deployment uses the Recreate strategy — a rolling update would deadlock with
+# two pods contending for the same volume.
+#
+# Schema migrations are NOT run by `yarn start`; an initContainer runs
+# `yarn db:migrate` first. `--env=production-ssl-disabled` matches the in-cluster
+# plaintext Postgres connection (PGSSLMODE=disable, see envFrom/env below).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: outline
+  namespace: outline
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: outline
+  template:
+    metadata:
+      labels:
+        app: outline
+    spec:
+      securityContext:
+        # Outline's image runs as uid/gid 1001 ("nodejs"); chown the Longhorn
+        # volume to it via fsGroup so local file storage is writable.
+        fsGroup: 1001
+      initContainers:
+        - name: migrate
+          image: outlinewiki/outline:1.8.1
+          command: ["yarn", "db:migrate", "--env=production-ssl-disabled"]
+          envFrom:
+            - configMapRef:
+                name: outline-config
+            - secretRef:
+                name: outline-db
+            - secretRef:
+                name: outline-secrets
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+      containers:
+        - name: outline
+          image: outlinewiki/outline:1.8.1
+          ports:
+            - containerPort: 3000
+          envFrom:
+            - configMapRef:
+                name: outline-config
+            - secretRef:
+                name: outline-db
+            - secretRef:
+                name: outline-secrets
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/outline/data
+          readinessProbe:
+            httpGet:
+              path: /_health
+              port: 3000
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /_health
+              port: 3000
+            initialDelaySeconds: 60
+            periodSeconds: 30
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: "2"
+              memory: 2Gi
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: outline-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: outline
+  namespace: outline
+spec:
+  type: ClusterIP
+  selector:
+    app: outline
+  ports:
+    - port: 80
+      targetPort: 3000

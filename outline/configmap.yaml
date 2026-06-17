@@ -1,0 +1,42 @@
+# Non-secret Outline configuration. Secrets (SECRET_KEY, UTILS_SECRET,
+# OIDC_CLIENT_SECRET, DATABASE_URL) are injected separately via the
+# outline-secrets / outline-db Secrets materialized by External Secrets.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: outline-config
+  namespace: outline
+data:
+  NODE_ENV: "production"
+  URL: "https://outline.shion1305.com"
+  PORT: "3000"
+  # TLS is terminated at Envoy Gateway, which forwards X-Forwarded-Proto. The
+  # gateway already enforces HTTPS, so disable Outline's own redirect to avoid
+  # any proxy-header redirect loop.
+  FORCE_HTTPS: "false"
+  DEFAULT_LANGUAGE: "en_US"
+  WEB_CONCURRENCY: "1"
+
+  # Postgres: shared cluster, in-cluster plaintext (pg_hba allows md5 over
+  # non-SSL). DATABASE_URL itself is templated into the outline-db Secret.
+  PGSSLMODE: "disable"
+
+  # Redis: in-namespace ephemeral instance (redis.yaml). Used for the
+  # websocket/collaboration pub-sub and the BullMQ job queue only.
+  REDIS_URL: "redis://outline-redis:6379"
+
+  # Attachments/images on the local Longhorn volume.
+  FILE_STORAGE: "local"
+  FILE_STORAGE_LOCAL_ROOT_DIR: "/var/lib/outline/data"
+  FILE_STORAGE_UPLOAD_MAX_SIZE: "262144000"
+
+  # OIDC against the Keycloak `user` realm (central passkey human-user pool).
+  # The client secret is delivered via the outline-secrets Secret.
+  OIDC_CLIENT_ID: "outline"
+  OIDC_AUTH_URI: "https://keycloak.shion1305.com/realms/user/protocol/openid-connect/auth"
+  OIDC_TOKEN_URI: "https://keycloak.shion1305.com/realms/user/protocol/openid-connect/token"
+  OIDC_USERINFO_URI: "https://keycloak.shion1305.com/realms/user/protocol/openid-connect/userinfo"
+  OIDC_LOGOUT_URI: "https://keycloak.shion1305.com/realms/user/protocol/openid-connect/logout"
+  OIDC_USERNAME_CLAIM: "preferred_username"
+  OIDC_DISPLAY_NAME: "Keycloak"
+  OIDC_SCOPES: "openid profile email"
