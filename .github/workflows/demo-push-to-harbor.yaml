@@ -38,7 +38,10 @@ on:
 
 jobs:
   build-push:
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        runner: [ubuntu-latest, shion1305-amd, shion1305-arm]
+    runs-on: ${{ matrix.runner }}
     permissions:
       contents: read
       id-token: write
