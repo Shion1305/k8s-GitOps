@@ -1,0 +1,33 @@
+# Stable in-cluster entrypoint for the home Envoy fleet.
+#
+# Envoy Gateway provisions its own Service for the `home` proxies, but its name
+# carries a content hash (e.g. envoy-envoy-home-XXXXXXXX), which is awkward to
+# pin from CoreDNS. This hand-authored Service gives a deterministic name that
+# the CoreDNS split-horizon rewrite targets:
+#
+#   harbor.shion1305.com    -> home-ingress.envoy-gateway-system.svc.cluster.local
+#   harbor.i.shion1305.com  -> home-ingress.envoy-gateway-system.svc.cluster.local
+#
+# (see kube-system-manual-config/coredns-configmap.yaml).
+#
+# The selector matches the home proxy pods (mergeGateways labels them by owning
+# GatewayClass). targetPort 10443 is Envoy Gateway's default container port for
+# a :443 listener when the proxy is NOT hostNetwork and does not set
+# useListenerPortAsContainerPort (the privileged port is offset by +10000). If a
+# future EG upgrade changes that offset, only this targetPort needs updating.
+apiVersion: v1
+kind: Service
+metadata:
+  name: home-ingress
+  namespace: envoy-gateway-system
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/managed-by: envoy-gateway
+    app.kubernetes.io/component: proxy
+    gateway.envoyproxy.io/owning-gatewayclass: envoy-home
+  ports:
+    - name: https
+      port: 443
+      targetPort: 10443
+      protocol: TCP

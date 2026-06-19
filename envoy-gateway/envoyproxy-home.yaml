@@ -1,0 +1,70 @@
+# Data plane for the `envoy-home` GatewayClass: a second Envoy fleet that lives
+# on the amd64 home nodes (shion-ubuntu-2505 / shion-ubuntu-2605) so that
+# in-cluster traffic to *.shion1305.com / *.i.shion1305.com can be terminated
+# INSIDE the home network instead of detouring through the OCI gateway
+# (instance-k8s-proxy) and back over WireGuard.
+#
+# Differences from the `instance-k8s-proxy` EnvoyProxy (envoyproxy.yaml):
+#   - NOT hostNetwork. This fleet is reached via an in-cluster ClusterIP
+#     (see service-home.yaml), not by owning a node's :443. So there is no
+#     privileged-port bind, no `--base-id` dance against cilium-envoy (which
+#     only collides in the shared host netns), and no root securityContext.
+#     The proxy binds the default offset container port 10443 for the :443
+#     listener; service-home.yaml maps 443 -> 10443.
+#   - Pinned to the two amd64 home nodes. Harbor itself is amd64-only
+#     (harbor/values.yaml), so harbor-core always lands on one of these; co-
+#     locating the ingress keeps the whole path on the home LAN/WireGuard mesh.
+#   - replicas: 2 with soft anti-affinity => one proxy per home node for HA.
+#     (Phase 2 will switch this to a DaemonSet so a Service with
+#     internalTrafficPolicy: Local can pin termination to the client's own node;
+#     not needed yet — plain ClusterIP load-balancing already removes the OCI
+#     round-trip.)
+#
+# mergeGateways: true matches the existing fleet's labeling
+# (gateway.envoyproxy.io/owning-gatewayclass=envoy-home), which service-home.yaml
+# selects on. Only the `home` Gateway uses this class, so the merge is a no-op
+# beyond the label scheme.
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: EnvoyProxy
+metadata:
+  name: home
+  namespace: envoy-gateway-system
+spec:
+  mergeGateways: true
+  provider:
+    type: Kubernetes
+    kubernetes:
+      envoyDeployment:
+        replicas: 2
+        pod:
+          affinity:
+            nodeAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                nodeSelectorTerms:
+                  - matchExpressions:
+                      - key: kubernetes.io/hostname
+                        operator: In
+                        values:
+                          - shion-ubuntu-2505
+                          - shion-ubuntu-2605
+            podAntiAffinity:
+              preferredDuringSchedulingIgnoredDuringExecution:
+                - weight: 100
+                  podAffinityTerm:
+                    topologyKey: kubernetes.io/hostname
+                    labelSelector:
+                      matchLabels:
+                        gateway.envoyproxy.io/owning-gatewayclass: envoy-home
+        container:
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 1000m
+              memory: 512Mi
+      envoyService:
+        # In-cluster only; CoreDNS rewrites the target hostnames to the stable
+        # ClusterIP Service in service-home.yaml. This EG-managed Service exists
+        # but is not referenced by name (its name carries a hash suffix).
+        type: ClusterIP

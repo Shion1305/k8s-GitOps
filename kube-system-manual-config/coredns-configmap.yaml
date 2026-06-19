@@ -7,6 +7,22 @@ data:
            lameduck 5s
         }
         ready
+        # Split-horizon for Harbor: keep in-cluster traffic on the home nodes.
+        # Public DNS resolves these to the OCI gateway (141.147.189.36 /
+        # 10.130.5.21); for pods we instead rewrite them to the in-cluster
+        # home-ingress Service, which fronts the home Envoy fleet (see
+        # envoy-gateway/service-home.yaml + docs/networking.md). The kubernetes
+        # plugin below resolves the rewritten cluster.local name; the answer's
+        # name is restored to the original by the rewrite plugin.
+        #
+        # Per-name (NOT a *.shion1305.com wildcard): the home gateway only has
+        # routes for the Harbor hostnames, so redirecting any other name here
+        # would 404. Add a line as each app's HTTPRoute is attached to the home
+        # gateway. NOTE: this only affects pods (CoreDNS); kubelet image pulls
+        # use the node resolver and are unaffected (a future per-node /etc/hosts
+        # phase covers those).
+        rewrite name harbor.shion1305.com home-ingress.envoy-gateway-system.svc.cluster.local
+        rewrite name harbor.i.shion1305.com home-ingress.envoy-gateway-system.svc.cluster.local
         kubernetes cluster.local in-addr.arpa ip6.arpa {
            pods insecure
            fallthrough in-addr.arpa ip6.arpa

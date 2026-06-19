@@ -1,0 +1,47 @@
+# Home Gateway: terminates the apex and internal wildcard hostnames on the home
+# nodes for in-cluster clients. Two HTTPS listeners share :443 and are
+# distinguished by SNI:
+#
+#   https           *.shion1305.com    cert wildcard-shion1305-com-tls
+#   https-internal  *.i.shion1305.com  cert wildcard-i-shion1305-com-tls
+#
+# Both certs already live in this namespace (envoy-gateway/certificates.yaml),
+# so the same wildcard certificates the OCI gateway serves are reused verbatim —
+# clients see an identical, valid certificate regardless of which gateway they
+# land on.
+#
+# Routes are attached per-app (NOT a wildcard catch-all): an HTTPRoute opts in
+# by adding this Gateway to its parentRefs. Today only Harbor does
+# (harbor/httproute-external.yaml + httproute-internal.yaml). A hostname whose
+# route is NOT attached here would 404, which is exactly why the CoreDNS
+# split-horizon override is also per-name — the two grow together.
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: home
+  namespace: envoy-gateway-system
+spec:
+  gatewayClassName: envoy-home
+  listeners:
+    - name: https
+      port: 443
+      protocol: HTTPS
+      hostname: "*.shion1305.com"
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - name: wildcard-shion1305-com-tls
+      allowedRoutes:
+        namespaces:
+          from: All
+    - name: https-internal
+      port: 443
+      protocol: HTTPS
+      hostname: "*.i.shion1305.com"
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - name: wildcard-i-shion1305-com-tls
+      allowedRoutes:
+        namespaces:
+          from: All

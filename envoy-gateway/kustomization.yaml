@@ -7,3 +7,9 @@ resources:
   - gateway-internal.yaml
   - gateway-external.yaml
   - client-traffic-policy.yaml
+  # Home-resident data plane (split-horizon for in-cluster *.shion1305.com /
+  # *.i.shion1305.com — see docs/networking.md).
+  - gatewayclass-home.yaml
+  - envoyproxy-home.yaml
+  - gateway-home.yaml
+  - service-home.yaml

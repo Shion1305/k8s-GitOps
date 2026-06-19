@@ -1,0 +1,21 @@
+# Home-resident GatewayClass. Separate from `envoy-default` because it needs a
+# DIFFERENT data plane: `envoy-default`'s EnvoyProxy (instance-k8s-proxy) is
+# pinned to the OCI node with hostNetwork to own the public 141.147.189.36 and
+# the internal 10.130.5.21 VIPs. This class points at the `home` EnvoyProxy,
+# whose proxies run on the amd64 home nodes behind an in-cluster ClusterIP — so
+# in-cluster clients (e.g. GARM runner pods pushing to Harbor) terminate on a
+# home node instead of hairpinning out to the OCI gateway and back.
+#
+# See `gateway-home.yaml` for the listeners and `docs/networking.md` for the
+# split-horizon design.
+apiVersion: gateway.networking.k8s.io/v1
+kind: GatewayClass
+metadata:
+  name: envoy-home
+spec:
+  controllerName: gateway.envoyproxy.io/gatewayclass-controller
+  parametersRef:
+    group: gateway.envoyproxy.io
+    kind: EnvoyProxy
+    name: home
+    namespace: envoy-gateway-system
