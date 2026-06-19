@@ -47,6 +47,11 @@ spec:
     - name: internal
       namespace: envoy-gateway-system
       sectionName: https
+    # Home gateway: in-cluster clients resolved to home-ingress terminate on a
+    # home node rather than detouring through 10.130.5.21 on the OCI node.
+    - name: home
+      namespace: envoy-gateway-system
+      sectionName: https-internal
   hostnames:
     - harbor.i.shion1305.com
   rules:
@@ -68,6 +73,9 @@ spec:
     - name: internal
       namespace: envoy-gateway-system
       sectionName: https
+    - name: home
+      namespace: envoy-gateway-system
+      sectionName: https-internal
   hostnames:
     - harbor.i.shion1305.com
   rules:

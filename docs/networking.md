@@ -140,6 +140,60 @@ the WireGuard CIDR (the LAN-side L4 control). There is no
 SecurityPolicy / IP-allowlist on the internal Gateway today; defense in
 depth at L7 may be added later.
 
+## Home-resident gateway (in-cluster split-horizon)
+
+The canonical Envoy data plane is a single proxy pinned to `instance-k8s-proxy`
+(the OCI node) with `hostNetwork`, owning both `141.147.189.36` and
+`10.130.5.21`. That is correct for genuinely external traffic, but it means an
+**in-cluster** client on a home node that talks to a `*.shion1305.com` /
+`*.i.shion1305.com` host hairpins **home → OCI → home**: the request leaves to
+the OCI gateway and the gateway proxies straight back to a backend that usually
+runs on a home node. For large transfers (e.g. a GARM runner pushing a
+multi-arch image to Harbor) this wastes the home uplink / WireGuard mesh badly.
+
+The fix is a **second, home-resident Envoy fleet** plus **split-horizon DNS**:
+
+- `GatewayClass envoy-home` → `EnvoyProxy home` runs Envoy on the amd64 home
+  nodes (`shion-ubuntu-2505` / `shion-ubuntu-2605`), **not** hostNetwork,
+  reached via an in-cluster ClusterIP (`envoy-gateway/envoyproxy-home.yaml`).
+- `Gateway home` terminates `*.shion1305.com` and `*.i.shion1305.com` on `:443`
+  by SNI, reusing the **same wildcard certificates** as the OCI gateway
+  (`envoy-gateway/gateway-home.yaml`).
+- `Service home-ingress` is a stable-named ClusterIP in front of that fleet
+  (`envoy-gateway/service-home.yaml`); the EG-provisioned Service has a hashed
+  name, so this hand-authored one is what CoreDNS targets.
+- CoreDNS rewrites the opted-in hostnames to that Service
+  (`kube-system-manual-config/coredns-configmap.yaml`), so a pod's request
+  terminates on a home node and reaches the backend over the home network only.
+
+An app opts in by (a) adding the `home` Gateway to its HTTPRoute `parentRefs`
+and (b) adding a CoreDNS `rewrite` line for its hostname. Today only Harbor is
+wired (`harbor/httproute-external.yaml`, `harbor/httproute-internal.yaml`). The
+two opt-ins must stay in lockstep — a hostname rewritten to `home-ingress`
+without a matching route on the `home` Gateway returns 404.
+
+Scope and limits (current = "Phase 1"):
+
+- **Pods only.** The CoreDNS rewrite governs pod DNS. **kubelet image pulls use
+  the node resolver, not CoreDNS**, so in-cluster *pulls* still reach the OCI
+  gateway; redirecting those needs a per-node `/etc/hosts`/NodeHosts step (a
+  later phase). The immediate win is pod-originated traffic — notably runner
+  `crane push`.
+- **No same-host pinning yet.** `home-ingress` is a plain ClusterIP, so a pod
+  may terminate on either home node (one cheap home-LAN hop) rather than its
+  own. A later phase can switch the fleet to a DaemonSet and add
+  `internalTrafficPolicy: Local` to pin termination to the client's node.
+- **External clients are unchanged.** Public DNS still points at
+  `141.147.189.36` / `10.130.5.21`; only in-cluster resolution is overridden.
+
+`kube-system-manual-config/coredns-configmap.yaml` is **not** managed by ArgoCD
+— apply it by hand and roll CoreDNS:
+
+```bash
+kubectl apply -f kube-system-manual-config/coredns-configmap.yaml
+kubectl rollout restart -n kube-system deployment/coredns
+```
+
 ## Migration status
 
 | Phase | Status | Notes |

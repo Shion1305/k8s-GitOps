@@ -54,6 +54,13 @@ spec:
     - name: external
       namespace: envoy-gateway-system
       sectionName: https
+    # Also served by the home gateway so in-cluster pushers (GARM runner pods)
+    # resolved to home-ingress via CoreDNS split-horizon terminate on a home
+    # node instead of hairpinning through the OCI external gateway. Same
+    # hostname, same wildcard cert, same harbor-core backend.
+    - name: home
+      namespace: envoy-gateway-system
+      sectionName: https
   hostnames:
     - harbor.shion1305.com
   rules:
