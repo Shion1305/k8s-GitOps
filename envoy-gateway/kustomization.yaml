@@ -13,3 +13,4 @@ resources:
   - envoyproxy-home.yaml
   - gateway-home.yaml
   - service-home.yaml
+  - networkpolicy-home.yaml

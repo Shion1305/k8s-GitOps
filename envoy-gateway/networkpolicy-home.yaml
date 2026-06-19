@@ -1,0 +1,36 @@
+# Allow in-cluster clients to reach the home Envoy fleet across namespaces.
+#
+# The Kyverno-generated `cross-ns-isolation` NetworkPolicy default-denies
+# ingress into envoy-gateway-system from every OTHER namespace (it permits only
+# same-namespace ingress). The home fleet, unlike the OCI `envoy-default` proxy,
+# is NOT hostNetwork — it is reached over a ClusterIP (home-ingress) by client
+# pods that live in other namespaces, e.g. GARM runner pods in
+# `github-actions-runner-pods` running `crane push harbor.shion1305.com`. Those
+# cross-namespace connections are dropped by the default-deny, surfacing to the
+# client as `dial tcp <home-ingress>:443: i/o timeout`.
+#
+# (The OCI gateway never needed this: hostNetwork means it is reached via the
+# node IP, which the cluster-wide allow-from-infra policy already permits.)
+#
+# Allow ingress to the home proxy pods on the HTTPS listener container port
+# (10443; home-ingress maps 443 -> 10443) from any namespace, matching the
+# gateway's role as a cluster-wide in-cluster ingress. This unions with the
+# default-deny — Cilium evaluates standard + Cilium policies as a union of
+# allows.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-home-gateway-ingress
+  namespace: envoy-gateway-system
+spec:
+  podSelector:
+    matchLabels:
+      gateway.envoyproxy.io/owning-gatewayclass: envoy-home
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector: {}
+      ports:
+        - protocol: TCP
+          port: 10443
