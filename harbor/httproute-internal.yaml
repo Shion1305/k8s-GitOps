@@ -95,6 +95,10 @@ spec:
         - path:
             type: PathPrefix
             value: /chartrepo/
+      # Same reason as harbor-push-external: /v2/ here serves blob push AND pull;
+      # the default 15s route timeout is too short for large layer transfers.
+      timeouts:
+        request: "1800s"
       backendRefs:
         - name: harbor-core
           port: 80

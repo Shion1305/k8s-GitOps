@@ -71,6 +71,15 @@ spec:
         - path:
             type: Exact
             value: /service/token
+      # Envoy Gateway's default route timeout is 15s, which is far too short for
+      # Docker Registry blob uploads: a multi-MB layer PATCH/PUT regularly runs
+      # tens of seconds (observed ~0.5 MB/s/stream over the home path), so crane
+      # pushes died with `504 upstream request timeout` at exactly 15000ms and
+      # the client then aborted the in-flight layer uploads. Raise it well above
+      # any realistic single blob transfer. Envoy's stream idle timeout still
+      # reaps genuinely dead connections, so a long request timeout is safe here.
+      timeouts:
+        request: "1800s"
       backendRefs:
         - name: harbor-core
           port: 80
