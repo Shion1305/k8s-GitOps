@@ -44,7 +44,7 @@ jobs:
       # local dev toolchain and CI run identical versions.
       - uses: aquaproj/aqua-installer@v4.0.4
         with:
-          aqua_version: v2.59.1
+          aqua_version: v2.60.1
 
       - name: Render + validate
         env:
