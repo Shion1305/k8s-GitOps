@@ -18,6 +18,7 @@ spec:
     harbor: []
     litellm: [] # LiteLLM front for scalable-llm (KubeAI on Tenstorrent)
     fde_knowledge_engine: []
+    research_gh_leaks: []
   databases:
     openwebui: openwebui
     langfuse: langfuse
@@ -27,6 +28,7 @@ spec:
     harbor: harbor
     litellm: litellm
     fde_knowledge_engine: fde_knowledge_engine
+    research_gh_leaks: research_gh_leaks
   postgresql:
     version: "17"
   resources:
