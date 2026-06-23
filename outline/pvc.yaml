@@ -1,0 +1,15 @@
+# Local attachment/image storage for Outline (FILE_STORAGE=local).
+# ReadWriteOnce is sufficient for the single web replica; the Deployment uses
+# the Recreate strategy so the volume is never contended.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: outline-data
+  namespace: outline
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: longhorn-hdd
+  resources:
+    requests:
+      storage: 20Gi

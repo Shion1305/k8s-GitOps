@@ -40,6 +40,17 @@ path "secret/metadata/shared/openwebui" {
 EOF
 echo "✓ Created policy: eso-openwebui"
 
+# Policy for outline namespace
+vault policy write eso-outline - <<EOF
+path "secret/data/shared/outline" {
+  capabilities = ["read"]
+}
+path "secret/metadata/shared/outline" {
+  capabilities = ["read", "list"]
+}
+EOF
+echo "✓ Created policy: eso-outline"
+
 # Policy for keycloak namespace
 vault policy write eso-keycloak - <<EOF
 path "secret/data/shared/keycloak" {
@@ -253,6 +264,14 @@ vault write auth/kubernetes/role/eso-openwebui \
   policies=eso-openwebui \
   ttl=1h
 echo "✓ Created role: eso-openwebui"
+
+# Outline
+vault write auth/kubernetes/role/eso-outline \
+  bound_service_account_names=eso \
+  bound_service_account_namespaces=outline \
+  policies=eso-outline \
+  ttl=1h
+echo "✓ Created role: eso-outline"
 
 # Keycloak
 vault write auth/kubernetes/role/eso-keycloak \
@@ -474,6 +493,7 @@ echo ""
 echo "Per-namespace roles created:"
 echo "  eso-langfuse    → SA eso/langfuse        → secret/data/shared/langfuse"
 echo "  eso-openwebui   → SA eso/openwebui       → secret/data/shared/openwebui"
+echo "  eso-outline     → SA eso/outline         → secret/data/shared/outline"
 echo "  eso-keycloak    → SA eso/keycloak        → secret/data/shared/keycloak"
 echo "  eso-atc         → SA eso/atc             → atc/data/*"
 echo "  eso-lumos-bot   → SA eso/lumos-bot       → lumos-bot/data/*"

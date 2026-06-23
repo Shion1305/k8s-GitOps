@@ -27,6 +27,7 @@ spec:
                 - mlflow
                 - nc-press-chotatsu
                 - openwebui
+                - outline
                 - postgres-operator
                 - scalable-llm
       toPorts:

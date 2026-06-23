@@ -174,3 +174,24 @@ spec:
           - https://keycloak.shion1305.com/realms/harbor/broker/user/endpoint
         webOrigins:
           - https://keycloak.shion1305.com
+      # Outline is NOT a child realm broker but a direct OIDC relying party:
+      # the Outline app authenticates human users straight against this
+      # passkey realm. Its callback is Outline's OIDC strategy endpoint
+      # (<URL>/auth/oidc.callback). The Keycloak-generated client secret must
+      # be copied post-import into Vault at secret/shared/outline
+      # (OIDC_CLIENT_SECRET) so External Secrets can deliver it to the app;
+      # see outline/README.md. Do NOT commit the actual secret to git.
+      - clientId: outline
+        name: "Outline knowledge base"
+        description: "Direct OIDC client for the Outline app (outline.shion1305.com)."
+        protocol: openid-connect
+        publicClient: false
+        clientAuthenticatorType: client-secret
+        secret: PLACEHOLDER_REPLACE_AFTER_REALM_IMPORT
+        standardFlowEnabled: true
+        directAccessGrantsEnabled: false
+        serviceAccountsEnabled: false
+        redirectUris:
+          - https://outline.shion1305.com/auth/oidc.callback
+        webOrigins:
+          - https://outline.shion1305.com
