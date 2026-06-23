@@ -6,7 +6,7 @@ metadata:
 spec:
   teamId: "default"
   volume:
-    size: 1000Gi
+    size: 1200Gi
     storageClass: longhorn-ssd
   numberOfInstances: 1
   users:
