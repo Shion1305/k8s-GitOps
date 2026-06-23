@@ -1,0 +1,59 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: atc-reprice
+  namespace: atc
+  labels:
+    app: atc-reprice
+spec:
+  replicas: 1
+  # The service holds in-memory order state and two live WebSocket sessions; a second
+  # replica would double-manage the same GMO orders. Keep it a singleton, recreate on
+  # update (never two pods re-pricing the same order concurrently).
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: atc-reprice
+  template:
+    metadata:
+      labels:
+        app: atc-reprice
+      annotations:
+        # Restart the pod when the GMO API secret rotates (stakater reloader).
+        reloader.stakater.com/auto: "true"
+    spec:
+      containers:
+        - name: atc-reprice
+          # Internal Harbor image (pushed by docker-publish-reprice.yml). Pull creds are
+          # auto-injected cluster-wide by the Kyverno harbor-pull-injection policy.
+          image: harbor.shion1305.com/shion1305/atc-reprice:main
+          imagePullPolicy: Always
+          # Manage every active LIMIT order and adopt newly-placed ones (default behavior).
+          # 逆指値/STOP orders are excluded automatically. Add --dry-run to validate first.
+          args:
+            - "--symbol"
+            - "ETH_JPY"
+            - "--adopt-all-active"
+            - "--watch"
+          env:
+            - name: GMO_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: gmo-coin-api-secret
+                  key: API_KEY
+            - name: GMO_API_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: gmo-coin-api-secret
+                  key: API_SECRET
+            - name: RUST_LOG
+              value: "info"
+          resources:
+            # Single static binary, no interpreter heap — a tight, predictable footprint.
+            requests:
+              memory: "32Mi"
+              cpu: "10m"
+            limits:
+              memory: "128Mi"
+              cpu: "250m"
