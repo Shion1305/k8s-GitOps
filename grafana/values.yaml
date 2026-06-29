@@ -20,21 +20,24 @@ prometheus:
           resources:
             requests:
               storage: 400Gi
-    # Service discovery settings - discover all ServiceMonitors EXCEPT those in
-    # the gh-leaked-tokens namespace. That namespace's token-validity series are
-    # an audit trail kept for years by a dedicated, time-retention Prometheus
-    # (gh-leaked-tokens/prometheus.yaml). This size-capped primary must NOT also
-    # scrape them, or its retention eviction would cut the history short — and a
-    # bare `{}` selector here would scrape every namespace regardless of the
-    # ServiceMonitor's labels. Excluding the namespace is what actually keeps the
-    # primary off that data (the SM label alone can't, since selector is empty).
+    # Service discovery: scrape every ServiceMonitor EXCEPT those opting out via
+    # the `monitoring-tier: dedicated` label. That label marks series owned by a
+    # dedicated, long-retention Prometheus (e.g. gh-leaked-tokens/prometheus.yaml
+    # for the token-validity audit trail) that this size-capped primary must NOT
+    # also scrape — otherwise its retention eviction would cut the history short.
+    #
+    # This is a GENERIC, namespace-agnostic opt-out: any future workload that
+    # needs its own retention just labels its ServiceMonitor `monitoring-tier:
+    # dedicated` and points a dedicated instance at it; no change here is needed.
+    # NotIn also matches ServiceMonitors that LACK the key (the vast majority),
+    # so they keep being scraped by the primary as before.
     serviceMonitorSelectorNilUsesHelmValues: false
-    serviceMonitorNamespaceSelector:
+    serviceMonitorNamespaceSelector: {}
+    serviceMonitorSelector:
       matchExpressions:
-        - key: kubernetes.io/metadata.name
+        - key: monitoring-tier
           operator: NotIn
-          values: ["gh-leaked-tokens"]
-    serviceMonitorSelector: {}
+          values: ["dedicated"]
     podMonitorSelectorNilUsesHelmValues: false
     podMonitorNamespaceSelector: {}
     podMonitorSelector: {}

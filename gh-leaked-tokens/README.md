@@ -33,17 +33,23 @@ namespace with **time-based retention only (10y), no size cap**. The series
 volume is minuscule (a few per token), so it costs almost nothing while never
 evicting history.
 
-Keeping the primary OFF this data takes **two** changes — the ServiceMonitor
-label alone is not enough, because the primary's `serviceMonitorSelector` is
-empty (`{}`) and would otherwise scrape every namespace's SMs regardless of
-labels:
+Routing is controlled by a **generic, namespace-agnostic opt-out label**,
+`monitoring-tier: dedicated`, on the ServiceMonitor:
 
-1. This namespace's ServiceMonitor carries `prometheus: gh-leaked-tokens`, which
-   the dedicated instance's `serviceMonitorSelector` matches — routing the data
-   to it.
-2. The primary's `serviceMonitorNamespaceSelector` is set to exclude this
-   namespace (`NotIn [gh-leaked-tokens]` in `grafana/values.yaml`) — so the
-   size-capped primary never scrapes (and so never evicts) the token series.
+1. The **primary** excludes any SM carrying it — its `serviceMonitorSelector` is
+   `monitoring-tier NotIn [dedicated]` (`grafana/values.yaml`). (Bare-label
+   selection alone wouldn't have worked: the primary previously used an empty
+   `{}` selector that scrapes everything regardless of labels, so an explicit
+   NotIn is what actually keeps it off.)
+2. The **dedicated** instance includes it — `serviceMonitorSelector:
+   monitoring-tier=dedicated`, scoped to this namespace via its
+   `serviceMonitorNamespaceSelector` so it doesn't grab another team's
+   dedicated SM elsewhere.
+
+The win: any future workload that needs its own retention just labels its
+ServiceMonitor `monitoring-tier: dedicated` and points a dedicated instance at
+it — **no edit to the primary is ever needed again** (vs. hard-coding each
+namespace into a `NotIn` list).
 
 Postgres `validation_checks` (append-only) remains the independent
 source-of-truth; this Prometheus is the queryable long-term *view* of it. Even

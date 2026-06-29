@@ -46,14 +46,17 @@ spec:
   # TIME retention only, deliberately long. No retentionSize → samples are never
   # evicted by capacity pressure, only by age (10y ≈ keep forever for this use).
   retention: 3650d
-  # Discover ServiceMonitors in THIS namespace carrying the dedicated label, and
-  # nothing else — so this instance is scoped to the token-validity Pushgateway.
+  # Discover only ServiceMonitors that opt into the dedicated tier
+  # (`monitoring-tier: dedicated`) AND live in THIS namespace. The namespace
+  # scope is what keeps this instance from also grabbing some other namespace's
+  # `monitoring-tier: dedicated` SM — the label is generic on purpose, the
+  # per-instance scoping is done here.
   serviceMonitorNamespaceSelector:
     matchLabels:
       kubernetes.io/metadata.name: gh-leaked-tokens
   serviceMonitorSelector:
     matchLabels:
-      prometheus: gh-leaked-tokens
+      monitoring-tier: dedicated
   resources:
     requests:
       cpu: 25m
