@@ -14,9 +14,10 @@
 # watch set this job exists to observe. So no selection flag is passed below.
 #
 # Flags:
-#   --push-interval 5  background-flush partial results to the gateway every 5s,
-#                      so a long run is observable mid-flight, not only at the end.
 #   --workers 8        matches the CLI's RECHECK_WORKERS default (pure I/O wait).
+# Metrics are pushed once at the end of the (seconds-long) run — recheck has no
+# mid-run flusher, and the Pushgateway push replaces the whole per-spec group, so
+# a single final push carries the complete snapshot.
 apiVersion: batch/v1
 kind: CronJob
 metadata:
@@ -62,8 +63,6 @@ spec:
                 # every token valid at least once, incl. ones since disabled), so no
                 # selection flag is needed here.
                 - recheck
-                - --push-interval
-                - "5"
                 - --workers
                 - "8"
               env:
