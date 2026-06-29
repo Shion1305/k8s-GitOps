@@ -192,7 +192,7 @@ rules:
   - apiGroups: [""]
     resources: ["secrets"]
     resourceNames:
-      - research_gh_leaks.postgres-shared.credentials.postgresql.acid.zalan.do
+      - research-gh-leaks.postgres-shared.credentials.postgresql.acid.zalan.do
     verbs: ["get", "list", "watch"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
