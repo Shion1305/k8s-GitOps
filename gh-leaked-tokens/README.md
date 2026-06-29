@@ -52,6 +52,11 @@ These are NOT in the repo and must exist before the app syncs cleanly:
 2. **Cross-namespace RBAC** — the `eso-db` SA's read access to that Secret is
    granted by `external-secrets/rbac-db-reader.yaml` (Role + RoleBinding
    `eso-db-gh-leaked-tokens`), synced by the external-secrets app.
+3. **DB network access** — `postgres-shared` denies ingress by default
+   (Cilium); `postgres-shared/networkpolicy.yaml` lists `gh-leaked-tokens` in
+   the `:5432` allow-list so the CronJob can reach Postgres. (Synced by the
+   shared-postgres app — same repo, but a different ArgoCD Application, so it
+   must be applied for the recheck job to connect.)
 
 ## Operating
 
