@@ -7,5 +7,6 @@ resources:
   - vault-secret-store.yaml
   - healthcheck-external-secret.yaml
   - pushgateway.yaml
+  - prometheus.yaml
   - servicemonitor.yaml
   - cronjob.yaml

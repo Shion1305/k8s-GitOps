@@ -1,8 +1,9 @@
-# Tells kube-prometheus-stack to scrape the Pushgateway. The stack's
-# serviceMonitorSelector is empty (grafana/values.yaml:
-# serviceMonitorSelectorNilUsesHelmValues:false + serviceMonitorSelector:{}),
-# so it discovers all ServiceMonitors; the `release: kube-prometheus-stack`
-# label is the convention every other app in this repo uses for the same reason.
+# Tells the DEDICATED long-term Prometheus (prometheus.yaml) to scrape the
+# Pushgateway. The label is `prometheus: gh-leaked-tokens`, NOT the usual
+# `release: kube-prometheus-stack` — that is deliberate: the primary
+# kube-prometheus-stack is size-capped and would evict this audit data, so we
+# route token validity to the dedicated instance ONLY. The dedicated
+# Prometheus' serviceMonitorSelector matches exactly this label.
 #
 # honorLabels: true is REQUIRED for a Pushgateway. The recheck job pushes series
 # with its own `job="gh_token_recheck"` and per-spec/instance labels (see
@@ -16,7 +17,7 @@ metadata:
   namespace: gh-leaked-tokens
   labels:
     app: gh-leaked-tokens-pushgateway
-    release: kube-prometheus-stack
+    prometheus: gh-leaked-tokens
 spec:
   selector:
     matchLabels:

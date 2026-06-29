@@ -1,0 +1,33 @@
+# Registers the dedicated long-term Prometheus (gh-leaked-tokens/prometheus.yaml)
+# as a Grafana datasource so the Token Validity dashboard can query the audit
+# history that the size-capped primary Prometheus would otherwise have evicted.
+#
+# Managed by the grafana app (alongside the primary datasource.yaml) because
+# GrafanaDatasource CRs live in the `grafana` namespace where the operator
+# watches — keeping grafana's namespaced resources under the app whose
+# destination IS that namespace. The URL points cross-namespace at the
+# gh-leaked-tokens Prometheus Service.
+apiVersion: grafana.integreatly.org/v1beta1
+kind: GrafanaDatasource
+metadata:
+  name: gh-leaked-tokens-prometheus
+  namespace: grafana
+spec:
+  instanceSelector:
+    matchLabels:
+      dashboards: main-grafana
+  datasource:
+    # Stable UID so the Token Validity dashboard JSON can hard-code this
+    # datasource instead of the default `prometheus` (which is the size-capped
+    # primary). Without a fixed UID the operator assigns a random one and the
+    # dashboard shows "No data".
+    uid: gh-leaked-tokens
+    name: GH Leaked Tokens (long-term)
+    type: prometheus
+    access: proxy
+    url: http://prometheus.gh-leaked-tokens.svc.cluster.local:9090
+    isDefault: false
+    editable: true
+    jsonData:
+      timeInterval: 60s
+      queryTimeout: 60s
