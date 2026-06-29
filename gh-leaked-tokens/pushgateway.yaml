@@ -1,0 +1,112 @@
+# Prometheus Pushgateway for the recheck CronJob.
+#
+# Why a Pushgateway at all: `recheck` is a short-lived BATCH job, not a
+# long-running scrape target. It computes each token's current validity and
+# PUSHES the result (metrics.py: push_recheck_batch → pushadd_to_gateway), then
+# exits. Prometheus can't scrape a pod that's already gone, so the job pushes to
+# this always-on gateway and kube-prometheus-stack scrapes the gateway instead.
+# The gh_token_valid gauge persisted here across successive runs IS the
+# token-disablement time-series the report audit trail depends on.
+#
+# --persistence.file + a PVC: the Pushgateway keeps pushed metrics in memory and
+# would lose the whole disablement history on every restart/redeploy. Persisting
+# to disk every 5m means a pod restart resumes from the last checkpoint instead
+# of dropping back to zero series.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pushgateway
+  namespace: gh-leaked-tokens
+  labels:
+    app: gh-leaked-tokens-pushgateway
+spec:
+  replicas: 1
+  # Recreate (not RollingUpdate): the single PVC is ReadWriteOnce, so a rolling
+  # update's second pod could not mount it. Recreate tears the old pod down
+  # first.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: gh-leaked-tokens-pushgateway
+  template:
+    metadata:
+      labels:
+        app: gh-leaked-tokens-pushgateway
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        runAsGroup: 65534
+        fsGroup: 65534
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: pushgateway
+          image: prom/pushgateway:v1.11.1
+          args:
+            - --persistence.file=/data/pushgateway.store
+            - --persistence.interval=5m
+          ports:
+            - name: metrics
+              containerPort: 9091
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          livenessProbe:
+            httpGet:
+              path: /-/healthy
+              port: metrics
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /-/ready
+              port: metrics
+            initialDelaySeconds: 5
+            periodSeconds: 15
+          volumeMounts:
+            - name: data
+              mountPath: /data
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: pushgateway-data
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pushgateway-data
+  namespace: gh-leaked-tokens
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: longhorn-ssd
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: pushgateway
+  namespace: gh-leaked-tokens
+  labels:
+    app: gh-leaked-tokens-pushgateway
+spec:
+  type: ClusterIP
+  selector:
+    app: gh-leaked-tokens-pushgateway
+  ports:
+    - name: metrics
+      port: 9091
+      targetPort: metrics
