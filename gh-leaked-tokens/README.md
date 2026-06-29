@@ -31,9 +31,19 @@ samples — and this audit data would be collateral damage.
 So `prometheus.yaml` runs a **separate, tiny Prometheus** scoped to this
 namespace with **time-based retention only (10y), no size cap**. The series
 volume is minuscule (a few per token), so it costs almost nothing while never
-evicting history. The ServiceMonitor carries `prometheus: gh-leaked-tokens`
-(NOT `release: kube-prometheus-stack`) so **only** this instance scrapes the
-gateway — the primary never sees, and so never evicts, the token series.
+evicting history.
+
+Keeping the primary OFF this data takes **two** changes — the ServiceMonitor
+label alone is not enough, because the primary's `serviceMonitorSelector` is
+empty (`{}`) and would otherwise scrape every namespace's SMs regardless of
+labels:
+
+1. This namespace's ServiceMonitor carries `prometheus: gh-leaked-tokens`, which
+   the dedicated instance's `serviceMonitorSelector` matches — routing the data
+   to it.
+2. The primary's `serviceMonitorNamespaceSelector` is set to exclude this
+   namespace (`NotIn [gh-leaked-tokens]` in `grafana/values.yaml`) — so the
+   size-capped primary never scrapes (and so never evicts) the token series.
 
 Postgres `validation_checks` (append-only) remains the independent
 source-of-truth; this Prometheus is the queryable long-term *view* of it. Even

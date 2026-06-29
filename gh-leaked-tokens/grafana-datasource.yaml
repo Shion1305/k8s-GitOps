@@ -2,11 +2,10 @@
 # as a Grafana datasource so the Token Validity dashboard can query the audit
 # history that the size-capped primary Prometheus would otherwise have evicted.
 #
-# Managed by the grafana app (alongside the primary datasource.yaml) because
-# GrafanaDatasource CRs live in the `grafana` namespace where the operator
-# watches — keeping grafana's namespaced resources under the app whose
-# destination IS that namespace. The URL points cross-namespace at the
-# gh-leaked-tokens Prometheus Service.
+# The CR lives in the `grafana` namespace (where the grafana-operator watches)
+# but is shipped by THIS app, alongside the folder + dashboard — the same
+# pattern clearnet-website-monitoring uses to own its Grafana objects. The URL
+# points cross-namespace at the gh-leaked-tokens Prometheus Service.
 apiVersion: grafana.integreatly.org/v1beta1
 kind: GrafanaDatasource
 metadata:

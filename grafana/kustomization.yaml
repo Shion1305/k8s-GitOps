@@ -7,7 +7,6 @@ resources:
   - grafana.yaml
   - datasource.yaml
   - datasource-loki.yaml
-  - datasource-gh-leaked-tokens.yaml
   - folders.yaml
   - dashboards/kubernetes.yaml
   - dashboards/node-metrics.yaml

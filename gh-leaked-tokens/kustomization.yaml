@@ -10,3 +10,6 @@ resources:
   - prometheus.yaml
   - servicemonitor.yaml
   - cronjob.yaml
+  - grafana-datasource.yaml
+  - grafana-folder.yaml
+  - grafana-dashboard.yaml
