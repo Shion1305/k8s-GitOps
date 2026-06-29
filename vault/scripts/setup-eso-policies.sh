@@ -161,6 +161,20 @@ path "fde-knowledge-engine/metadata/*" {
 EOF
 echo "✓ Created policy: eso-fde-knowledge-engine"
 
+# Policy for gh-leaked-tokens namespace (separate KV v2 engine mounted at gh-leaked-tokens/).
+# Holds the healthchecks.io ping URL for the recheck CronJob (the URL is a
+# capability secret — anyone with it can spoof the dead-man's-switch — so it
+# lives in Vault, not the public k8s-GitOps repo).
+vault policy write eso-gh-leaked-tokens - <<EOF
+path "gh-leaked-tokens/data/*" {
+  capabilities = ["read"]
+}
+path "gh-leaked-tokens/metadata/*" {
+  capabilities = ["read", "list"]
+}
+EOF
+echo "✓ Created policy: eso-gh-leaked-tokens"
+
 # NOTE: An `eso-harbor-broker` role for the Keycloak namespace to read
 # `harbor/broker-credentials` is intentionally NOT created here. There is no
 # precedent yet for ESO-managed broker client secrets in the keycloak ns
@@ -342,6 +356,14 @@ vault write auth/kubernetes/role/eso-fde-knowledge-engine \
   ttl=1h
 echo "✓ Created role: eso-fde-knowledge-engine"
 
+# gh-leaked-tokens
+vault write auth/kubernetes/role/eso-gh-leaked-tokens \
+  bound_service_account_names=eso \
+  bound_service_account_namespaces=gh-leaked-tokens \
+  policies=eso-gh-leaked-tokens \
+  ttl=1h
+echo "✓ Created role: eso-gh-leaked-tokens"
+
 # github-app (cluster-scoped store; binds to the ESO operator SA, not a per-namespace SA)
 vault write auth/kubernetes/role/eso-github-app \
   bound_service_account_names=external-secrets \
@@ -485,6 +507,7 @@ echo "  eso-zot         → SA eso/zot             → zot/data/*"
 echo "  eso-harbor      → SA eso/harbor          → harbor/data/*"
 echo "  eso-nc-press-chotatsu → SA eso/nc-press-chotatsu → nc-press-chotatsu/data/*"
 echo "  eso-fde-knowledge-engine → SA eso/fde-knowledge-engine → fde-knowledge-engine/data/*"
+echo "  eso-gh-leaked-tokens → SA eso/gh-leaked-tokens → gh-leaked-tokens/data/*"
 echo "  eso-github-app  → SA external-secrets/external-secrets → github-app-shared/data/*"
 echo "  eso-cloudflare-grafana → SA eso/monitoring     → cloudflare-grafana/data/*"
 echo "  eso-cluster-puller → SA external-secrets/external-secrets → zot/data/cluster-puller"

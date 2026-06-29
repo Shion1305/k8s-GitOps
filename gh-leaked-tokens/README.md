@@ -28,9 +28,20 @@ the job pushes are not overwritten by the scrape.
 | `namespace.yaml` | `gh-leaked-tokens` namespace |
 | `db-secret-store.yaml` | ESO SecretStore + `eso-db` SA to read the shared-Postgres user secret cross-namespace |
 | `db-external-secret.yaml` | Materializes `DB_URL` (user `research_gh_leaks`, db `research_gh_leaks`) for the in-cluster Postgres Service |
+| `vault-secret-store.yaml` | ESO SecretStore + `eso` SA to read this namespace's Vault KV mount (`gh-leaked-tokens/`) |
+| `healthcheck-external-secret.yaml` | Materializes `HEALTHCHECK_URL` (healthchecks.io ping URL) from Vault |
 | `pushgateway.yaml` | Pushgateway Deployment + PVC + Service |
 | `servicemonitor.yaml` | Tells kube-prometheus-stack to scrape the gateway (`release: kube-prometheus-stack`, `honorLabels: true`) |
 | `cronjob.yaml` | The 15-minute `recheck` job |
+
+## Monitoring the job itself
+
+The recheck CLI pings a [healthchecks.io](https://healthchecks.io) check once at
+the end of each run — the base URL on success, `…/fail` if the metrics push had
+errors. A run that never happens (CronJob broken, image won't pull) or crashes
+before finishing simply never pings, and healthchecks.io alerts on the overdue
+ping. The URL is injected as `$HEALTHCHECK_URL` from Vault (see setup below);
+when unset the ping is a no-op.
 
 ## Image
 
@@ -57,6 +68,15 @@ These are NOT in the repo and must exist before the app syncs cleanly:
    the `:5432` allow-list so the CronJob can reach Postgres. (Synced by the
    shared-postgres app — same repo, but a different ArgoCD Application, so it
    must be applied for the recheck job to connect.)
+4. **Vault healthcheck secret** — the `gh-leaked-tokens/` KV v2 mount, the
+   `eso-gh-leaked-tokens` policy/role, and the ping URL itself must exist:
+   ```sh
+   vault secrets enable -path=gh-leaked-tokens -version=2 kv   # once
+   bash vault/scripts/setup-eso-policies.sh                    # creates policy + role
+   vault kv put gh-leaked-tokens/healthcheck url=https://hc-ping.com/<your-check-uuid>
+   ```
+   Optional: skip all of this and the job still runs — `HEALTHCHECK_URL` is an
+   `optional` secret ref and the CLI no-ops on an empty URL (no ping, no error).
 
 ## Operating
 

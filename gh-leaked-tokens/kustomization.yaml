@@ -4,6 +4,8 @@ resources:
   - namespace.yaml
   - db-secret-store.yaml
   - db-external-secret.yaml
+  - vault-secret-store.yaml
+  - healthcheck-external-secret.yaml
   - pushgateway.yaml
   - servicemonitor.yaml
   - cronjob.yaml
