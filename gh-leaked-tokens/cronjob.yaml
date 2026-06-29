@@ -1,0 +1,119 @@
+# Periodic re-validation of already-known leaked tokens, pushed to Prometheus.
+#
+# Runs `cli.py recheck` every 15 minutes. The image entrypoint applies Alembic
+# migrations first (schema is operator-owned, never created at runtime), then
+# execs the recheck command. recheck re-probes each currently-known token's
+# provider API, records valid→invalid transitions (the moment a leaked token is
+# disabled) to Postgres history, and PUSHES every result to the Pushgateway.
+# Prometheus scrapes the gateway → the gh_token_valid gauge over successive runs
+# becomes the disablement time-series.
+#
+# recheck defaults to --monitoring-only: it re-probes exactly the monitoring
+# targets — every token that has validated at least once (incl. ones since
+# disabled), skipping never-valid tokens — which is precisely the disablement-
+# watch set this job exists to observe. So no selection flag is passed below.
+#
+# Flags:
+#   --workers 8        matches the CLI's RECHECK_WORKERS default (pure I/O wait).
+# Metrics are pushed once at the end of the (seconds-long) run — recheck has no
+# mid-run flusher, and the Pushgateway push replaces the whole per-spec group, so
+# a single final push carries the complete snapshot.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: gh-leaked-tokens-recheck
+  namespace: gh-leaked-tokens
+spec:
+  schedule: "*/15 * * * *"
+  timeZone: "UTC"
+  # Don't stack runs: a slow recheck must finish before the next fires, else two
+  # jobs probe the same tokens and double-push to the gateway. With a 15-minute
+  # period this is the load-shedding valve — a run that overruns its window is
+  # skipped, not queued.
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  # If the controller was down past a scheduled tick, don't fire a late catch-up
+  # run that would race the next on-time one. Kept within the 15-minute period.
+  startingDeadlineSeconds: 600
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      # Hard cap below the 15-minute schedule: a run that can't finish inside its
+      # own window is wedged, not slow — kill it so it releases the Forbid lock
+      # before the next tick instead of starving every subsequent run.
+      activeDeadlineSeconds: 600
+      template:
+        spec:
+          restartPolicy: Never
+          nodeSelector:
+            kubernetes.io/arch: amd64
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            runAsGroup: 10001
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: recheck
+              image: harbor.i.shion1305.com/shion1305/gh-leaked-tokens:latest
+              imagePullPolicy: Always
+              args:
+                # recheck defaults to --monitoring-only (the disablement-watch set:
+                # every token valid at least once, incl. ones since disabled), so no
+                # selection flag is needed here.
+                - recheck
+                - --workers
+                - "8"
+              env:
+                - name: DB_URL
+                  valueFrom:
+                    secretKeyRef:
+                      name: gh-leaked-tokens-db
+                      key: DB_URL
+                # metrics.py reads these three. Pointing at the in-namespace
+                # Pushgateway Service; PROMETHEUS_JOB matches metrics.py's
+                # DEFAULT_JOB so the series name is stable across runs.
+                - name: PROMETHEUS_ENABLED
+                  value: "true"
+                - name: PROMETHEUS_PUSHGATEWAY_URL
+                  value: "http://pushgateway.gh-leaked-tokens.svc.cluster.local:9091"
+                - name: PROMETHEUS_JOB
+                  value: "gh_token_recheck"
+                # healthchecks.io dead-man's-switch URL (from Vault via ESO). Pinged
+                # once at the end of the run. optional:true so the job still runs if the
+                # secret isn't populated yet — the CLI no-ops when the URL is empty.
+                - name: HEALTHCHECK_URL
+                  valueFrom:
+                    secretKeyRef:
+                      name: gh-leaked-tokens-healthcheck
+                      key: HEALTHCHECK_URL
+                      optional: true
+              resources:
+                requests:
+                  cpu: 100m
+                  memory: 256Mi
+                  ephemeral-storage: 256Mi
+                limits:
+                  cpu: 1000m
+                  memory: 1Gi
+                  ephemeral-storage: 1Gi
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: ["ALL"]
+              volumeMounts:
+                # uv writes bytecode caches under $HOME and /tmp at runtime;
+                # readOnlyRootFilesystem needs these writable.
+                - name: tmp
+                  mountPath: /tmp
+                - name: home
+                  mountPath: /home/appuser
+          volumes:
+            - name: tmp
+              emptyDir:
+                sizeLimit: 256Mi
+            - name: home
+              emptyDir:
+                sizeLimit: 256Mi

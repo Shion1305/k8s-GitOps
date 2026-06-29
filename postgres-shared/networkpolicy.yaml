@@ -21,6 +21,7 @@ spec:
               values:
                 - adminer
                 - fde-knowledge-engine
+                - gh-leaked-tokens
                 - harbor
                 - keycloak
                 - langfuse
