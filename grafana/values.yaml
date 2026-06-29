@@ -20,10 +20,24 @@ prometheus:
           resources:
             requests:
               storage: 400Gi
-    # Service discovery settings - discover all ServiceMonitors
+    # Service discovery: scrape every ServiceMonitor EXCEPT those opting out via
+    # the `monitoring-tier: dedicated` label. That label marks series owned by a
+    # dedicated, long-retention Prometheus (e.g. gh-leaked-tokens/prometheus.yaml
+    # for the token-validity audit trail) that this size-capped primary must NOT
+    # also scrape — otherwise its retention eviction would cut the history short.
+    #
+    # This is a GENERIC, namespace-agnostic opt-out: any future workload that
+    # needs its own retention just labels its ServiceMonitor `monitoring-tier:
+    # dedicated` and points a dedicated instance at it; no change here is needed.
+    # NotIn also matches ServiceMonitors that LACK the key (the vast majority),
+    # so they keep being scraped by the primary as before.
     serviceMonitorSelectorNilUsesHelmValues: false
     serviceMonitorNamespaceSelector: {}
-    serviceMonitorSelector: {}
+    serviceMonitorSelector:
+      matchExpressions:
+        - key: monitoring-tier
+          operator: NotIn
+          values: ["dedicated"]
     podMonitorSelectorNilUsesHelmValues: false
     podMonitorNamespaceSelector: {}
     podMonitorSelector: {}

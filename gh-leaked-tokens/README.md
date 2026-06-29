@@ -9,9 +9,9 @@ Prometheus. This is the in-cluster deployment of the `recheck` command from
 A CronJob runs `cli.py recheck` every 15 minutes. For each token already in the
 research DB it re-probes the provider's API, records any **valid → invalid**
 transition (the moment a leaked token gets disabled) to Postgres history, and
-**pushes** every result to a Pushgateway. kube-prometheus-stack scrapes the
-gateway, so the `gh_token_valid` gauge over successive runs becomes the
-token-disablement time-series the report audit trail depends on.
+**pushes** every result to a Pushgateway. A **dedicated long-term Prometheus**
+scrapes the gateway, so the `gh_token_valid` gauge over successive runs becomes
+the token-disablement time-series the report audit trail depends on.
 
 ## Why a Pushgateway
 
@@ -20,6 +20,43 @@ already exited. The job pushes to an always-on Pushgateway (Deployment + PVC for
 persistence across restarts) and Prometheus scrapes that instead. The
 ServiceMonitor sets `honorLabels: true` so the per-token `job`/`instance` labels
 the job pushes are not overwritten by the scrape.
+
+## Why a dedicated long-term Prometheus (not the primary)
+
+Token validity is an **audit trail we must keep for years**. The primary
+kube-prometheus-stack is **size-capped** (`retentionSize` is its real retention
+factor), so its high-churn cluster-wide metrics continuously evict the oldest
+samples — and this audit data would be collateral damage.
+
+So `prometheus.yaml` runs a **separate, tiny Prometheus** scoped to this
+namespace with **time-based retention only (10y), no size cap**. The series
+volume is minuscule (a few per token), so it costs almost nothing while never
+evicting history.
+
+Routing is controlled by a **generic, namespace-agnostic opt-out label**,
+`monitoring-tier: dedicated`, on the ServiceMonitor:
+
+1. The **primary** excludes any SM carrying it — its `serviceMonitorSelector` is
+   `monitoring-tier NotIn [dedicated]` (`grafana/values.yaml`). (Bare-label
+   selection alone wouldn't have worked: the primary previously used an empty
+   `{}` selector that scrapes everything regardless of labels, so an explicit
+   NotIn is what actually keeps it off.)
+2. The **dedicated** instance includes it — `serviceMonitorSelector:
+   monitoring-tier=dedicated`, scoped to this namespace via its
+   `serviceMonitorNamespaceSelector` so it doesn't grab another team's
+   dedicated SM elsewhere.
+
+The win: any future workload that needs its own retention just labels its
+ServiceMonitor `monitoring-tier: dedicated` and points a dedicated instance at
+it — **no edit to the primary is ever needed again** (vs. hard-coding each
+namespace into a `NotIn` list).
+
+Postgres `validation_checks` (append-only) remains the independent
+source-of-truth; this Prometheus is the queryable long-term *view* of it. Even
+if the Prometheus PVC were lost, the audit record in Postgres is intact.
+
+Grafana reads it via a dedicated datasource (`uid: gh-leaked-tokens`, defined in
+`grafana/datasource-gh-leaked-tokens.yaml`).
 
 ## Components
 
@@ -31,8 +68,12 @@ the job pushes are not overwritten by the scrape.
 | `vault-secret-store.yaml` | ESO SecretStore + `eso` SA to read this namespace's Vault KV mount (`gh-leaked-tokens/`) |
 | `healthcheck-external-secret.yaml` | Materializes `HEALTHCHECK_URL` (healthchecks.io ping URL) from Vault |
 | `pushgateway.yaml` | Pushgateway Deployment + PVC + Service |
-| `servicemonitor.yaml` | Tells kube-prometheus-stack to scrape the gateway (`release: kube-prometheus-stack`, `honorLabels: true`) |
+| `prometheus.yaml` | Dedicated long-term Prometheus (10y, no size cap) + SA + ClusterRoleBinding + Service; scrapes only this namespace's gateway |
+| `servicemonitor.yaml` | Points the gateway at the dedicated instance (`prometheus: gh-leaked-tokens`, `honorLabels: true`) |
 | `cronjob.yaml` | The 15-minute `recheck` job |
+
+(The Grafana datasource for the dedicated Prometheus lives in
+`grafana/datasource-gh-leaked-tokens.yaml`, managed by the grafana app.)
 
 ## Monitoring the job itself
 

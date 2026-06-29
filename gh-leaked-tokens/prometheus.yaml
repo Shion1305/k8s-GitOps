@@ -1,0 +1,100 @@
+# Dedicated long-term Prometheus for the leaked-token disablement series.
+#
+# Why a separate instance instead of the primary kube-prometheus-stack:
+# the primary is SIZE-capped (retentionSize 340GB is its real retention factor),
+# so its high-churn cluster-wide metrics continuously evict the oldest samples.
+# Token validity is an AUDIT TRAIL we must keep for years, and it would be
+# collateral damage of that eviction. This instance is the opposite profile:
+# tiny data volume (a handful of series per token), TIME-based retention only
+# (10y), no size cap — so the disablement history is never pushed out.
+#
+# It scrapes ONLY this namespace's Pushgateway: serviceMonitorSelector matches
+# the dedicated `prometheus: gh-leaked-tokens` label (the ServiceMonitor moved
+# off the `release: kube-prometheus-stack` label so the primary no longer scrapes
+# it — see servicemonitor.yaml). Postgres `validation_checks` remains the
+# independent source-of-truth; this instance is the queryable long-term view.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: prometheus
+  namespace: gh-leaked-tokens
+---
+# Reuse the ClusterRole the kube-prometheus-stack operator installs (same
+# approach as atc/prometheus.yaml) — it grants the get/list/watch on
+# endpoints/services/pods that Prometheus needs for target discovery.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: prometheus-gh-leaked-tokens
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: kube-prometheus-stack-prometheus
+subjects:
+  - kind: ServiceAccount
+    name: prometheus
+    namespace: gh-leaked-tokens
+---
+apiVersion: monitoring.coreos.com/v1
+kind: Prometheus
+metadata:
+  name: gh-leaked-tokens
+  namespace: gh-leaked-tokens
+spec:
+  replicas: 1
+  serviceAccountName: prometheus
+  # TIME retention only, deliberately long. No retentionSize → samples are never
+  # evicted by capacity pressure, only by age (10y ≈ keep forever for this use).
+  retention: 3650d
+  # Discover only ServiceMonitors that opt into the dedicated tier
+  # (`monitoring-tier: dedicated`) AND live in THIS namespace. The namespace
+  # scope is what keeps this instance from also grabbing some other namespace's
+  # `monitoring-tier: dedicated` SM — the label is generic on purpose, the
+  # per-instance scoping is done here.
+  serviceMonitorNamespaceSelector:
+    matchLabels:
+      kubernetes.io/metadata.name: gh-leaked-tokens
+  serviceMonitorSelector:
+    matchLabels:
+      monitoring-tier: dedicated
+  resources:
+    requests:
+      cpu: 25m
+      memory: 192Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  storage:
+    volumeClaimTemplate:
+      spec:
+        storageClassName: longhorn-hdd
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          # The series volume is tiny (a few per token); 10Gi holds many years.
+          requests:
+            storage: 10Gi
+  securityContext:
+    fsGroup: 2000
+    runAsGroup: 2000
+    runAsNonRoot: true
+    runAsUser: 1000
+    seccompProfile:
+      type: RuntimeDefault
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: prometheus
+  namespace: gh-leaked-tokens
+  labels:
+    app: gh-leaked-tokens-prometheus
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: prometheus
+    prometheus: gh-leaked-tokens
+  ports:
+    - name: http-web
+      port: 9090
+      targetPort: 9090
