@@ -10,7 +10,11 @@ resources:
   - prometheus.yaml
   - servicemonitor.yaml
   - cronjob.yaml
+  - grafana-db-secret-store.yaml
+  - grafana-db-external-secret.yaml
   - grafana-datasource.yaml
+  - grafana-datasource-postgres.yaml
   - grafana-folder.yaml
   - grafana-dashboard.yaml
   - grafana-dashboard-by-provider.yaml
+  - grafana-dashboard-provider-detail.yaml

@@ -208,3 +208,8 @@ subjects:
   - kind: ServiceAccount
     name: eso-db
     namespace: gh-leaked-tokens
+  # grafana's eso-db reads the same credentials Secret to wire the Postgres
+  # datasource that shows token org/owner enrichment.
+  - kind: ServiceAccount
+    name: eso-db
+    namespace: grafana
