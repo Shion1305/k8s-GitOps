@@ -668,7 +668,7 @@ spec:
                 "type": "prometheus",
                 "uid": "gh-leaked-tokens"
               },
-              "expr": "time() - gh_token_recheck_timestamp_seconds{provider=~\"$provider\", spec_id=~\"$spec_id\"}",
+              "expr": "time() - max by (token) (gh_token_recheck_timestamp_seconds{provider=~\"$provider\", spec_id=~\"$spec_id\"})",
               "format": "table",
               "instant": true,
               "legendFormat": ""
@@ -686,46 +686,25 @@ spec:
               "id": "organize",
               "options": {
                 "excludeByName": {
-                  "Time": true,
                   "Time 1": true,
                   "Time 2": true,
                   "__name__": true,
-                  "__name__ 1": true,
-                  "__name__ 2": true,
                   "job": true,
-                  "job 1": true,
-                  "job 2": true,
                   "instance": true,
-                  "instance 1": true,
-                  "instance 2": true,
                   "namespace": true,
-                  "namespace 1": true,
-                  "namespace 2": true,
                   "pod": true,
-                  "pod 1": true,
-                  "pod 2": true,
                   "service": true,
-                  "service 1": true,
-                  "service 2": true,
                   "endpoint": true,
-                  "endpoint 1": true,
-                  "endpoint 2": true,
-                  "container": true,
-                  "container 1": true,
-                  "container 2": true,
-                  "provider 2": true,
-                  "spec_id 2": true
+                  "container": true
                 },
                 "renameByName": {
-                  "provider 1": "provider",
-                  "spec_id 1": "spec_id",
                   "Value #valid": "status",
                   "Value #lastcheck": "last_check_ago"
                 },
                 "indexByName": {
                   "token": 0,
-                  "provider 1": 1,
-                  "spec_id 1": 2,
+                  "provider": 1,
+                  "spec_id": 2,
                   "token_hash": 3,
                   "leak_level": 4,
                   "impact_level": 5,
