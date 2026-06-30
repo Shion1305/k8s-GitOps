@@ -13,3 +13,4 @@ resources:
   - grafana-datasource.yaml
   - grafana-folder.yaml
   - grafana-dashboard.yaml
+  - grafana-dashboard-by-provider.yaml
