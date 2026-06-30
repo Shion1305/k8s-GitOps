@@ -6,7 +6,7 @@ injector:
 server:
   image:
     repository: hashicorp/vault
-    tag: 2.0.2
+    tag: 2.0.3
   # vault 2.0.1 ships the binary with the cap_ipc_lock file capability, so it
   # refuses to start unless the container is granted IPC_LOCK (mlock keeps
   # secrets out of swap). disable_mlock does not help: the entrypoint fails at
@@ -64,7 +64,7 @@ server:
     name: "vault-unsealer"
   extraContainers:
     - name: unseal-sidecar
-      image: hashicorp/vault:2.0.2
+      image: hashicorp/vault:2.0.3
       securityContext:
         runAsNonRoot: true
         runAsUser: 100
