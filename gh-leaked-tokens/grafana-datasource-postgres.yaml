@@ -24,7 +24,7 @@ spec:
     type: postgres
     access: proxy
     url: postgres-shared.postgres-operator-deployment.svc.cluster.local:5432
-    user: ${user}
+    user: ${username}
     database: research_gh_leaks
     isDefault: false
     editable: true
