@@ -634,6 +634,208 @@ spec:
               "refId": "A"
             }
           ]
+        },
+        {
+          "id": 16,
+          "title": "Token status (per-token table)",
+          "type": "table",
+          "gridPos": {
+            "h": 12,
+            "w": 24,
+            "x": 0,
+            "y": 33
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "gh-leaked-tokens"
+          },
+          "description": "One row per leaked token: current validity, last re-check, and its labels. Filter/sort by any column.",
+          "targets": [
+            {
+              "refId": "valid",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "gh-leaked-tokens"
+              },
+              "expr": "gh_token_valid{provider=~\"$provider\", spec_id=~\"$spec_id\", impact_level=~\"$impact_level\"}",
+              "format": "table",
+              "instant": true,
+              "legendFormat": ""
+            },
+            {
+              "refId": "lastcheck",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "gh-leaked-tokens"
+              },
+              "expr": "time() - max by (token) (gh_token_recheck_timestamp_seconds{provider=~\"$provider\", spec_id=~\"$spec_id\"})",
+              "format": "table",
+              "instant": true,
+              "legendFormat": ""
+            }
+          ],
+          "transformations": [
+            {
+              "id": "joinByField",
+              "options": {
+                "byField": "token",
+                "mode": "outer"
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {
+                  "Time 1": true,
+                  "Time 2": true,
+                  "__name__": true,
+                  "job": true,
+                  "instance": true,
+                  "namespace": true,
+                  "pod": true,
+                  "service": true,
+                  "endpoint": true,
+                  "container": true
+                },
+                "renameByName": {
+                  "Value #valid": "status",
+                  "Value #lastcheck": "last_check_ago"
+                },
+                "indexByName": {
+                  "token": 0,
+                  "provider": 1,
+                  "spec_id": 2,
+                  "token_hash": 3,
+                  "leak_level": 4,
+                  "impact_level": 5,
+                  "has_write_scope": 6,
+                  "has_admin_scope": 7,
+                  "Value #valid": 8,
+                  "Value #lastcheck": 9
+                }
+              }
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "custom": {
+                "align": "auto",
+                "filterable": true
+              }
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "status"
+                },
+                "properties": [
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "type": "value",
+                        "options": {
+                          "1": {
+                            "text": "\ud83d\udfe2 live",
+                            "color": "green",
+                            "index": 0
+                          },
+                          "0": {
+                            "text": "\ud83d\udd34 disabled",
+                            "color": "red",
+                            "index": 1
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "id": "custom.cellOptions",
+                    "value": {
+                      "type": "color-text"
+                    }
+                  },
+                  {
+                    "id": "custom.width",
+                    "value": 110
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "last_check_ago"
+                },
+                "properties": [
+                  {
+                    "id": "unit",
+                    "value": "s"
+                  },
+                  {
+                    "id": "custom.width",
+                    "value": 150
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "has_write_scope"
+                },
+                "properties": [
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "type": "value",
+                        "options": {
+                          "true": {
+                            "text": "\u270d\ufe0f",
+                            "color": "orange",
+                            "index": 0
+                          },
+                          "false": {
+                            "text": "\u00b7",
+                            "index": 1
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "id": "custom.cellOptions",
+                    "value": {
+                      "type": "color-text"
+                    }
+                  },
+                  {
+                    "id": "custom.width",
+                    "value": 90
+                  }
+                ]
+              }
+            ]
+          },
+          "options": {
+            "showHeader": true,
+            "cellHeight": "sm",
+            "sortBy": [
+              {
+                "displayName": "status",
+                "desc": false
+              }
+            ],
+            "footer": {
+              "show": true,
+              "reducer": [
+                "count"
+              ],
+              "fields": [
+                "token"
+              ]
+            }
+          }
         }
       ],
       "__inputs": [],
