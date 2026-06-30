@@ -1,0 +1,36 @@
+apiVersion: grafana.integreatly.org/v1beta1
+kind: GrafanaDatasource
+metadata:
+  name: gh-leaked-tokens-postgres
+  namespace: grafana
+spec:
+  instanceSelector:
+    matchLabels:
+      dashboards: main-grafana
+  valuesFrom:
+    - targetPath: user
+      valueFrom:
+        secretKeyRef:
+          name: gh-leaked-tokens-db-grafana
+          key: username
+    - targetPath: secureJsonData.password
+      valueFrom:
+        secretKeyRef:
+          name: gh-leaked-tokens-db-grafana
+          key: password
+  datasource:
+    uid: gh-leaked-tokens-pg
+    name: GH Leaked Tokens (Postgres)
+    type: postgres
+    access: proxy
+    url: postgres-shared.postgres-operator-deployment.svc.cluster.local:5432
+    user: ${user}
+    database: research_gh_leaks
+    isDefault: false
+    editable: true
+    secureJsonData:
+      password: ${password}
+    jsonData:
+      sslmode: require
+      postgresVersion: 1700
+      timescaledb: false

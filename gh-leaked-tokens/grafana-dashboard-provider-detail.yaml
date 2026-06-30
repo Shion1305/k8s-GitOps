@@ -1,0 +1,1006 @@
+apiVersion: grafana.integreatly.org/v1beta1
+kind: GrafanaDashboard
+metadata:
+  name: gh-leaked-tokens-provider-detail
+  namespace: grafana
+spec:
+  instanceSelector:
+    matchLabels:
+      dashboards: main-grafana
+  folderRef: gh-leaked-tokens
+  datasources:
+    - inputName: DS_GH_LEAKED_TOKENS_PG
+      datasourceName: GH Leaked Tokens (Postgres)
+  resyncPeriod: 5m
+  json: |
+    {
+      "annotations": {
+        "list": []
+      },
+      "editable": true,
+      "graphTooltip": 0,
+      "title": "Token Disablement — Provider Detail (Postgres)",
+      "uid": "gh-leaked-tokens-provider-detail",
+      "tags": [
+        "gh-leaked-tokens"
+      ],
+      "time": {
+        "from": "now-6h",
+        "to": "now"
+      },
+      "templating": {
+        "list": []
+      },
+      "schemaVersion": 39,
+      "panels": [
+        {
+          "type": "row",
+          "id": 1,
+          "title": "github",
+          "collapsed": false,
+          "gridPos": {
+            "h": 1,
+            "w": 24,
+            "x": 0,
+            "y": 0
+          },
+          "panels": []
+        },
+        {
+          "type": "table",
+          "id": 2,
+          "title": "github — leaked accounts",
+          "datasource": {
+            "type": "postgres",
+            "uid": "gh-leaked-tokens-pg"
+          },
+          "gridPos": {
+            "h": 9,
+            "w": 24,
+            "x": 0,
+            "y": 1
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": {
+                "type": "postgres",
+                "uid": "gh-leaked-tokens-pg"
+              },
+              "format": "table",
+              "rawQuery": true,
+              "rawSql": "SELECT\n  a.user_login AS login,\n  a.user_name AS name,\n  a.user_email AS email,\n  a.user_company AS company,\n  (a.raw_profile->>'two_factor_authentication')::bool AS mfa,\n  a.total_repos AS repos,\n  a.private_repos AS private_repos,\n  a.owned_private_repos AS owned_priv,\n  a.org_count AS orgs,\n  a.org_logins AS org_logins,\n  (a.raw_profile#>>'{plan,name}') AS plan,\n  CASE WHEN v.is_valid IS TRUE THEN 'valid'\n       WHEN v.is_valid IS FALSE THEN 'disabled'\n       ELSE 'unknown' END AS status,\n  a.leak_level,\n  COALESCE(a.effective_scopes, v.scopes) AS scopes\nFROM accounts a\nLEFT JOIN validations v\n  ON v.provider = a.provider AND v.token_decoded = a.token_decoded\n\nWHERE a.provider = 'github'\nORDER BY (v.is_valid IS NOT TRUE), a.user_login"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "custom": {
+                "filterable": true,
+                "align": "auto"
+              }
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "status"
+                },
+                "properties": [
+                  {
+                    "id": "custom.cellOptions",
+                    "value": {
+                      "type": "color-text"
+                    }
+                  },
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "type": "value",
+                        "options": {
+                          "valid": {
+                            "color": "red",
+                            "index": 0,
+                            "text": "valid"
+                          },
+                          "disabled": {
+                            "color": "green",
+                            "index": 1,
+                            "text": "disabled"
+                          },
+                          "unknown": {
+                            "color": "text",
+                            "index": 2,
+                            "text": "unknown"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "options": {
+            "showHeader": true,
+            "cellHeight": "sm",
+            "footer": {
+              "show": false
+            }
+          }
+        },
+        {
+          "type": "row",
+          "id": 3,
+          "title": "openai",
+          "collapsed": true,
+          "gridPos": {
+            "h": 1,
+            "w": 24,
+            "x": 0,
+            "y": 10
+          },
+          "panels": [
+            {
+              "type": "table",
+              "id": 4,
+              "title": "openai — leaked accounts",
+              "datasource": {
+                "type": "postgres",
+                "uid": "gh-leaked-tokens-pg"
+              },
+              "gridPos": {
+                "h": 9,
+                "w": 24,
+                "x": 0,
+                "y": 0
+              },
+              "targets": [
+                {
+                  "refId": "A",
+                  "datasource": {
+                    "type": "postgres",
+                    "uid": "gh-leaked-tokens-pg"
+                  },
+                  "format": "table",
+                  "rawQuery": true,
+                  "rawSql": "SELECT\n  a.raw_profile#>>'{me,email}' AS email,\n  a.raw_profile#>>'{me,name}' AS name,\n  a.raw_profile#>>'{me,orgs,data,0,title}' AS org,\n  a.raw_profile#>>'{me,orgs,data,0,role}' AS org_role,\n  (a.raw_profile#>>'{me,mfa_flag_enabled}')::bool AS mfa,\n  jsonb_array_length(COALESCE(a.raw_profile->'models','[]'::jsonb)) AS models,\n  a.raw_profile#>>'{me,has_payg_project_spend_limit}' AS spend_limit,\n  CASE WHEN v.is_valid IS TRUE THEN 'valid'\n       WHEN v.is_valid IS FALSE THEN 'disabled'\n       ELSE 'unknown' END AS status,\n  a.leak_level,\n  COALESCE(a.effective_scopes, v.scopes) AS scopes\nFROM accounts a\nLEFT JOIN validations v\n  ON v.provider = a.provider AND v.token_decoded = a.token_decoded\n\nWHERE a.provider = 'openai'\nORDER BY (v.is_valid IS NOT TRUE), a.user_login"
+                }
+              ],
+              "fieldConfig": {
+                "defaults": {
+                  "custom": {
+                    "filterable": true,
+                    "align": "auto"
+                  }
+                },
+                "overrides": [
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "status"
+                    },
+                    "properties": [
+                      {
+                        "id": "custom.cellOptions",
+                        "value": {
+                          "type": "color-text"
+                        }
+                      },
+                      {
+                        "id": "mappings",
+                        "value": [
+                          {
+                            "type": "value",
+                            "options": {
+                              "valid": {
+                                "color": "red",
+                                "index": 0,
+                                "text": "valid"
+                              },
+                              "disabled": {
+                                "color": "green",
+                                "index": 1,
+                                "text": "disabled"
+                              },
+                              "unknown": {
+                                "color": "text",
+                                "index": 2,
+                                "text": "unknown"
+                              }
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              },
+              "options": {
+                "showHeader": true,
+                "cellHeight": "sm",
+                "footer": {
+                  "show": false
+                }
+              }
+            }
+          ]
+        },
+        {
+          "type": "row",
+          "id": 5,
+          "title": "stripe",
+          "collapsed": true,
+          "gridPos": {
+            "h": 1,
+            "w": 24,
+            "x": 0,
+            "y": 20
+          },
+          "panels": [
+            {
+              "type": "table",
+              "id": 6,
+              "title": "stripe — leaked accounts",
+              "datasource": {
+                "type": "postgres",
+                "uid": "gh-leaked-tokens-pg"
+              },
+              "gridPos": {
+                "h": 9,
+                "w": 24,
+                "x": 0,
+                "y": 0
+              },
+              "targets": [
+                {
+                  "refId": "A",
+                  "datasource": {
+                    "type": "postgres",
+                    "uid": "gh-leaked-tokens-pg"
+                  },
+                  "format": "table",
+                  "rawQuery": true,
+                  "rawSql": "SELECT\n  a.raw_profile->>'id' AS account_id,\n  a.raw_profile->>'email' AS email,\n  a.raw_profile->>'country' AS country,\n  a.raw_profile->>'default_currency' AS currency,\n  a.raw_profile->>'business_type' AS biz_type,\n  (a.raw_profile->>'charges_enabled')::bool AS charges,\n  (a.raw_profile->>'payouts_enabled')::bool AS payouts,\n  (a.raw_profile->>'details_submitted')::bool AS details_done,\n  a.raw_profile#>>'{business_profile,name}' AS business_name,\n  CASE WHEN v.is_valid IS TRUE THEN 'valid'\n       WHEN v.is_valid IS FALSE THEN 'disabled'\n       ELSE 'unknown' END AS status,\n  a.leak_level,\n  COALESCE(a.effective_scopes, v.scopes) AS scopes\nFROM accounts a\nLEFT JOIN validations v\n  ON v.provider = a.provider AND v.token_decoded = a.token_decoded\n\nWHERE a.provider = 'stripe'\nORDER BY (v.is_valid IS NOT TRUE), a.user_login"
+                }
+              ],
+              "fieldConfig": {
+                "defaults": {
+                  "custom": {
+                    "filterable": true,
+                    "align": "auto"
+                  }
+                },
+                "overrides": [
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "status"
+                    },
+                    "properties": [
+                      {
+                        "id": "custom.cellOptions",
+                        "value": {
+                          "type": "color-text"
+                        }
+                      },
+                      {
+                        "id": "mappings",
+                        "value": [
+                          {
+                            "type": "value",
+                            "options": {
+                              "valid": {
+                                "color": "red",
+                                "index": 0,
+                                "text": "valid"
+                              },
+                              "disabled": {
+                                "color": "green",
+                                "index": 1,
+                                "text": "disabled"
+                              },
+                              "unknown": {
+                                "color": "text",
+                                "index": 2,
+                                "text": "unknown"
+                              }
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              },
+              "options": {
+                "showHeader": true,
+                "cellHeight": "sm",
+                "footer": {
+                  "show": false
+                }
+              }
+            }
+          ]
+        },
+        {
+          "type": "row",
+          "id": 7,
+          "title": "slack",
+          "collapsed": true,
+          "gridPos": {
+            "h": 1,
+            "w": 24,
+            "x": 0,
+            "y": 30
+          },
+          "panels": [
+            {
+              "type": "table",
+              "id": 8,
+              "title": "slack — leaked accounts",
+              "datasource": {
+                "type": "postgres",
+                "uid": "gh-leaked-tokens-pg"
+              },
+              "gridPos": {
+                "h": 9,
+                "w": 24,
+                "x": 0,
+                "y": 0
+              },
+              "targets": [
+                {
+                  "refId": "A",
+                  "datasource": {
+                    "type": "postgres",
+                    "uid": "gh-leaked-tokens-pg"
+                  },
+                  "format": "table",
+                  "rawQuery": true,
+                  "rawSql": "SELECT\n  a.raw_profile#>>'{auth_test,team}' AS team,\n  a.raw_profile#>>'{auth_test,user}' AS user,\n  a.raw_profile#>>'{auth_test,url}' AS workspace_url,\n  a.raw_profile#>>'{auth_test,team_id}' AS team_id,\n  (a.raw_profile#>>'{auth_test,is_enterprise_install}')::bool AS enterprise,\n  CASE WHEN a.raw_profile->>'bot_id' IS NOT NULL OR a.raw_profile#>>'{auth_test,bot_id}' IS NOT NULL THEN true ELSE false END AS is_bot,\n  CASE WHEN v.is_valid IS TRUE THEN 'valid'\n       WHEN v.is_valid IS FALSE THEN 'disabled'\n       ELSE 'unknown' END AS status,\n  a.leak_level,\n  COALESCE(a.effective_scopes, v.scopes) AS scopes\nFROM accounts a\nLEFT JOIN validations v\n  ON v.provider = a.provider AND v.token_decoded = a.token_decoded\n\nWHERE a.provider = 'slack'\nORDER BY (v.is_valid IS NOT TRUE), a.user_login"
+                }
+              ],
+              "fieldConfig": {
+                "defaults": {
+                  "custom": {
+                    "filterable": true,
+                    "align": "auto"
+                  }
+                },
+                "overrides": [
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "status"
+                    },
+                    "properties": [
+                      {
+                        "id": "custom.cellOptions",
+                        "value": {
+                          "type": "color-text"
+                        }
+                      },
+                      {
+                        "id": "mappings",
+                        "value": [
+                          {
+                            "type": "value",
+                            "options": {
+                              "valid": {
+                                "color": "red",
+                                "index": 0,
+                                "text": "valid"
+                              },
+                              "disabled": {
+                                "color": "green",
+                                "index": 1,
+                                "text": "disabled"
+                              },
+                              "unknown": {
+                                "color": "text",
+                                "index": 2,
+                                "text": "unknown"
+                              }
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              },
+              "options": {
+                "showHeader": true,
+                "cellHeight": "sm",
+                "footer": {
+                  "show": false
+                }
+              }
+            }
+          ]
+        },
+        {
+          "type": "row",
+          "id": 9,
+          "title": "airtable",
+          "collapsed": true,
+          "gridPos": {
+            "h": 1,
+            "w": 24,
+            "x": 0,
+            "y": 40
+          },
+          "panels": [
+            {
+              "type": "table",
+              "id": 10,
+              "title": "airtable — leaked accounts",
+              "datasource": {
+                "type": "postgres",
+                "uid": "gh-leaked-tokens-pg"
+              },
+              "gridPos": {
+                "h": 9,
+                "w": 24,
+                "x": 0,
+                "y": 0
+              },
+              "targets": [
+                {
+                  "refId": "A",
+                  "datasource": {
+                    "type": "postgres",
+                    "uid": "gh-leaked-tokens-pg"
+                  },
+                  "format": "table",
+                  "rawQuery": true,
+                  "rawSql": "SELECT\n  a.user_login AS login,\n  a.raw_profile->>'id' AS user_id,\n  a.raw_profile->>'email' AS email,\n  CASE WHEN v.is_valid IS TRUE THEN 'valid'\n       WHEN v.is_valid IS FALSE THEN 'disabled'\n       ELSE 'unknown' END AS status,\n  a.leak_level,\n  COALESCE(a.effective_scopes, v.scopes) AS scopes\nFROM accounts a\nLEFT JOIN validations v\n  ON v.provider = a.provider AND v.token_decoded = a.token_decoded\n\nWHERE a.provider = 'airtable'\nORDER BY (v.is_valid IS NOT TRUE), a.user_login"
+                }
+              ],
+              "fieldConfig": {
+                "defaults": {
+                  "custom": {
+                    "filterable": true,
+                    "align": "auto"
+                  }
+                },
+                "overrides": [
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "status"
+                    },
+                    "properties": [
+                      {
+                        "id": "custom.cellOptions",
+                        "value": {
+                          "type": "color-text"
+                        }
+                      },
+                      {
+                        "id": "mappings",
+                        "value": [
+                          {
+                            "type": "value",
+                            "options": {
+                              "valid": {
+                                "color": "red",
+                                "index": 0,
+                                "text": "valid"
+                              },
+                              "disabled": {
+                                "color": "green",
+                                "index": 1,
+                                "text": "disabled"
+                              },
+                              "unknown": {
+                                "color": "text",
+                                "index": 2,
+                                "text": "unknown"
+                              }
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              },
+              "options": {
+                "showHeader": true,
+                "cellHeight": "sm",
+                "footer": {
+                  "show": false
+                }
+              }
+            }
+          ]
+        },
+        {
+          "type": "row",
+          "id": 11,
+          "title": "huggingface",
+          "collapsed": true,
+          "gridPos": {
+            "h": 1,
+            "w": 24,
+            "x": 0,
+            "y": 50
+          },
+          "panels": [
+            {
+              "type": "table",
+              "id": 12,
+              "title": "huggingface — leaked accounts",
+              "datasource": {
+                "type": "postgres",
+                "uid": "gh-leaked-tokens-pg"
+              },
+              "gridPos": {
+                "h": 9,
+                "w": 24,
+                "x": 0,
+                "y": 0
+              },
+              "targets": [
+                {
+                  "refId": "A",
+                  "datasource": {
+                    "type": "postgres",
+                    "uid": "gh-leaked-tokens-pg"
+                  },
+                  "format": "table",
+                  "rawQuery": true,
+                  "rawSql": "SELECT\n  a.raw_profile->>'name' AS username,\n  a.raw_profile->>'fullname' AS fullname,\n  a.raw_profile->>'email' AS email,\n  a.raw_profile->>'type' AS type,\n  (a.raw_profile->>'isPro')::bool AS is_pro,\n  (a.raw_profile->>'canPay')::bool AS can_pay,\n  a.raw_profile->>'billingMode' AS billing,\n  jsonb_array_length(COALESCE(a.raw_profile->'orgs','[]'::jsonb)) AS orgs,\n  a.raw_profile#>>'{auth,accessToken,role}' AS token_role,\n  CASE WHEN v.is_valid IS TRUE THEN 'valid'\n       WHEN v.is_valid IS FALSE THEN 'disabled'\n       ELSE 'unknown' END AS status,\n  a.leak_level,\n  COALESCE(a.effective_scopes, v.scopes) AS scopes\nFROM accounts a\nLEFT JOIN validations v\n  ON v.provider = a.provider AND v.token_decoded = a.token_decoded\n\nWHERE a.provider = 'huggingface'\nORDER BY (v.is_valid IS NOT TRUE), a.user_login"
+                }
+              ],
+              "fieldConfig": {
+                "defaults": {
+                  "custom": {
+                    "filterable": true,
+                    "align": "auto"
+                  }
+                },
+                "overrides": [
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "status"
+                    },
+                    "properties": [
+                      {
+                        "id": "custom.cellOptions",
+                        "value": {
+                          "type": "color-text"
+                        }
+                      },
+                      {
+                        "id": "mappings",
+                        "value": [
+                          {
+                            "type": "value",
+                            "options": {
+                              "valid": {
+                                "color": "red",
+                                "index": 0,
+                                "text": "valid"
+                              },
+                              "disabled": {
+                                "color": "green",
+                                "index": 1,
+                                "text": "disabled"
+                              },
+                              "unknown": {
+                                "color": "text",
+                                "index": 2,
+                                "text": "unknown"
+                              }
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              },
+              "options": {
+                "showHeader": true,
+                "cellHeight": "sm",
+                "footer": {
+                  "show": false
+                }
+              }
+            }
+          ]
+        },
+        {
+          "type": "row",
+          "id": 13,
+          "title": "digitalocean",
+          "collapsed": true,
+          "gridPos": {
+            "h": 1,
+            "w": 24,
+            "x": 0,
+            "y": 60
+          },
+          "panels": [
+            {
+              "type": "table",
+              "id": 14,
+              "title": "digitalocean — leaked accounts",
+              "datasource": {
+                "type": "postgres",
+                "uid": "gh-leaked-tokens-pg"
+              },
+              "gridPos": {
+                "h": 9,
+                "w": 24,
+                "x": 0,
+                "y": 0
+              },
+              "targets": [
+                {
+                  "refId": "A",
+                  "datasource": {
+                    "type": "postgres",
+                    "uid": "gh-leaked-tokens-pg"
+                  },
+                  "format": "table",
+                  "rawQuery": true,
+                  "rawSql": "SELECT\n  a.raw_profile->>'email' AS email,\n  a.raw_profile#>>'{team,name}' AS team,\n  a.raw_profile->>'name' AS name,\n  a.raw_profile->>'status' AS account_status,\n  (a.raw_profile->>'email_verified')::bool AS email_verified,\n  (a.raw_profile->>'droplet_limit')::int AS droplet_limit,\n  (a.raw_profile->>'volume_limit')::int AS volume_limit,\n  a.droplets_count AS droplets,\n  a.databases_count AS databases,\n  a.kubernetes_count AS k8s,\n  CASE WHEN v.is_valid IS TRUE THEN 'valid'\n       WHEN v.is_valid IS FALSE THEN 'disabled'\n       ELSE 'unknown' END AS status,\n  a.leak_level,\n  COALESCE(a.effective_scopes, v.scopes) AS scopes\nFROM accounts a\nLEFT JOIN validations v\n  ON v.provider = a.provider AND v.token_decoded = a.token_decoded\n\nWHERE a.provider = 'digitalocean'\nORDER BY (v.is_valid IS NOT TRUE), a.user_login"
+                }
+              ],
+              "fieldConfig": {
+                "defaults": {
+                  "custom": {
+                    "filterable": true,
+                    "align": "auto"
+                  }
+                },
+                "overrides": [
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "status"
+                    },
+                    "properties": [
+                      {
+                        "id": "custom.cellOptions",
+                        "value": {
+                          "type": "color-text"
+                        }
+                      },
+                      {
+                        "id": "mappings",
+                        "value": [
+                          {
+                            "type": "value",
+                            "options": {
+                              "valid": {
+                                "color": "red",
+                                "index": 0,
+                                "text": "valid"
+                              },
+                              "disabled": {
+                                "color": "green",
+                                "index": 1,
+                                "text": "disabled"
+                              },
+                              "unknown": {
+                                "color": "text",
+                                "index": 2,
+                                "text": "unknown"
+                              }
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              },
+              "options": {
+                "showHeader": true,
+                "cellHeight": "sm",
+                "footer": {
+                  "show": false
+                }
+              }
+            }
+          ]
+        },
+        {
+          "type": "row",
+          "id": 15,
+          "title": "vercel",
+          "collapsed": true,
+          "gridPos": {
+            "h": 1,
+            "w": 24,
+            "x": 0,
+            "y": 70
+          },
+          "panels": [
+            {
+              "type": "table",
+              "id": 16,
+              "title": "vercel — leaked accounts",
+              "datasource": {
+                "type": "postgres",
+                "uid": "gh-leaked-tokens-pg"
+              },
+              "gridPos": {
+                "h": 9,
+                "w": 24,
+                "x": 0,
+                "y": 0
+              },
+              "targets": [
+                {
+                  "refId": "A",
+                  "datasource": {
+                    "type": "postgres",
+                    "uid": "gh-leaked-tokens-pg"
+                  },
+                  "format": "table",
+                  "rawQuery": true,
+                  "rawSql": "SELECT\n  a.raw_profile#>>'{user,username}' AS username,\n  a.raw_profile#>>'{user,email}' AS email,\n  (a.raw_profile#>>'{user,limited}')::bool AS limited,\n  a.raw_profile#>>'{user,version}' AS plan,\n  a.raw_profile#>>'{user,defaultTeamId}' AS team_id,\n  CASE WHEN v.is_valid IS TRUE THEN 'valid'\n       WHEN v.is_valid IS FALSE THEN 'disabled'\n       ELSE 'unknown' END AS status,\n  a.leak_level,\n  COALESCE(a.effective_scopes, v.scopes) AS scopes\nFROM accounts a\nLEFT JOIN validations v\n  ON v.provider = a.provider AND v.token_decoded = a.token_decoded\n\nWHERE a.provider = 'vercel'\nORDER BY (v.is_valid IS NOT TRUE), a.user_login"
+                }
+              ],
+              "fieldConfig": {
+                "defaults": {
+                  "custom": {
+                    "filterable": true,
+                    "align": "auto"
+                  }
+                },
+                "overrides": [
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "status"
+                    },
+                    "properties": [
+                      {
+                        "id": "custom.cellOptions",
+                        "value": {
+                          "type": "color-text"
+                        }
+                      },
+                      {
+                        "id": "mappings",
+                        "value": [
+                          {
+                            "type": "value",
+                            "options": {
+                              "valid": {
+                                "color": "red",
+                                "index": 0,
+                                "text": "valid"
+                              },
+                              "disabled": {
+                                "color": "green",
+                                "index": 1,
+                                "text": "disabled"
+                              },
+                              "unknown": {
+                                "color": "text",
+                                "index": 2,
+                                "text": "unknown"
+                              }
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              },
+              "options": {
+                "showHeader": true,
+                "cellHeight": "sm",
+                "footer": {
+                  "show": false
+                }
+              }
+            }
+          ]
+        },
+        {
+          "type": "row",
+          "id": 17,
+          "title": "notion",
+          "collapsed": true,
+          "gridPos": {
+            "h": 1,
+            "w": 24,
+            "x": 0,
+            "y": 80
+          },
+          "panels": [
+            {
+              "type": "table",
+              "id": 18,
+              "title": "notion — leaked accounts",
+              "datasource": {
+                "type": "postgres",
+                "uid": "gh-leaked-tokens-pg"
+              },
+              "gridPos": {
+                "h": 9,
+                "w": 24,
+                "x": 0,
+                "y": 0
+              },
+              "targets": [
+                {
+                  "refId": "A",
+                  "datasource": {
+                    "type": "postgres",
+                    "uid": "gh-leaked-tokens-pg"
+                  },
+                  "format": "table",
+                  "rawQuery": true,
+                  "rawSql": "SELECT\n  a.raw_profile->>'name' AS name,\n  a.raw_profile->>'type' AS type,\n  a.raw_profile#>>'{bot,owner,type}' AS bot_owner,\n  a.raw_profile#>>'{bot,workspace_name}' AS workspace,\n  CASE WHEN v.is_valid IS TRUE THEN 'valid'\n       WHEN v.is_valid IS FALSE THEN 'disabled'\n       ELSE 'unknown' END AS status,\n  a.leak_level,\n  COALESCE(a.effective_scopes, v.scopes) AS scopes\nFROM accounts a\nLEFT JOIN validations v\n  ON v.provider = a.provider AND v.token_decoded = a.token_decoded\n\nWHERE a.provider = 'notion'\nORDER BY (v.is_valid IS NOT TRUE), a.user_login"
+                }
+              ],
+              "fieldConfig": {
+                "defaults": {
+                  "custom": {
+                    "filterable": true,
+                    "align": "auto"
+                  }
+                },
+                "overrides": [
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "status"
+                    },
+                    "properties": [
+                      {
+                        "id": "custom.cellOptions",
+                        "value": {
+                          "type": "color-text"
+                        }
+                      },
+                      {
+                        "id": "mappings",
+                        "value": [
+                          {
+                            "type": "value",
+                            "options": {
+                              "valid": {
+                                "color": "red",
+                                "index": 0,
+                                "text": "valid"
+                              },
+                              "disabled": {
+                                "color": "green",
+                                "index": 1,
+                                "text": "disabled"
+                              },
+                              "unknown": {
+                                "color": "text",
+                                "index": 2,
+                                "text": "unknown"
+                              }
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              },
+              "options": {
+                "showHeader": true,
+                "cellHeight": "sm",
+                "footer": {
+                  "show": false
+                }
+              }
+            }
+          ]
+        },
+        {
+          "type": "row",
+          "id": 19,
+          "title": "postman",
+          "collapsed": true,
+          "gridPos": {
+            "h": 1,
+            "w": 24,
+            "x": 0,
+            "y": 90
+          },
+          "panels": [
+            {
+              "type": "table",
+              "id": 20,
+              "title": "postman — leaked accounts",
+              "datasource": {
+                "type": "postgres",
+                "uid": "gh-leaked-tokens-pg"
+              },
+              "gridPos": {
+                "h": 9,
+                "w": 24,
+                "x": 0,
+                "y": 0
+              },
+              "targets": [
+                {
+                  "refId": "A",
+                  "datasource": {
+                    "type": "postgres",
+                    "uid": "gh-leaked-tokens-pg"
+                  },
+                  "format": "table",
+                  "rawQuery": true,
+                  "rawSql": "SELECT\n  a.raw_profile#>>'{user,username}' AS username,\n  a.raw_profile#>>'{user,email}' AS email,\n  a.raw_profile#>>'{user,fullName}' AS fullname,\n  a.raw_profile#>>'{user,teamName}' AS team,\n  a.raw_profile#>>'{user,teamDomain}' AS team_domain,\n  (a.raw_profile#>>'{user,emailVerified}')::bool AS email_verified,\n  array_to_string(ARRAY(SELECT jsonb_array_elements_text(a.raw_profile#>'{user,roles}')), ', ') AS roles,\n  CASE WHEN v.is_valid IS TRUE THEN 'valid'\n       WHEN v.is_valid IS FALSE THEN 'disabled'\n       ELSE 'unknown' END AS status,\n  a.leak_level,\n  COALESCE(a.effective_scopes, v.scopes) AS scopes\nFROM accounts a\nLEFT JOIN validations v\n  ON v.provider = a.provider AND v.token_decoded = a.token_decoded\n\nWHERE a.provider = 'postman'\nORDER BY (v.is_valid IS NOT TRUE), a.user_login"
+                }
+              ],
+              "fieldConfig": {
+                "defaults": {
+                  "custom": {
+                    "filterable": true,
+                    "align": "auto"
+                  }
+                },
+                "overrides": [
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "status"
+                    },
+                    "properties": [
+                      {
+                        "id": "custom.cellOptions",
+                        "value": {
+                          "type": "color-text"
+                        }
+                      },
+                      {
+                        "id": "mappings",
+                        "value": [
+                          {
+                            "type": "value",
+                            "options": {
+                              "valid": {
+                                "color": "red",
+                                "index": 0,
+                                "text": "valid"
+                              },
+                              "disabled": {
+                                "color": "green",
+                                "index": 1,
+                                "text": "disabled"
+                              },
+                              "unknown": {
+                                "color": "text",
+                                "index": 2,
+                                "text": "unknown"
+                              }
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              },
+              "options": {
+                "showHeader": true,
+                "cellHeight": "sm",
+                "footer": {
+                  "show": false
+                }
+              }
+            }
+          ]
+        }
+      ]
+    }
