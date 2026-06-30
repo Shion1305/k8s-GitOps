@@ -1,0 +1,501 @@
+# Per-provider drill-down view of the token disablement data. Same dedicated
+# long-term Prometheus datasource as the main dashboard; the `provider` variable
+# is SINGLE-select (no All) so the whole page focuses on one provider at a time.
+apiVersion: grafana.integreatly.org/v1beta1
+kind: GrafanaDashboard
+metadata:
+  name: gh-leaked-tokens-by-provider
+  namespace: grafana
+spec:
+  instanceSelector:
+    matchLabels:
+      dashboards: main-grafana
+  folderRef: gh-leaked-tokens
+  resyncPeriod: 5m
+  json: |
+    {
+      "annotations": {
+        "list": []
+      },
+      "editable": true,
+      "graphTooltip": 1,
+      "title": "Token Disablement \u2014 by Provider",
+      "uid": "gh-leaked-tokens-by-provider",
+      "tags": [
+        "gh-leaked-tokens"
+      ],
+      "timezone": "",
+      "schemaVersion": 39,
+      "version": 1,
+      "time": {
+        "from": "now-30d",
+        "to": "now"
+      },
+      "refresh": "1m",
+      "templating": {
+        "list": [
+          {
+            "name": "provider",
+            "type": "query",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "gh-leaked-tokens"
+            },
+            "query": "label_values(gh_token_valid, provider)",
+            "includeAll": false,
+            "multi": false,
+            "refresh": 2,
+            "current": {
+              "selected": false,
+              "text": "github",
+              "value": "github"
+            }
+          },
+          {
+            "name": "spec_id",
+            "type": "query",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "gh-leaked-tokens"
+            },
+            "query": "label_values(gh_token_valid{provider=\"$provider\"}, spec_id)",
+            "includeAll": true,
+            "multi": true,
+            "refresh": 2,
+            "current": {
+              "selected": true,
+              "text": [
+                "All"
+              ],
+              "value": [
+                "$__all"
+              ]
+            }
+          }
+        ]
+      },
+      "panels": [
+        {
+          "id": 1,
+          "title": "Live tokens",
+          "type": "stat",
+          "gridPos": {
+            "h": 5,
+            "w": 6,
+            "x": 0,
+            "y": 0
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "gh-leaked-tokens"
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "gh-leaked-tokens"
+              },
+              "expr": "sum(gh_token_valid{provider=\"$provider\", spec_id=~\"$spec_id\"} == 1)",
+              "legendFormat": "live"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "thresholds": {
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ]
+            },
+            "colorMode": "value",
+            "graphMode": "area"
+          }
+        },
+        {
+          "id": 2,
+          "title": "Disabled (cumulative)",
+          "type": "stat",
+          "gridPos": {
+            "h": 5,
+            "w": 6,
+            "x": 6,
+            "y": 0
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "gh-leaked-tokens"
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "gh-leaked-tokens"
+              },
+              "expr": "sum(gh_token_disabled_transitions_total{provider=\"$provider\", spec_id=~\"$spec_id\"})",
+              "legendFormat": "disabled"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "thresholds": {
+                "steps": [
+                  {
+                    "color": "blue",
+                    "value": null
+                  },
+                  {
+                    "color": "orange",
+                    "value": 1
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ]
+            },
+            "colorMode": "value",
+            "graphMode": "area"
+          }
+        },
+        {
+          "id": 3,
+          "title": "Newly disabled (24h)",
+          "type": "stat",
+          "gridPos": {
+            "h": 5,
+            "w": 6,
+            "x": 12,
+            "y": 0
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "gh-leaked-tokens"
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "gh-leaked-tokens"
+              },
+              "expr": "sum(increase(gh_token_disabled_transitions_total{provider=\"$provider\", spec_id=~\"$spec_id\"}[24h]))",
+              "legendFormat": "24h"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "thresholds": {
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "red",
+                    "value": 1
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ]
+            },
+            "colorMode": "background",
+            "graphMode": "none"
+          }
+        },
+        {
+          "id": 4,
+          "title": "Live write-capable",
+          "type": "stat",
+          "gridPos": {
+            "h": 5,
+            "w": 6,
+            "x": 18,
+            "y": 0
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "gh-leaked-tokens"
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "gh-leaked-tokens"
+              },
+              "expr": "sum(gh_token_valid{provider=\"$provider\", has_write_scope=\"true\"} == 1)",
+              "legendFormat": "write & live"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "thresholds": {
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "red",
+                    "value": 1
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ]
+            },
+            "colorMode": "background",
+            "graphMode": "none"
+          }
+        },
+        {
+          "id": 5,
+          "title": "Live tokens by spec",
+          "type": "bargauge",
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 5
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "gh-leaked-tokens"
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "gh-leaked-tokens"
+              },
+              "expr": "sum by (spec_id) (gh_token_valid{provider=\"$provider\"} == 1)",
+              "legendFormat": "{{spec_id}}"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "continuous-GrYlRd"
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "displayMode": "gradient",
+            "orientation": "horizontal",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ]
+            }
+          }
+        },
+        {
+          "id": 6,
+          "title": "Live tokens by leak_level",
+          "type": "piechart",
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 5
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "gh-leaked-tokens"
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "gh-leaked-tokens"
+              },
+              "expr": "sum by (leak_level) (gh_token_valid{provider=\"$provider\"} == 1)",
+              "legendFormat": "{{leak_level}}"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {},
+            "overrides": []
+          },
+          "options": {
+            "legend": {
+              "displayMode": "table",
+              "placement": "right",
+              "values": [
+                "value"
+              ]
+            },
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ]
+            }
+          }
+        },
+        {
+          "id": 7,
+          "title": "Disablement events (hourly)",
+          "type": "timeseries",
+          "gridPos": {
+            "h": 7,
+            "w": 24,
+            "x": 0,
+            "y": 13
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "gh-leaked-tokens"
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "gh-leaked-tokens"
+              },
+              "expr": "sum by (spec_id) (increase(gh_token_disabled_transitions_total{provider=\"$provider\", spec_id=~\"$spec_id\"}[1h]))",
+              "legendFormat": "{{spec_id}}"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "custom": {
+                "drawStyle": "bars",
+                "fillOpacity": 60
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": {
+              "displayMode": "table",
+              "placement": "right",
+              "calcs": [
+                "sum"
+              ]
+            },
+            "tooltip": {
+              "mode": "multi"
+            }
+          }
+        },
+        {
+          "id": 8,
+          "title": "Per-token validity (1\u21920 = disablement)",
+          "type": "timeseries",
+          "gridPos": {
+            "h": 11,
+            "w": 24,
+            "x": 0,
+            "y": 20
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "gh-leaked-tokens"
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "gh-leaked-tokens"
+              },
+              "expr": "gh_token_valid{provider=\"$provider\", spec_id=~\"$spec_id\"}",
+              "legendFormat": "{{spec_id}} {{token}} [{{impact_level}}]"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "min": 0,
+              "max": 1,
+              "custom": {
+                "drawStyle": "line",
+                "lineInterpolation": "stepAfter",
+                "lineWidth": 2,
+                "fillOpacity": 15,
+                "pointSize": 7,
+                "showPoints": "always",
+                "spanNulls": true
+              },
+              "mappings": [
+                {
+                  "type": "value",
+                  "options": {
+                    "0": {
+                      "text": "disabled",
+                      "color": "red"
+                    },
+                    "1": {
+                      "text": "live",
+                      "color": "green"
+                    }
+                  }
+                }
+              ]
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": {
+              "displayMode": "table",
+              "placement": "right",
+              "calcs": [
+                "lastNotNull"
+              ]
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          }
+        }
+      ],
+      "__inputs": [],
+      "__requires": []
+    }
