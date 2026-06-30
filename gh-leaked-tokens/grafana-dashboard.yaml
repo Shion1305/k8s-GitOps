@@ -668,7 +668,7 @@ spec:
                 "type": "prometheus",
                 "uid": "gh-leaked-tokens"
               },
-              "expr": "gh_token_recheck_timestamp_seconds{provider=~\"$provider\", spec_id=~\"$spec_id\"}",
+              "expr": "time() - gh_token_recheck_timestamp_seconds{provider=~\"$provider\", spec_id=~\"$spec_id\"}",
               "format": "table",
               "instant": true,
               "legendFormat": ""
@@ -720,7 +720,7 @@ spec:
                   "provider 1": "provider",
                   "spec_id 1": "spec_id",
                   "Value #valid": "status",
-                  "Value #lastcheck": "last_check"
+                  "Value #lastcheck": "last_check_ago"
                 },
                 "indexByName": {
                   "token": 0,
@@ -786,12 +786,12 @@ spec:
               {
                 "matcher": {
                   "id": "byName",
-                  "options": "last_check"
+                  "options": "last_check_ago"
                 },
                 "properties": [
                   {
                     "id": "unit",
-                    "value": "dateTimeFromNow"
+                    "value": "s"
                   },
                   {
                     "id": "custom.width",
