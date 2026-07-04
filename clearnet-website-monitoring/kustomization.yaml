@@ -8,5 +8,9 @@ resources:
   - deployment.yaml
   - service.yaml
   - servicemonitor.yaml
+  - reference-grant.yaml
+  - httproute-internal.yaml
   - grafana-folder.yaml
-  - grafana-dashboard.yaml
+  - grafana-dashboard-pm-fleet.yaml
+  - grafana-dashboard-pm-domain.yaml
+  - grafana-dashboard-pm-host.yaml

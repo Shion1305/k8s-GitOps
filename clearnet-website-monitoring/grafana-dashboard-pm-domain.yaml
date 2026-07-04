@@ -1,0 +1,699 @@
+apiVersion: grafana.integreatly.org/v1beta1
+kind: GrafanaDashboard
+metadata:
+  name: clearnet-website-monitoring-pm-domain
+  namespace: grafana
+spec:
+  instanceSelector:
+    matchLabels:
+      dashboards: main-grafana
+  folderRef: clearnet-website-monitoring
+  resyncPeriod: 5m
+  json: |
+    {
+      "uid": "pm-domain",
+      "title": "pm-domain",
+      "tags": ["clearnet-website-monitoring"],
+      "schemaVersion": 39,
+      "editable": true,
+      "graphTooltip": 0,
+      "refresh": "1m",
+      "time": {
+        "from": "now-24h",
+        "to": "now"
+      },
+      "timezone": "browser",
+      "templating": {
+        "list": [
+          {
+            "name": "domain",
+            "label": "Domain",
+            "type": "query",
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            },
+            "query": "label_values(provider_monitor_last_check_timestamp, domain)",
+            "refresh": 2,
+            "sort": 1,
+            "includeAll": false,
+            "multi": false,
+            "current": {}
+          }
+        ]
+      },
+      "annotations": {
+        "list": [
+          {
+            "builtIn": 1,
+            "datasource": {
+              "type": "grafana",
+              "uid": "-- Grafana --"
+            },
+            "enable": true,
+            "hide": true,
+            "iconColor": "rgba(0, 211, 255, 1)",
+            "name": "Annotations & Alerts",
+            "type": "dashboard"
+          }
+        ]
+      },
+      "panels": [
+        {
+          "id": 100,
+          "type": "row",
+          "title": "Domain: $domain — Header",
+          "collapsed": false,
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+          "panels": []
+        },
+        {
+          "id": 1,
+          "type": "stat",
+          "title": "Last Check",
+          "gridPos": { "h": 4, "w": 5, "x": 0, "y": 1 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "prometheus" },
+              "expr": "provider_monitor_last_check_timestamp{domain=\"$domain\"} * 1000",
+              "instant": true,
+              "legendFormat": "last check",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "dateTimeFromNow",
+              "color": { "mode": "fixed", "fixedColor": "text" }
+            },
+            "overrides": []
+          },
+          "options": {
+            "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+            "colorMode": "none",
+            "graphMode": "none",
+            "justifyMode": "auto",
+            "textMode": "value",
+            "orientation": "auto"
+          }
+        },
+        {
+          "id": 2,
+          "type": "stat",
+          "title": "Domain Reachable",
+          "gridPos": { "h": 4, "w": 5, "x": 5, "y": 1 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "prometheus" },
+              "expr": "provider_monitor_domain_reachable{domain=\"$domain\"}",
+              "instant": true,
+              "legendFormat": "reachable",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "mappings": [
+                { "type": "value", "options": { "0": { "text": "DOWN", "color": "red", "index": 0 } } },
+                { "type": "value", "options": { "1": { "text": "UP", "color": "green", "index": 1 } } }
+              ],
+              "color": { "mode": "thresholds" },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "red", "value": null },
+                  { "color": "green", "value": 1 }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+            "colorMode": "background",
+            "graphMode": "none",
+            "justifyMode": "auto",
+            "textMode": "value",
+            "orientation": "auto"
+          }
+        },
+        {
+          "id": 3,
+          "type": "stat",
+          "title": "Up / Total Hosts",
+          "gridPos": { "h": 4, "w": 5, "x": 10, "y": 1 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "prometheus" },
+              "expr": "provider_monitor_domain_up_host_count{domain=\"$domain\"}",
+              "instant": true,
+              "legendFormat": "up",
+              "refId": "A"
+            },
+            {
+              "datasource": { "type": "prometheus", "uid": "prometheus" },
+              "expr": "provider_monitor_domain_total_host_count{domain=\"$domain\"}",
+              "instant": true,
+              "legendFormat": "total",
+              "refId": "B"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "color": { "mode": "thresholds" },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "text", "value": null }
+                ]
+              }
+            },
+            "overrides": [
+              {
+                "matcher": { "id": "byName", "options": "up" },
+                "properties": [
+                  { "id": "color", "value": { "mode": "fixed", "fixedColor": "green" } }
+                ]
+              }
+            ]
+          },
+          "options": {
+            "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+            "colorMode": "value",
+            "graphMode": "none",
+            "justifyMode": "auto",
+            "textMode": "value_and_name",
+            "orientation": "horizontal"
+          }
+        },
+        {
+          "id": 4,
+          "type": "stat",
+          "title": "NS Count",
+          "gridPos": { "h": 4, "w": 4, "x": 15, "y": 1 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "prometheus" },
+              "expr": "provider_monitor_registrar_ns_count{domain=\"$domain\"}",
+              "instant": true,
+              "legendFormat": "ns count",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "color": { "mode": "fixed", "fixedColor": "text" }
+            },
+            "overrides": []
+          },
+          "options": {
+            "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+            "colorMode": "none",
+            "graphMode": "none",
+            "justifyMode": "auto",
+            "textMode": "value",
+            "orientation": "auto"
+          }
+        },
+        {
+          "id": 5,
+          "type": "text",
+          "title": "Evidence / Screenshots",
+          "gridPos": { "h": 4, "w": 5, "x": 19, "y": 1 },
+          "options": {
+            "mode": "markdown",
+            "content": "### Evidence\n\n[Open change records & screenshots for **$domain** →](https://clearnet-evidence.i.shion1305.com/domain/$domain)\n\nOpens the external evidence viewer (screenshots, diffs, change history)."
+          }
+        },
+        {
+          "id": 200,
+          "type": "row",
+          "title": "WHOIS & Nameservers",
+          "collapsed": false,
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 5 },
+          "panels": []
+        },
+        {
+          "id": 6,
+          "type": "table",
+          "title": "WHOIS Flags",
+          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 6 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "prometheus" },
+              "expr": "provider_monitor_registrar_status{domain=\"$domain\"}",
+              "instant": true,
+              "format": "table",
+              "refId": "A"
+            }
+          ],
+          "transformations": [
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {
+                  "Time": true,
+                  "__name__": true,
+                  "domain": true,
+                  "job": true,
+                  "instance": true,
+                  "Value": true
+                },
+                "indexByName": {},
+                "renameByName": {
+                  "flag": "WHOIS Flag"
+                }
+              }
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {},
+            "overrides": []
+          },
+          "options": {
+            "showHeader": true,
+            "sortBy": [{ "displayName": "WHOIS Flag", "desc": false }]
+          }
+        },
+        {
+          "id": 7,
+          "type": "table",
+          "title": "Nameservers",
+          "gridPos": { "h": 8, "w": 16, "x": 8, "y": 6 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "prometheus" },
+              "expr": "provider_monitor_ns_response_code{domain=\"$domain\"}",
+              "instant": true,
+              "format": "table",
+              "refId": "A"
+            },
+            {
+              "datasource": { "type": "prometheus", "uid": "prometheus" },
+              "expr": "provider_monitor_ns_answers_count{domain=\"$domain\"}",
+              "instant": true,
+              "format": "table",
+              "refId": "B"
+            }
+          ],
+          "transformations": [
+            {
+              "id": "merge",
+              "options": {}
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {
+                  "Time": true,
+                  "__name__": true,
+                  "domain": true,
+                  "job": true,
+                  "instance": true
+                },
+                "indexByName": {
+                  "ns": 0,
+                  "Value #A": 1,
+                  "Value #B": 2
+                },
+                "renameByName": {
+                  "ns": "Nameserver",
+                  "Value #A": "Response Code",
+                  "Value #B": "Answers"
+                }
+              }
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {},
+            "overrides": [
+              {
+                "matcher": { "id": "byName", "options": "Response Code" },
+                "properties": [
+                  {
+                    "id": "mappings",
+                    "value": [
+                      { "type": "value", "options": {
+                        "0":  { "text": "NOERROR",      "color": "green",  "index": 0 },
+                        "1":  { "text": "FORMERR",      "color": "orange", "index": 1 },
+                        "2":  { "text": "SERVFAIL",     "color": "red",    "index": 2 },
+                        "3":  { "text": "NXDOMAIN",     "color": "red",    "index": 3 },
+                        "4":  { "text": "NOTIMP",       "color": "orange", "index": 4 },
+                        "5":  { "text": "REFUSED",      "color": "red",    "index": 5 },
+                        "90": { "text": "ERROR",        "color": "red",    "index": 6 },
+                        "91": { "text": "UNRESOLVABLE", "color": "red",    "index": 7 },
+                        "99": { "text": "UNKNOWN",      "color": "orange", "index": 8 }
+                      } }
+                    ]
+                  },
+                  {
+                    "id": "custom.cellOptions",
+                    "value": { "type": "color-text" }
+                  }
+                ]
+              }
+            ]
+          },
+          "options": {
+            "showHeader": true,
+            "sortBy": [{ "displayName": "Nameserver", "desc": false }]
+          }
+        },
+        {
+          "id": 300,
+          "type": "row",
+          "title": "Per-Host Roll-up",
+          "collapsed": false,
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 14 },
+          "panels": []
+        },
+        {
+          "id": 8,
+          "type": "table",
+          "title": "Hosts",
+          "gridPos": { "h": 10, "w": 24, "x": 0, "y": 15 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "prometheus" },
+              "expr": "max by (domain, ip) (provider_monitor_host_state{domain=\"$domain\"})",
+              "instant": true,
+              "format": "table",
+              "refId": "A"
+            },
+            {
+              "datasource": { "type": "prometheus", "uid": "prometheus" },
+              "expr": "provider_monitor_host_http_status{domain=\"$domain\"}",
+              "instant": true,
+              "format": "table",
+              "refId": "B"
+            },
+            {
+              "datasource": { "type": "prometheus", "uid": "prometheus" },
+              "expr": "provider_monitor_host_phash_distance{domain=\"$domain\"} != -1",
+              "instant": true,
+              "format": "table",
+              "refId": "C"
+            },
+            {
+              "datasource": { "type": "prometheus", "uid": "prometheus" },
+              "expr": "provider_monitor_host_text_similarity{domain=\"$domain\"} != -1",
+              "instant": true,
+              "format": "table",
+              "refId": "D"
+            },
+            {
+              "datasource": { "type": "prometheus", "uid": "prometheus" },
+              "expr": "provider_monitor_host_cert_match{domain=\"$domain\"}",
+              "instant": true,
+              "format": "table",
+              "refId": "E"
+            },
+            {
+              "datasource": { "type": "prometheus", "uid": "prometheus" },
+              "expr": "provider_monitor_host_cert_expiry_timestamp{domain=\"$domain\"} * 1000",
+              "instant": true,
+              "format": "table",
+              "refId": "F"
+            }
+          ],
+          "transformations": [
+            {
+              "id": "merge",
+              "options": {}
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {
+                  "Time": true,
+                  "__name__": true,
+                  "domain": true,
+                  "job": true,
+                  "instance": true
+                },
+                "indexByName": {
+                  "ip": 0,
+                  "Value #A": 1,
+                  "Value #B": 2,
+                  "Value #C": 3,
+                  "Value #D": 4,
+                  "Value #E": 5,
+                  "Value #F": 6
+                },
+                "renameByName": {
+                  "ip": "IP",
+                  "Value #A": "State",
+                  "Value #B": "HTTP Status",
+                  "Value #C": "pHash Dist",
+                  "Value #D": "Text Sim",
+                  "Value #E": "Cert Match",
+                  "Value #F": "Cert Expiry"
+                }
+              }
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {},
+            "overrides": [
+              {
+                "matcher": { "id": "byName", "options": "IP" },
+                "properties": [
+                  {
+                    "id": "links",
+                    "value": [
+                      {
+                        "title": "Host drilldown (D3)",
+                        "url": "/d/pm-host/pm-host?var-domain=$domain&var-ip=${__value.text}&${__url_time_range}",
+                        "targetBlank": false
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "matcher": { "id": "byName", "options": "State" },
+                "properties": [
+                  {
+                    "id": "mappings",
+                    "value": [
+                      { "type": "value", "options": {
+                        "2": { "text": "up",    "color": "green",  "index": 0 },
+                        "1": { "text": "DOWN",  "color": "red",    "index": 1 },
+                        "0": { "text": "DEREG", "color": "orange", "index": 2 }
+                      } }
+                    ]
+                  },
+                  { "id": "custom.cellOptions", "value": { "type": "color-background", "mode": "basic" } }
+                ]
+              },
+              {
+                "matcher": { "id": "byName", "options": "Cert Match" },
+                "properties": [
+                  {
+                    "id": "mappings",
+                    "value": [
+                      { "type": "value", "options": {
+                        "0": { "text": "NO",  "color": "red",   "index": 0 },
+                        "1": { "text": "YES", "color": "green", "index": 1 }
+                      } }
+                    ]
+                  },
+                  { "id": "custom.cellOptions", "value": { "type": "color-text" } }
+                ]
+              },
+              {
+                "matcher": { "id": "byName", "options": "Cert Expiry" },
+                "properties": [
+                  { "id": "unit", "value": "dateTimeFromNow" }
+                ]
+              },
+              {
+                "matcher": { "id": "byName", "options": "pHash Dist" },
+                "properties": [
+                  { "id": "unit", "value": "short" },
+                  {
+                    "id": "thresholds",
+                    "value": {
+                      "mode": "absolute",
+                      "steps": [
+                        { "color": "green", "value": null },
+                        { "color": "red", "value": 10 }
+                      ]
+                    }
+                  },
+                  { "id": "custom.cellOptions", "value": { "type": "color-text" } }
+                ]
+              },
+              {
+                "matcher": { "id": "byName", "options": "Text Sim" },
+                "properties": [
+                  { "id": "unit", "value": "short" },
+                  { "id": "decimals", "value": 3 },
+                  {
+                    "id": "thresholds",
+                    "value": {
+                      "mode": "absolute",
+                      "steps": [
+                        { "color": "red", "value": null },
+                        { "color": "green", "value": 0.7 }
+                      ]
+                    }
+                  },
+                  { "id": "custom.cellOptions", "value": { "type": "color-text" } }
+                ]
+              },
+              {
+                "matcher": { "id": "byName", "options": "HTTP Status" },
+                "properties": [
+                  { "id": "unit", "value": "short" }
+                ]
+              }
+            ]
+          },
+          "options": {
+            "showHeader": true,
+            "cellHeight": "sm",
+            "sortBy": [{ "displayName": "IP", "desc": false }]
+          }
+        },
+        {
+          "id": 400,
+          "type": "row",
+          "title": "Divergence & Anomalies",
+          "collapsed": false,
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 25 },
+          "panels": []
+        },
+        {
+          "id": 9,
+          "type": "state-timeline",
+          "title": "Divergence over time (registrar / ns / host / cert changed)",
+          "gridPos": { "h": 8, "w": 16, "x": 0, "y": 26 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "prometheus" },
+              "expr": "provider_monitor_registrar_changed{domain=\"$domain\"}",
+              "legendFormat": "registrar",
+              "refId": "A"
+            },
+            {
+              "datasource": { "type": "prometheus", "uid": "prometheus" },
+              "expr": "provider_monitor_ns_changed{domain=\"$domain\"}",
+              "legendFormat": "ns",
+              "refId": "B"
+            },
+            {
+              "datasource": { "type": "prometheus", "uid": "prometheus" },
+              "expr": "provider_monitor_host_changed{domain=\"$domain\"}",
+              "legendFormat": "host",
+              "refId": "C"
+            },
+            {
+              "datasource": { "type": "prometheus", "uid": "prometheus" },
+              "expr": "provider_monitor_host_cert_changed{domain=\"$domain\"}",
+              "legendFormat": "cert",
+              "refId": "D"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "mappings": [
+                { "type": "value", "options": {
+                  "0": { "text": "same",    "color": "green", "index": 0 },
+                  "1": { "text": "CHANGED", "color": "red",   "index": 1 }
+                } }
+              ],
+              "color": { "mode": "thresholds" },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "red", "value": 1 }
+                ]
+              },
+              "custom": { "fillOpacity": 80, "lineWidth": 0 }
+            },
+            "overrides": []
+          },
+          "options": {
+            "mergeValues": true,
+            "showValue": "never",
+            "alignValue": "left",
+            "rowHeight": 0.9,
+            "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true },
+            "tooltip": { "mode": "single", "sort": "none" }
+          }
+        },
+        {
+          "id": 10,
+          "type": "table",
+          "title": "Reachable but NO cert (host_state==2 without cert expiry)",
+          "gridPos": { "h": 8, "w": 8, "x": 16, "y": 26 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "prometheus" },
+              "expr": "provider_monitor_host_state{domain=\"$domain\"} == 2 unless on(domain, ip) provider_monitor_host_cert_expiry_timestamp",
+              "instant": true,
+              "format": "table",
+              "refId": "A"
+            }
+          ],
+          "transformations": [
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {
+                  "Time": true,
+                  "__name__": true,
+                  "domain": true,
+                  "job": true,
+                  "instance": true,
+                  "origin": true,
+                  "Value": true
+                },
+                "indexByName": {
+                  "ip": 0
+                },
+                "renameByName": {
+                  "ip": "IP (up, no cert)"
+                }
+              }
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {},
+            "overrides": [
+              {
+                "matcher": { "id": "byName", "options": "IP (up, no cert)" },
+                "properties": [
+                  {
+                    "id": "links",
+                    "value": [
+                      {
+                        "title": "Host drilldown (D3)",
+                        "url": "/d/pm-host/pm-host?var-domain=$domain&var-ip=${__value.text}&${__url_time_range}",
+                        "targetBlank": false
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "options": {
+            "showHeader": true
+          }
+        }
+      ]
+    }

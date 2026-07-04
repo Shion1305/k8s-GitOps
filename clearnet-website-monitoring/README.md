@@ -60,14 +60,28 @@ Lines starting with `#` and blank lines are ignored by the exporter.
 ## State persistence
 
 The exporter writes baselines and round snapshots under
-`/app/out/provider_monitor`, backed by a 5 Gi Longhorn PVC
+`/app/out/provider_monitor`, backed by a 20 Gi Longhorn PVC
 (`clearnet-website-monitoring-data`). Without persistence the first round
 after a Pod restart re-baselines every domain and the `*_changed` diff
 metrics report spurious zeros until enough history accumulates.
 
 ## Dashboards
 
-A `GrafanaDashboard` CR (`grafana-dashboard.yaml`) wires the "Clearnet
-Website Monitoring" dashboard into the main Grafana instance under the
-"Clearnet Website Monitoring" folder. Available at
-<https://o11y.shion1305.com/grafana>.
+Three `GrafanaDashboard` CRs wire the monitoring views into the main Grafana
+instance under the "Clearnet Website Monitoring" folder:
+
+- `pm-fleet`: fleet triage across all domains
+- `pm-domain`: per-domain investigation
+- `pm-host`: per-host evidence and drift detail
+
+Available at <https://o11y.shion1305.com/grafana>.
+
+## Evidence viewer
+
+The exporter Pod also runs a read-only `viewer` sidecar from the same image.
+It mounts the data PVC read-only and serves screenshots plus change-record
+diff details from `/app/out/provider_monitor`.
+
+The viewer is exposed only through the internal Gateway at
+<https://clearnet-evidence.i.shion1305.com>. Grafana evidence links point to
+that hostname.
