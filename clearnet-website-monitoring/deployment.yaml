@@ -63,6 +63,47 @@ spec:
               port: 9877
             initialDelaySeconds: 30
             periodSeconds: 30
+        - name: viewer
+          image: harbor.i.shion1305.com/shion1305/provider-monitor:latest
+          imagePullPolicy: Always
+          command:
+            - uv
+            - run
+            - provider-monitor
+            - view
+            - --output-root
+            - /app/out/provider_monitor
+            - --host
+            - 0.0.0.0
+            - --port
+            - "8081"
+          ports:
+            - containerPort: 8081
+              name: viewer
+              protocol: TCP
+          volumeMounts:
+            - name: data
+              mountPath: /app/out/provider_monitor
+              readOnly: true
+          resources:
+            requests:
+              cpu: 25m
+              memory: 128Mi
+            limits:
+              cpu: 250m
+              memory: 512Mi
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 8081
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8081
+            initialDelaySeconds: 15
+            periodSeconds: 30
       volumes:
         # Materialized from Vault by ESO
         # (clearnet-website-monitoring/domains). The domains list is kept
