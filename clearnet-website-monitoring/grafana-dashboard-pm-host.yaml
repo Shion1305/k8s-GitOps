@@ -28,7 +28,30 @@ spec:
       "fiscalYearStartMonth": 0,
       "graphTooltip": 1,
       "id": null,
-      "links": [],
+      "links": [
+        {
+          "asDropdown": false,
+          "icon": "external link",
+          "includeVars": false,
+          "keepTime": false,
+          "tags": [],
+          "targetBlank": true,
+          "title": "Evidence viewer",
+          "tooltip": "Screenshots & change records for this host (opens in a new tab)",
+          "type": "link",
+          "url": "https://clearnet-evidence.i.shion1305.com/domain/$domain?ip=$ip"
+        },
+        {
+          "asDropdown": false,
+          "icon": "external link",
+          "includeVars": false,
+          "keepTime": true,
+          "tags": ["clearnet-website-monitoring"],
+          "targetBlank": false,
+          "title": "Monitoring dashboards",
+          "type": "dashboards"
+        }
+      ],
       "liveNow": false,
       "panels": [
         {

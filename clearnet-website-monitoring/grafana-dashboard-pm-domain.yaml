@@ -16,6 +16,30 @@ spec:
       "tags": ["clearnet-website-monitoring"],
       "schemaVersion": 39,
       "editable": true,
+      "links": [
+        {
+          "asDropdown": false,
+          "icon": "external link",
+          "includeVars": false,
+          "keepTime": false,
+          "tags": [],
+          "targetBlank": true,
+          "title": "Evidence viewer",
+          "tooltip": "Screenshots & change records (opens in a new tab)",
+          "type": "link",
+          "url": "https://clearnet-evidence.i.shion1305.com/domain/$domain"
+        },
+        {
+          "asDropdown": false,
+          "icon": "external link",
+          "includeVars": false,
+          "keepTime": true,
+          "tags": ["clearnet-website-monitoring"],
+          "targetBlank": false,
+          "title": "Monitoring dashboards",
+          "type": "dashboards"
+        }
+      ],
       "graphTooltip": 0,
       "refresh": "1m",
       "time": {
@@ -227,8 +251,8 @@ spec:
           "title": "Evidence / Screenshots",
           "gridPos": { "h": 4, "w": 5, "x": 19, "y": 1 },
           "options": {
-            "mode": "markdown",
-            "content": "### Evidence\n\n[Open change records & screenshots for **$domain** →](https://clearnet-evidence.i.shion1305.com/domain/$domain)\n\nOpens the external evidence viewer (screenshots, diffs, change history)."
+            "mode": "html",
+            "content": "<div style=\"padding:8px 4px; font-size:14px; line-height:1.6\">\n<p>Open change records &amp; screenshots for <code>$domain</code>:</p>\n<p><a href=\"https://clearnet-evidence.i.shion1305.com/domain/$domain\" target=\"_blank\" rel=\"noopener\" style=\"font-weight:600\">→ Evidence viewer</a></p>\n<p style=\"opacity:0.7; font-size:12px\">Screenshots, diffs and change history are served by a separate viewer, not embedded here.</p>\n</div>"
           }
         },
         {

@@ -36,6 +36,18 @@ spec:
           "asDropdown": false,
           "icon": "external link",
           "includeVars": false,
+          "keepTime": false,
+          "tags": [],
+          "targetBlank": true,
+          "title": "Evidence viewer",
+          "tooltip": "Screenshots & change records for all domains (opens in a new tab)",
+          "type": "link",
+          "url": "https://clearnet-evidence.i.shion1305.com/"
+        },
+        {
+          "asDropdown": false,
+          "icon": "external link",
+          "includeVars": false,
           "keepTime": true,
           "tags": [
             "clearnet-website-monitoring"
