@@ -36,6 +36,23 @@ spec:
             # single Pod can comfortably finish a round.
             - name: PROVIDER_MONITOR_INTERVAL
               value: "3600"
+            # Browserbase-flagged targets (browserbase-crawl: true in
+            # targets.yaml) crawl on this slower cadence (4h) because Browserbase
+            # sessions are a limited paid resource.
+            - name: PROVIDER_MONITOR_BROWSERBASE_INTERVAL
+              value: "14400"
+            # Browserbase credentials (materialized from Vault by ESO). Optional
+            # to the exporter — domains without browserbase-crawl never touch it.
+            - name: BROWSERBASE_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: clearnet-website-monitoring-browserbase
+                  key: BROWSERBASE_API_KEY
+            - name: BROWSERBASE_PROJECT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: clearnet-website-monitoring-browserbase
+                  key: BROWSERBASE_PROJECT_ID
           volumeMounts:
             - name: domains
               mountPath: /data
