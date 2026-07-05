@@ -5,6 +5,7 @@ resources:
   - pvc.yaml
   - vault-secret-store.yaml
   - external-secret.yaml
+  - external-secret-browserbase.yaml
   - deployment.yaml
   - service.yaml
   - servicemonitor.yaml
