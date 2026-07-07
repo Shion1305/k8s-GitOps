@@ -17,9 +17,15 @@ spec:
         - name: postgres-mcp
           image: crystaldba/postgres-mcp:latest
           imagePullPolicy: Always
+          # SECURITY: restricted mode (read-only SQL with safety checks).
+          # This service injects the shared superuser DSN and is reachable from
+          # the openwebui namespace; unrestricted mode made it a write-capable,
+          # audit-free path into production data that also bypasses the research
+          # holdout law. Follow-up (tracked): a dedicated read-only DB role that
+          # excludes market-data tables, and a pinned image tag.
           args:
             - "--transport=sse"
-            - "--access-mode=unrestricted"
+            - "--access-mode=restricted"
           ports:
             - containerPort: 8000
               name: http
