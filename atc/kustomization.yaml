@@ -18,6 +18,8 @@ resources:
   - external-secret.yaml
   - deployment-gmocoin-exec-alert.yaml
   - seaweedfs-external-secret.yaml
+  - etl-s3-external-secret.yaml
+  - cronjob-orderbook-s3-export.yaml
   - seaweedfs-statefulset.yaml
   - seaweedfs-service.yaml
   - seaweedfs-httproute.yaml
