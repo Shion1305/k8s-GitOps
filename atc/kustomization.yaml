@@ -12,11 +12,14 @@ resources:
   - grafana-deployment.yaml
   - grafana-service.yaml
   - grafana-httproute.yaml
+  - atc-dashboard-service.yaml
+  - atc-dashboard-httproute.yaml
   - prometheus.yaml
   - prometheus-httproute.yaml
   - vault-secret-store.yaml
   - external-secret.yaml
   - deployment-gmocoin-exec-alert.yaml
+  - atc-dashboard-deployment.yaml
   - seaweedfs-external-secret.yaml
   - etl-s3-external-secret.yaml
   - cronjob-orderbook-s3-export.yaml
