@@ -27,7 +27,7 @@ spec:
       automountServiceAccountToken: false
       containers:
         - name: buildkitd
-          image: moby/buildkit:v0.30.0-rootless
+          image: moby/buildkit:v0.31.1-rootless
           args:
             # Local socket plus an unauthenticated TCP listener. The TCP port is
             # only reachable from the runner-pods namespace (see networkpolicy.yaml).
