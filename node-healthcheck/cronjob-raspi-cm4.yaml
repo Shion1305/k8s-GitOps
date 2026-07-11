@@ -32,7 +32,7 @@ spec:
                           - shion-raspi-cm4
           containers:
             - name: ping
-              image: curlimages/curl:8.20.0
+              image: curlimages/curl:8.21.0
               command: ["/bin/sh", "/scripts/healthcheck.sh"]
               env:
                 - name: HEALTHCHECK_URL
