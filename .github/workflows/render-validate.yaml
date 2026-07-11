@@ -38,7 +38,7 @@ jobs:
       - name: Install Helm
         uses: azure/setup-helm@v5
         with:
-          version: v3.16.4
+          version: v4.2.3
 
       # kustomize, kubeconform, yq and jq are pinned in aqua.yaml so the
       # local dev toolchain and CI run identical versions.
