@@ -39,7 +39,7 @@ jobs:
       #
       # crane is installed via aqua so the local toolchain (aqua.yaml) and CI
       # use the exact same pinned version.
-      - uses: aquaproj/aqua-installer@v4.0.4
+      - uses: aquaproj/aqua-installer@v4.0.5
         with:
           aqua_version: v2.59.1
 
