@@ -168,7 +168,7 @@ runs:
     # aqua_opts `-l -a`: `-a` triggers installAll which actually consumes
     # AQUA_GLOBAL_CONFIG; `-l` alone (the installer default) only links
     # aqua-proxy and skips package installs.
-    - uses: aquaproj/aqua-installer@v4.0.4
+    - uses: aquaproj/aqua-installer@v4.0.5
       with:
         aqua_version: v2.59.1
         aqua_opts: -l -a
