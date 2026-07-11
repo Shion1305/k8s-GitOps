@@ -3,6 +3,13 @@ kind: Application
 metadata:
   name: atc
   namespace: argocd
+  annotations:
+    # This Application is being migrated to be managed directly against its own
+    # repo (crypto-auto-trading/infra/k8s). Prune=false tells the root-app
+    # (app-of-apps) NOT to delete this Application when a follow-up PR removes its
+    # entry from apps/ — so the live App (and its resources) survive the removal
+    # and can be handed off to crypto-auto-trading management instead of being pruned.
+    argocd.argoproj.io/sync-options: Prune=false
 spec:
   project: default
   source:
