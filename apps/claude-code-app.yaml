@@ -8,7 +8,7 @@ spec:
   sources:
     - repoURL: https://open-telemetry.github.io/opentelemetry-helm-charts
       chart: opentelemetry-collector
-      targetRevision: 0.158.2
+      targetRevision: 0.165.0
       helm:
         releaseName: claude-code
         valueFiles:
