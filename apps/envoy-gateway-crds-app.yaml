@@ -18,7 +18,7 @@ spec:
   # apps/envoy-gateway-app.yaml.
   source:
     repoURL: https://github.com/envoyproxy/gateway.git
-    targetRevision: v1.8.1
+    targetRevision: v1.8.2
     path: charts/gateway-helm/charts/crds/crds/generated
   destination:
     server: https://kubernetes.default.svc
