@@ -15,7 +15,7 @@ spec:
       restartPolicy: OnFailure
       initContainers:
         - name: download-garm-cli
-          image: curlimages/curl:8.20.0
+          image: curlimages/curl:8.21.0
           imagePullPolicy: IfNotPresent
           securityContext:
             runAsUser: 0
@@ -36,7 +36,7 @@ spec:
               mountPath: /opt/garm/bin
       containers:
         - name: init
-          image: curlimages/curl:8.20.0
+          image: curlimages/curl:8.21.0
           imagePullPolicy: IfNotPresent
           securityContext:
             runAsUser: 0
