@@ -1,0 +1,24 @@
+# Persistent wheel cache for proxpi. proxpi caches downloaded files under
+# PROXPI_CACHE_DIR (an LRU bounded by PROXPI_CACHE_SIZE); without a PVC that
+# cache lives in the container's /tmp and is lost on every restart, so each cold
+# start would re-fetch every wheel from PyPI over the WAN -- defeating the point.
+# A single RWO volume is correct: proxpi runs as one replica (a shared cache with
+# one writer; scaling out would need RWX + coordination we don't want here).
+#
+# longhorn-hdd: the workload is bandwidth-bound bulk wheel storage, not latency-
+# sensitive, so HDD-class replicated storage is the right cost/durability point
+# (matches mlflow-artifacts). 20Gi comfortably holds the ATC dependency closure
+# (pyarrow/scipy/polars/numpy/marimo/... ~a few hundred MB per Python/platform)
+# with headroom; proxpi's LRU evicts against PROXPI_CACHE_SIZE below this.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: proxpi-cache
+  namespace: pypi-cache
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: longhorn-hdd
+  resources:
+    requests:
+      storage: 20Gi
