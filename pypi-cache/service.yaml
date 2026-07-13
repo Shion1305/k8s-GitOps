@@ -1,0 +1,20 @@
+# Stable in-cluster endpoint for proxpi. The CI runner image bakes
+# UV_DEFAULT_INDEX=http://proxpi.pypi-cache.svc.cluster.local:5000/index/ , so
+# this Service name/port is part of the contract -- do not rename without
+# updating Dockerfile.ci-runner in crypto-auto-trading.
+apiVersion: v1
+kind: Service
+metadata:
+  name: proxpi
+  namespace: pypi-cache
+  labels:
+    app.kubernetes.io/name: proxpi
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: proxpi
+  ports:
+    - name: http
+      port: 5000
+      targetPort: http
+      protocol: TCP

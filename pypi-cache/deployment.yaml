@@ -1,0 +1,109 @@
+# proxpi -- a lightweight pull-through PyPI proxy that caches wheels in-cluster.
+#
+# WHY (and why not a plain nginx proxy): PyPI's simple API returns ABSOLUTE wheel
+# URLs on files.pythonhosted.org, so a naive reverse-proxy of just the index host
+# would serve the index but let the client fetch wheels straight from PyPI --
+# uncached. proxpi rewrites those file URLs to route through itself
+# (/index/<pkg>/<file>) and caches the bytes, which is exactly what makes the
+# cache effective. devpi does the same but has no official image and needs
+# index/user init; proxpi is a single Flask/gunicorn process purpose-built for
+# this, so it's the minimal fit.
+#
+# WHO USES IT: this repo's CI runner image (crypto-auto-trading-ci) bakes
+# UV_DEFAULT_INDEX=http://proxpi.pypi-cache.svc.cluster.local:5000/index/ , so
+# `uv sync` resolves + downloads wheels through here with ZERO per-repo workflow
+# edits. Lockfile integrity is preserved: proxpi returns byte-identical upstream
+# wheels, so the hashes pinned in uv.lock still match. First fetch of a wheel goes
+# to PyPI (WAN) and is cached to the PVC; every subsequent pull -- across pods and
+# across CI jobs -- is served from the LAN.
+#
+# This is a NEW, self-contained component. It does NOT touch the shared
+# github-actions-runner config; runner pods reach it as an ordinary in-cluster
+# Service (their namespace has no egress default-deny blocking it).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: proxpi
+  namespace: pypi-cache
+  labels:
+    app.kubernetes.io/name: proxpi
+spec:
+  replicas: 1
+  # RWO PVC with a single writer: never run two proxpi pods against the same
+  # volume. Recreate (not RollingUpdate) so the old pod releases the PVC before
+  # the new one attaches, avoiding a multi-attach stall on longhorn.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: proxpi
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: proxpi
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: proxpi
+          # Pinned by digest (epicwink/proxpi:latest at time of writing). Docker
+          # Hub is the only distribution channel for this image; a Harbor
+          # docker.io proxy-cache project could front it later, but the digest
+          # pin already makes the pull reproducible.
+          image: epicwink/proxpi@sha256:7f8dce8778b7d4634c1e35d6f8d99f366e83dc60721ffc8f45893d19afcc5a90
+          imagePullPolicy: IfNotPresent
+          args:
+            - --bind
+            - 0.0.0.0:5000
+            - --threads
+            - "4"
+            - --no-control-socket
+          env:
+            # Persist the wheel cache on the PVC (default is an ephemeral /tmp dir).
+            - name: PROXPI_CACHE_DIR
+              value: /var/cache/proxpi
+            # LRU ceiling in bytes; keep below the 20Gi PVC so proxpi evicts
+            # before longhorn fills. 16 GiB.
+            - name: PROXPI_CACHE_SIZE
+              value: "17179869184"
+            # Re-check the simple index this often (seconds). 30 min balances
+            # picking up new releases against hammering PyPI for the index.
+            - name: PROXPI_INDEX_TTL
+              value: "1800"
+          ports:
+            - name: http
+              containerPort: 5000
+          volumeMounts:
+            - name: cache
+              mountPath: /var/cache/proxpi
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              memory: 512Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+      volumes:
+        - name: cache
+          persistentVolumeClaim:
+            claimName: proxpi-cache
