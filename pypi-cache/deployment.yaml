@@ -80,6 +80,11 @@ spec:
           volumeMounts:
             - name: cache
               mountPath: /var/cache/proxpi
+            # Gunicorn creates a per-worker temporary file at startup.  The
+            # container filesystem is intentionally read-only, so provide a
+            # writable ephemeral /tmp without weakening that hardening.
+            - name: tmp
+              mountPath: /tmp
           readinessProbe:
             httpGet:
               path: /health
@@ -107,3 +112,5 @@ spec:
         - name: cache
           persistentVolumeClaim:
             claimName: proxpi-cache
+        - name: tmp
+          emptyDir: {}
