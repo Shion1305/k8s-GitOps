@@ -1,0 +1,24 @@
+# The namespace-wide cross-ns-isolation policy denies this ingress by default.
+# Permit only ephemeral GARM runner Pods to use the in-cluster PyPI cache.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-garm-runners-to-proxpi
+  namespace: pypi-cache
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: proxpi
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: github-actions-runner-pods
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/managed-by: garm
+      ports:
+        - protocol: TCP
+          port: 5000
