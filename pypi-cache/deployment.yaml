@@ -54,7 +54,7 @@ spec:
           # Hub is the only distribution channel for this image; a Harbor
           # docker.io proxy-cache project could front it later, but the digest
           # pin already makes the pull reproducible.
-          image: epicwink/proxpi@1.3.0
+          image: epicwink/proxpi:1.3.0
           imagePullPolicy: IfNotPresent
           args:
             - --bind
