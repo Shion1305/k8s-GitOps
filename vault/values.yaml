@@ -36,7 +36,7 @@ server:
     periodSeconds: 10
     failureThreshold: 5
   # Ingress disabled; HTTPRoutes in vault/httproute-*.yaml attach the per-host
-  # routing to Envoy Gateway (matches harbor/zot/keycloak pattern).
+  # routing to Envoy Gateway (matches harbor/keycloak pattern).
   ingress:
     enabled: false
   affinity:

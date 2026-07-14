@@ -121,9 +121,9 @@ This cluster uses a layered secret management approach:
 - **Realms**:
   - `master`: Keycloak admin only (do not modify declaratively)
   - `user`: central human-user pool (passkey-only); brokered into child realms
-  - `zot`: Docker registry auth (zot UI + GitHub Actions token-exchange)
+  - `harbor`: Container registry UI authentication
   - `ynufes-tech`: GitHub-OAuth realm for the cloudflare-grafana audience
-- **GitHub Actions Integration**: Uses OIDC token exchange via `gha-exchanger` client (in the `zot` realm)
+- **GitHub Actions Integration**: Uses Vault JWT auth to retrieve scoped Harbor robot credentials.
 
 ## Storage
 
@@ -175,7 +175,7 @@ namespace). Two `Gateway` resources expose two listener spaces:
 
 1. **`external`** (`141.147.189.36`): publicly reachable. Listeners:
    - `https` on `*.shion1305.com` — canonical apex hostname for all
-     externally-published apps (argocd, langfuse, keycloak, vault,
+     externally-published apps (argocd, keycloak, vault,
      openwebui, github-readme-stats, ynufes-cf grafana, …).
    - `https-legacy-k` on `*.k.shion1305.com` — legacy listener serving
      301-redirect HTTPRoutes that move old `*.k` URLs to their apex

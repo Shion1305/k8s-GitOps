@@ -25,11 +25,6 @@ This repository implements a comprehensive GitOps workflow for Kubernetes using 
 - **Local Storage** - Local path provisioner for persistent volumes
 - **NGINX Ingress** - Ingress controller with SSL support
 
-### Development & Testing
-
-- **Guestbook** - Sample application for testing
-- **Network Stress Test** - Network performance testing tools
-
 ## Repository Structure
 
 - `apps/` - ArgoCD Application manifests for all services

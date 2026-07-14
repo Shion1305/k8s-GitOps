@@ -122,12 +122,10 @@ different namespace.
 Envoy Gateway ships extension APIs in `gateway.envoyproxy.io/v1alpha1`:
 
 - `SecurityPolicy` — OIDC / JWT / authn enforcement, attached to one or
-  more `HTTPRoute`s. Used by the zot UI; see
-  `zot/securitypolicy.yaml`.
+  more `HTTPRoute`s.
 - `BackendTrafficPolicy` — connection / retry / timeout / circuit-
   breaker tuning per backend.
-- `EnvoyExtensionPolicy` — Lua / external-processing filters. Used by
-  the zot SPA mgmt rewrite.
+- `EnvoyExtensionPolicy` — Lua / external-processing filters.
 
 301 redirects use `HTTPRoute.rules.filters.requestRedirect`. The
 Gateway API CEL validator restricts `statusCode` to 301 or 302; 308 is
@@ -201,7 +199,7 @@ kubectl rollout restart -n kube-system deployment/coredns
 | Envoy Gateway deployed | ✅ done | `envoy-gateway-system` namespace |
 | Wildcard certificates issued | ✅ done | apex, `*.i`, `*.k` (legacy) |
 | Per-app HTTPRoute migration | ✅ done | All currently-deployed apps |
-| 301-redirects on `*.k` | ✅ done | argocd, langfuse, openwebui, github-readme-stats, ynufes-cf-grafana, keycloak, vault |
+| 301-redirects on `*.k` | ✅ done | argocd, openwebui, github-readme-stats, ynufes-cf-grafana, keycloak, vault |
 | DNS repoint of `*.k` to Envoy | 🟡 in progress | Per-record cutover; tracked out-of-band |
 | `*.k` listener + cert removal | ⏳ pending | Once all redirects unused |
 
@@ -225,4 +223,3 @@ kubectl rollout restart -n kube-system deployment/coredns
 - `envoy-gateway/` — Gateway / GatewayClass / Certificate manifests
 - `keycloak-operator/httproute-external.yaml` + `httproute-legacy-redirect.yaml`
   — canonical example of the apex + redirect pattern
-- `zot/securitypolicy.yaml` — example of OIDC `SecurityPolicy` attachment
