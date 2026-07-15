@@ -17,8 +17,11 @@ Key configurations:
 - **Routing**: Envoy Gateway HTTPRoutes (see `httproute-*.yaml`); the chart-rendered Ingress is disabled
 - **Storage**: 10Gi persistent volumes for data and audit logs (longhorn-hdd-ha with 2 replicas)
 - **Resources**: 256Mi/250m requests, 512Mi/500m limits
-- **Auto-Unseal**: KV-based sidecar auto-unseal via active node
-- **Pod Anti-Affinity**: Pods prefer to spread across different nodes for better HA
+- **Auto-Unseal**: file-based sidecar auto-unseal — each pod reads the unseal
+  keys from a mounted Secret and unseals itself independently (see
+  [Resilience & Disaster Recovery](#resilience--disaster-recovery))
+- **Pod Anti-Affinity**: hard anti-affinity spreads the 3 pods across 3 distinct
+  nodes so a single-node event can never take down the raft quorum
 
 ## Access
 
@@ -66,13 +69,158 @@ vault kv put <svc>/credentials \
 ### Backup & Maintenance
 
 ```bash
-# Create Raft snapshot
+# Create Raft snapshot manually (automated hourly via the CronJob below)
 vault operator raft snapshot save backup-$(date +%Y%m%d).snap
 
 # Check cluster status
 vault operator raft list-peers
 vault status
 ```
+
+## Resilience & Disaster Recovery
+
+### How HA and auto-unseal work
+
+Vault runs as a **3-node Raft cluster**. Raft needs a **quorum of 2 of 3**
+voters to elect a leader (the *active* node); the other two are *standby*.
+
+Two independent mechanisms keep the cluster available:
+
+1. **Cross-node spread (hard anti-affinity).** The three pods are forced onto
+   three distinct nodes (`values.yaml` → `server.affinity.podAntiAffinity`,
+   `requiredDuringScheduling`). A single node event therefore seals/kills at
+   most **one** pod; the other two retain quorum and an active leader. Node
+   preference favours the strong amd64 hosts but every schedulable node is a
+   last-resort fallback, so a pod is never left `Pending`. Because
+   `longhorn-hdd-ha` uses `dataLocality: disabled`, a pod can attach its data
+   volume from any node.
+
+2. **File-based auto-unseal sidecar.** Each pod runs an `unseal-sidecar`
+   (`values.yaml` → `server.extraContainers`) that reads the unseal keys from a
+   **mounted Secret** (`vault-unseal-keys`) and unseals its *local* node. Because
+   the keys come from a Secret — not from the active node — **a pod can
+   self-unseal even when no node is active**. This is the key change from the
+   previous design, where the sidecar fetched keys from `vault-active` and thus
+   could not bootstrap when every node was sealed at once.
+
+**What now recovers automatically:**
+
+| Event | Outcome |
+|-------|---------|
+| One node reboots / one pod restarts | Other two hold quorum; the pod reschedules to a free node and auto-unseals. **No action.** |
+| All pods restart at once (e.g. all-nodes reboot), data intact | Each pod auto-unseals from its mounted Secret, they re-form quorum. **No action.** |
+| Quorum lost + Raft data loss/corruption on a majority | Manual recovery required — see [Lost-quorum recovery](#lost-quorum--corruption-recovery-peersjson). |
+
+### The unseal-keys Secret
+
+`vault-unseal-keys` (namespace `vault`) holds `key1`/`key2`/`key3` (3 of the 5
+Shamir shares = the unseal threshold). It is **created out-of-band and never
+committed** (this is a public repo). To (re)create it:
+
+```bash
+kubectl create secret generic vault-unseal-keys -n vault \
+  --from-literal=key1='<unseal-key-1>' \
+  --from-literal=key2='<unseal-key-2>' \
+  --from-literal=key3='<unseal-key-3>'
+```
+
+Security note: the keys live in etcd (base64). Ensure etcd encryption-at-rest is
+enabled, and restrict `get secret` in the `vault` namespace. This is the
+availability/security trade-off chosen over the previous self-referential
+design. A future hardening is KMS/transit auto-unseal (keys never leave the KMS).
+
+### Automated Raft snapshots
+
+`raft-snapshot-cronjob.yaml` runs `vault operator raft snapshot save` every 6h
+to a dedicated PVC (`vault-raft-snapshots`), keeping the 14 most recent. A recent
+snapshot turns a lost-quorum/corruption event into a `snapshot restore` instead
+of manual surgery.
+
+One-time setup (the CronJob's ServiceAccount needs a scoped Vault role). Run with
+an admin token:
+
+```bash
+export VAULT_ADDR=http://127.0.0.1:8200
+export VAULT_TOKEN=<admin-token>
+kubectl port-forward svc/vault-active 8200:8200 -n vault &
+bash vault/scripts/setup-snapshot-role.sh
+```
+
+Restore from a snapshot (into an already-initialised, unsealed, active cluster):
+
+```bash
+kubectl cp vault/<snapshot-pod>:/snapshots/vault-<ts>.snap ./restore.snap
+kubectl cp ./restore.snap vault/vault-0:/tmp/restore.snap
+kubectl exec -n vault vault-0 -c vault -- vault operator raft snapshot restore /tmp/restore.snap
+```
+
+### Lost-quorum / corruption recovery (peers.json)
+
+Use this only when a **majority of nodes have lost or corrupted Raft data** so no
+leader can be elected (symptoms: every node `Sealed`, one node `Initialized=true`
+but stuck `HA Mode: standby` after unseal, others `Initialized=false` /
+crash-looping with a bbolt `freepages` panic). This reduces the single surviving
+copy to a one-node cluster, then rejoins the rest fresh.
+
+1. **Identify the survivor** — the node with `Initialized=true` and the highest
+   `Raft Applied Index`. Back up its raw data first:
+
+   ```bash
+   kubectl exec -n vault vault-0 -c vault -- \
+     tar czf - -C /vault/data raft vault.db > vault-survivor-backup.tgz
+   ```
+
+2. **Write `peers.json`** (Raft protocol v3; cluster address is port `8201`)
+   into the survivor:
+
+   ```bash
+   kubectl exec -n vault vault-0 -c vault -- sh -c 'cat > /vault/data/raft/peers.json <<EOF
+   [{"id":"vault-0","address":"vault-0.vault-internal:8201","non_voter":false}]
+   EOF'
+   ```
+
+3. **Restart the survivor, then unseal it.** `peers.json` is consumed at
+   **unseal time** (Raft `SetupCluster` runs on unseal, not at process start):
+
+   ```bash
+   kubectl delete pod vault-0 -n vault
+   # wait for Running, then unseal (sidecar does this automatically, or:)
+   kubectl exec -n vault vault-0 -c vault -- vault operator unseal <key1>
+   kubectl exec -n vault vault-0 -c vault -- vault operator unseal <key2>
+   kubectl exec -n vault vault-0 -c vault -- vault operator unseal <key3>
+   ```
+
+   The logs show `initial configuration ... servers=[vault-0 Voter]` →
+   `entering leader state`, `peers.json` is auto-deleted, and `HA Mode: active`.
+   **Service is restored here** (all secrets available again).
+
+4. **Rejoin the other nodes fresh.** Their stale data blocks a clean join
+   (`cluster already has state`), so wipe it:
+
+   ```bash
+   # for a running-but-empty node:
+   kubectl exec -n vault vault-1 -c vault -- sh -c 'rm -rf /vault/data/raft /vault/data/vault.db'
+   kubectl delete pod vault-1 -n vault
+   # for a crash-looping node (container won't start): recreate its PVC
+   kubectl delete pvc data-vault-2 -n vault --wait=false
+   kubectl delete pod vault-2 -n vault
+   ```
+
+   Each rejoins via `retry_join`, receives a snapshot from the leader, and the
+   sidecar auto-unseals it. Confirm all three become `Voter`.
+
+5. **ESO recovery.** Stores/ExternalSecrets stuck `InvalidProviderConfig` from
+   the outage backoff recover after a reconcile nudge:
+
+   ```bash
+   kubectl annotate clustersecretstore <name> reconcile.eso/nudge="$(date +%s)" --overwrite
+   kubectl annotate externalsecret <name> -n <ns> force-sync="$(date +%s)" --overwrite
+   ```
+
+> PVCs are created from the StatefulSet's `volumeClaimTemplates` and are **not**
+> ArgoCD-tracked, so deleting a PVC/pod does not fight `selfHeal`. Do **not**
+> hand-edit the StatefulSet (affinity, sidecar) live — `selfHeal` reverts it;
+> change `values.yaml` and let ArgoCD sync.
 
 ## OIDC Authentication (Keycloak)
 

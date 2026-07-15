@@ -5,3 +5,4 @@ resources:
   - httproute-external.yaml
   - httproute-legacy-redirect.yaml
   - networkpolicy.yaml
+  - raft-snapshot-cronjob.yaml

@@ -39,30 +39,64 @@ server:
   # routing to Envoy Gateway (matches harbor/zot/keycloak pattern).
   ingress:
     enabled: false
+  # 3-node raft cluster: a quorum (2 of 3) must survive any single-node event, so
+  # the three pods must land on three distinct nodes.
   affinity:
+    # Prefer the strong amd64 nodes, then the OCI arm64 nodes; all schedulable
+    # nodes stay eligible as a last resort so a pod is never left Pending. The
+    # longhorn-hdd-ha class has dataLocality=disabled, so a pod can attach its
+    # volume from any node.
     nodeAffinity:
-      requiredDuringSchedulingIgnoredDuringExecution:
-        nodeSelectorTerms:
-          - matchExpressions:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          preference:
+            matchExpressions:
               - key: kubernetes.io/hostname
                 operator: In
                 values:
                   - shion-ubuntu-2505
+                  - shion-ubuntu-2605
+        - weight: 50
+          preference:
+            matchExpressions:
+              - key: kubernetes.io/hostname
+                operator: In
+                values:
+                  - instance-2024-1
                   - instance-k8s-proxy
+    # Hard anti-affinity: never co-locate two vault pods on the same node.
     podAntiAffinity:
-      preferredDuringSchedulingIgnoredDuringExecution:
-        - weight: 100
-          podAffinityTerm:
-            labelSelector:
-              matchLabels:
-                app.kubernetes.io/name: vault
-                app.kubernetes.io/instance: vault
-                component: server
-            topologyKey: kubernetes.io/hostname
+      requiredDuringSchedulingIgnoredDuringExecution:
+        - labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: vault
+              app.kubernetes.io/instance: vault
+              component: server
+          topologyKey: kubernetes.io/hostname
+  # Tolerate the control-plane taint so instance-2024-1 can host a replica.
+  tolerations:
+    - key: node-role.kubernetes.io/control-plane
+      operator: Exists
+      effect: NoSchedule
   serviceAccount:
     create: true
     name: "vault-unsealer"
+  # Extra volume holding the unseal keys, mounted read-only into the sidecar.
+  # The vault-unseal-keys Secret is created out-of-band and never committed
+  # (public repo).
+  volumes:
+    - name: unseal-keys
+      secret:
+        secretName: vault-unseal-keys
+        # 0440: files are owned root:1000 (pod fsGroup=1000); the sidecar runs as
+        # uid 100 / gid 1000 and reads the keys via the group bit.
+        defaultMode: 0440
   extraContainers:
+    # Auto-unseal sidecar. Reads the unseal keys from the mounted Secret and
+    # unseals the local node. Sourcing keys from a Secret rather than from the
+    # active node means a pod can self-unseal even when no node is active, so a
+    # full simultaneous restart (e.g. a node reboot) recovers without a human
+    # supplying keys.
     - name: unseal-sidecar
       image: hashicorp/vault:2.0.3
       securityContext:
@@ -73,9 +107,9 @@ server:
         - sh
         - -c
         - |
-          echo "Starting KV Auto-Unseal Sidecar..."
-          ACTIVE_ADDR="http://vault-active.vault.svc.cluster.local:8200"
+          echo "Starting file-based auto-unseal sidecar..."
           LOCAL_ADDR="http://127.0.0.1:8200"
+          KEYS_DIR="/vault/unseal-keys"
 
           while true; do
             sleep 10
@@ -86,33 +120,20 @@ server:
             fi
 
             if [ "$SEALED" = "true" ]; then
-              echo "Vault is sealed! Attempting auto-unseal via vault-active..."
-
-              SA_TOKEN=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)
-              AUTH_JSON=$(VAULT_ADDR="$ACTIVE_ADDR" vault write -format=json auth/kubernetes/login jwt="$SA_TOKEN" role="vault-unsealer" 2>/dev/null || true)
-              VAULT_TOKEN=$(printf '%s' "$AUTH_JSON" | sed -n 's/.*"client_token"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n 1)
-              if [ -z "$VAULT_TOKEN" ]; then
-                echo "Failed to get Vault token. Active node might be down."
-                continue
-              fi
-
-              KEY1=$(VAULT_ADDR="$ACTIVE_ADDR" VAULT_TOKEN="$VAULT_TOKEN" vault kv get -field=key1 secret/unseal-keys 2>/dev/null || true)
-              KEY2=$(VAULT_ADDR="$ACTIVE_ADDR" VAULT_TOKEN="$VAULT_TOKEN" vault kv get -field=key2 secret/unseal-keys 2>/dev/null || true)
-              KEY3=$(VAULT_ADDR="$ACTIVE_ADDR" VAULT_TOKEN="$VAULT_TOKEN" vault kv get -field=key3 secret/unseal-keys 2>/dev/null || true)
-              if [ -z "$KEY1" ] || [ -z "$KEY2" ] || [ -z "$KEY3" ]; then
-                echo "Failed to read keys from KV."
-                continue
-              fi
-
-              echo "Submitting unseal keys..."
-              VAULT_ADDR="$LOCAL_ADDR" vault operator unseal "$KEY1" >/dev/null 2>&1 || true
-              VAULT_ADDR="$LOCAL_ADDR" vault operator unseal "$KEY2" >/dev/null 2>&1 || true
-              VAULT_ADDR="$LOCAL_ADDR" vault operator unseal "$KEY3" >/dev/null 2>&1 || true
-
-              echo "Unseal commands submitted."
+              echo "Vault is sealed! Unsealing from mounted keys..."
+              for f in "$KEYS_DIR"/key1 "$KEYS_DIR"/key2 "$KEYS_DIR"/key3; do
+                if [ -f "$f" ]; then
+                  VAULT_ADDR="$LOCAL_ADDR" vault operator unseal "$(cat "$f")" >/dev/null 2>&1 || true
+                fi
+              done
+              echo "Unseal keys submitted."
               sleep 5
             fi
           done
+      volumeMounts:
+        - name: unseal-keys
+          mountPath: /vault/unseal-keys
+          readOnly: true
   standalone:
     enabled: false
   ha:
