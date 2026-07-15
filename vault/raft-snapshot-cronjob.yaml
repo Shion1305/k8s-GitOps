@@ -1,0 +1,93 @@
+---
+# Durable, off-raft copies of Vault state. A recent snapshot turns a lost-quorum
+# or storage-corruption event into `vault operator raft snapshot restore` instead
+# of manual peers.json surgery. See README.md ("Disaster Recovery").
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: vault-snapshot
+  namespace: vault
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: vault-raft-snapshots
+  namespace: vault
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: longhorn-hdd-ha
+  resources:
+    requests:
+      storage: 5Gi
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: vault-raft-snapshot
+  namespace: vault
+spec:
+  schedule: "0 */6 * * *"
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 300
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      activeDeadlineSeconds: 600
+      template:
+        spec:
+          serviceAccountName: vault-snapshot
+          restartPolicy: OnFailure
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 100
+            runAsGroup: 1000
+            fsGroup: 1000
+          containers:
+            - name: snapshot
+              image: hashicorp/vault:2.0.3
+              env:
+                - name: VAULT_ADDR
+                  value: http://vault-active.vault.svc.cluster.local:8200
+              command:
+                - sh
+                - -c
+                - |
+                  set -eu
+                  echo "Authenticating to Vault via Kubernetes auth (role=vault-snapshot)..."
+                  SA_TOKEN=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)
+                  AUTH_JSON=$(vault write -format=json auth/kubernetes/login \
+                    jwt="$SA_TOKEN" role="vault-snapshot")
+                  VAULT_TOKEN=$(printf '%s' "$AUTH_JSON" | sed -n 's/.*"client_token"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n1)
+                  if [ -z "$VAULT_TOKEN" ]; then
+                    echo "ERROR: failed to obtain Vault token" >&2
+                    exit 1
+                  fi
+                  export VAULT_TOKEN
+                  TS=$(date +%Y%m%d-%H%M%S)
+                  OUT="/snapshots/vault-${TS}.snap"
+                  echo "Saving raft snapshot to ${OUT}..."
+                  vault operator raft snapshot save "$OUT"
+                  # Retain the 14 most recent snapshots (~3.5 days at the 6h cadence).
+                  ls -1t /snapshots/vault-*.snap 2>/dev/null | tail -n +15 | while read -r old; do
+                    echo "Pruning old snapshot: $old"
+                    rm -f "$old"
+                  done
+                  echo "Done. Current snapshots:"
+                  ls -la /snapshots/
+              volumeMounts:
+                - name: snapshots
+                  mountPath: /snapshots
+              resources:
+                requests:
+                  cpu: 50m
+                  memory: 64Mi
+                limits:
+                  cpu: 250m
+                  memory: 256Mi
+          volumes:
+            - name: snapshots
+              persistentVolumeClaim:
+                claimName: vault-raft-snapshots
