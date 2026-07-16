@@ -1,0 +1,31 @@
+# Scrape GARM's Prometheus metrics (garm-server:9997/metrics). Auth is disabled
+# on /metrics (see deployment.yaml [metrics] block), so no bearer token is
+# needed. The primary Prometheus selects every ServiceMonitor except those
+# labeled `monitoring-tier: dedicated` (grafana/values.yaml), so this is picked
+# up automatically.
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: garm-server
+  namespace: github-actions-runner
+  labels:
+    app: garm-server
+    release: kube-prometheus-stack
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: garm-server
+  namespaceSelector:
+    matchNames:
+      - github-actions-runner
+  endpoints:
+    - port: http
+      path: /metrics
+      scheme: http
+      interval: 30s
+      scrapeTimeout: 10s
+      # Pin a stable job label so dashboard queries can use job="garm" instead
+      # of the ServiceMonitor-derived default.
+      relabelings:
+        - targetLabel: job
+          replacement: garm

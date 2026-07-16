@@ -129,6 +129,28 @@ or:
 runs-on: shion1305-arm
 ```
 
+## Observability
+
+GARM exposes Prometheus metrics on `garm-server:9997/metrics`. The `[metrics]`
+block in `deployment.yaml` sets `disable_auth = true`, so `/metrics` is scraped
+without a bearer token — only that endpoint is unauthenticated; the `/api/v1`
+surface keeps its JWT auth. This is deliberate: GARM's metrics token expires and
+would silently stop scraping, and the endpoint is reachable only in-cluster
+(default-deny ingress + the clusterwide `allow-from-infra` policy admit only
+Prometheus, Envoy, nodes, and runner-pods to port 9997).
+
+- `servicemonitor.yaml` scrapes `/metrics` and pins `job="garm"`. The primary
+  Prometheus discovers it automatically.
+- Dashboard: **GitHub Actions Runners** folder in Grafana
+  (`grafana-folder.yaml` + `grafana-dashboard.yaml`, uid `garm-runners`) —
+  controller health, runners by repo/status/arch, workflow jobs, pool sizing,
+  GitHub API rate-limit/error ratios, webhook validity, and runner-pod
+  CPU/memory.
+
+Key metric families: `garm_health`, `garm_runner_status`, `garm_job_status`,
+`garm_pool_*`, `garm_runner_operations_total`, `garm_github_operations_total` /
+`garm_github_errors_total`, `garm_github_rate_limit_*`, `garm_webhook_received`.
+
 ## Notes
 
 - `min-idle-runners: 0` scales runner pods to zero when no jobs are queued.

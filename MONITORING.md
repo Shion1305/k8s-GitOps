@@ -37,9 +37,23 @@ This repository now includes a comprehensive monitoring stack with node-exporter
 
 ### Pre-configured Dashboards
 
-- Kubernetes Cluster Monitoring (Dashboard ID: 7249)
-- Node Exporter Full (Dashboard ID: 1860)
-- Node Exporter Server Metrics (Dashboard ID: 405)
+Dashboards are provisioned as `GrafanaDashboard` CRs (grafana-operator), not
+imported by community ID. The live set:
+
+- **Node Metrics** / **Kubernetes** / **Monitoring** folders — the
+  kube-prometheus-stack mixin dashboards (node-exporter, k8s compute/network,
+  Prometheus & Alertmanager self-monitoring), rendered from the chart's
+  ConfigMaps.
+- **GitHub Actions Runners** — GARM controller, runner pools, workflow jobs,
+  GitHub API rate-limit/errors, webhooks, and runner-pod resources
+  (`github-actions-runner/grafana-dashboard.yaml`).
+- **Tenstorrent**, **GH Leaked Tokens**, and other app-owned dashboards.
+
+Note: all dashboards should pin the primary `Prometheus` datasource (uid
+`prometheus`). Any additional prometheus-type datasource registered into
+`main-grafana` must be named so it sorts **after** `Prometheus`, otherwise
+Grafana's datasource-variable picker auto-selects the wrong one on the mixin
+dashboards.
 
 ## Features
 

@@ -1,0 +1,13 @@
+# Grafana folder for the GARM / GitHub Actions Runners dashboard. Lives in the
+# `grafana` namespace (where grafana-operator watches) but is shipped by THIS
+# app, the same pattern gh-leaked-tokens uses to own its Grafana objects.
+apiVersion: grafana.integreatly.org/v1beta1
+kind: GrafanaFolder
+metadata:
+  name: github-actions-runners
+  namespace: grafana
+spec:
+  instanceSelector:
+    matchLabels:
+      dashboards: main-grafana
+  title: "GitHub Actions Runners"
