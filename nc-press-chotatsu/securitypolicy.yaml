@@ -1,0 +1,32 @@
+# Gateway-enforced OIDC for nc-chotatsu.shion1305.com: every request completes
+# an Authorization Code flow against the `nc-chotatsu` Keycloak realm (which
+# brokers GitHub login) before reaching the frontend.
+#
+# `/oauth2/callback` and `/logout` are handled by Envoy, not proxied upstream,
+# so the auth-unaware frontend needs no changes. `redirectURL` must match the
+# Keycloak client redirectUri exactly.
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: SecurityPolicy
+metadata:
+  name: nc-chotatsu-oidc
+  namespace: nc-press-chotatsu
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: nc-press-chotatsu-external
+  oidc:
+    provider:
+      issuer: https://keycloak.shion1305.com/realms/nc-chotatsu
+    clientIDRef:
+      name: nc-chotatsu-oidc-credentials
+    clientSecret:
+      name: nc-chotatsu-oidc-credentials
+    redirectURL: https://nc-chotatsu.shion1305.com/oauth2/callback
+    logoutPath: /logout
+    # `openid` is auto-added by Envoy; the frontend needs no other claim.
+    scopes:
+      - email
+      - profile
+    cookieConfig:
+      sameSite: Lax

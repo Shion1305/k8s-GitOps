@@ -1,0 +1,71 @@
+# Keycloak realm gating https://nc-chotatsu.shion1305.com behind GitHub login,
+# enforced at the Envoy edge (nc-press-chotatsu/securitypolicy.yaml). GitHub is
+# OAuth2-only (no id_token), so Keycloak brokers it into OIDC for Envoy.
+# Mirrors the ynufes-tech (GitHub IdP) + zot (gateway OIDC) patterns. No
+# groups/mappers: the app reads no claim; Envoy enforces "authenticated" and
+# the first-broker-login flow (step 3) enforces "which users".
+#
+# Manual post-import steps (KeycloakRealmImport reconciles once; GitHub secrets
+# are UI-managed):
+# 1. github IdP: set Client ID/Secret from a GitHub OAuth App whose callback is
+#    https://keycloak.shion1305.com/realms/nc-chotatsu/broker/github/endpoint
+# 2. Bind the Browser flow to "Identity Provider Redirector" (default: github)
+#    so login skips the password form. (v2alpha1 CRD can't express flows.)
+# 3. Restrict to specific users: copy the "first broker login" flow, set
+#    "Create User If Unique" -> DISABLED, bind it. Pre-create allowed users
+#    (email matching their GitHub account; trustEmail links by email). WITHOUT
+#    this, ANY GitHub account can log in.
+# 4. Persist the generated `nc-chotatsu` client secret to Vault (mount/role
+#    already exist from the DB secret):
+#      vault kv put nc-press-chotatsu/oidc-credentials \
+#        client_id=nc-chotatsu client_secret=<value>
+apiVersion: k8s.keycloak.org/v2alpha1
+kind: KeycloakRealmImport
+metadata:
+  name: nc-chotatsu
+  namespace: keycloak
+spec:
+  keycloakCRName: keycloak
+  realm:
+    realm: nc-chotatsu
+    enabled: true
+    registrationAllowed: false
+    resetPasswordAllowed: false
+    loginWithEmailAllowed: true
+    rememberMe: false
+
+    sslRequired: external
+
+    # Confidential client for Envoy's SecurityPolicy.oidc. No protocolMappers:
+    # the frontend reads no claim, and the auto-seeded openid/profile/email
+    # scopes suffice. Secret is Keycloak-generated on first import (placeholder
+    # not re-applied); do NOT commit the real value.
+    clients:
+      - clientId: nc-chotatsu
+        protocol: openid-connect
+        publicClient: false
+        clientAuthenticatorType: client-secret
+        secret: PLACEHOLDER_REPLACE_AFTER_REALM_IMPORT
+        standardFlowEnabled: true
+        directAccessGrantsEnabled: false
+        serviceAccountsEnabled: false
+        redirectUris:
+          - https://nc-chotatsu.shion1305.com/oauth2/callback
+        webOrigins:
+          - https://nc-chotatsu.shion1305.com
+
+    # GitHub OAuth IdP. clientId/clientSecret set via the admin UI post-import
+    # (step 1); not re-applied on reconcile, so do NOT commit real creds.
+    identityProviders:
+      - alias: github
+        providerId: github
+        enabled: true
+        storeToken: false
+        addReadTokenRoleOnCreate: false
+        trustEmail: true
+        firstBrokerLoginFlowAlias: "first broker login"
+        config:
+          clientId: PLACEHOLDER_REPLACE_AFTER_REALM_IMPORT
+          clientSecret: PLACEHOLDER_REPLACE_AFTER_REALM_IMPORT
+          defaultScope: "user:email"
+          syncMode: IMPORT
