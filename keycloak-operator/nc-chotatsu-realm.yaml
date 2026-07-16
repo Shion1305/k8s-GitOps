@@ -1,75 +1,24 @@
-# =============================================================================
-# Keycloak Realm Import: nc-chotatsu
-# =============================================================================
+# Keycloak realm gating https://nc-chotatsu.shion1305.com behind GitHub login,
+# enforced at the Envoy edge (nc-press-chotatsu/securitypolicy.yaml). GitHub is
+# OAuth2-only (no id_token), so Keycloak brokers it into OIDC for Envoy.
+# Mirrors the ynufes-tech (GitHub IdP) + zot (gateway OIDC) patterns. No
+# groups/mappers: the app reads no claim; Envoy enforces "authenticated" and
+# the first-broker-login flow (step 3) enforces "which users".
 #
-# This file is reconciled by the Keycloak Operator (KeycloakRealmImport CRD).
-# It declares the `nc-chotatsu` realm, whose sole purpose is to gate
-# https://nc-chotatsu.shion1305.com behind a GitHub login enforced at the
-# Envoy Gateway edge (nc-press-chotatsu/securitypolicy.yaml).
-#
-# Flow:
-#   Browser -> Envoy Gateway SecurityPolicy.oidc (Authorization Code flow
-#              against THIS realm, using the `nc-chotatsu` confidential client)
-#           -> Keycloak `github` Identity Provider (OAuth2) -> GitHub
-#   Envoy mints its own encrypted session cookie from the resulting id_token;
-#   the frontend upstream sees only authenticated requests. The app does not
-#   consume any claim, so this realm carries NO groups/roles/mappers -- Envoy
-#   enforces "authenticated" and the first-broker-login flow (manual step #3)
-#   enforces "which GitHub users are allowed".
-#
-# Why Keycloak at all: GitHub is pure OAuth2 (no OIDC discovery, no id_token),
-# so Envoy's SecurityPolicy.oidc cannot target GitHub directly. Keycloak
-# brokers GitHub into a real OIDC provider. This mirrors the ynufes-tech realm
-# (GitHub IdP) + the zot realm (Envoy-enforced gateway OIDC).
-#
-# Authentication policy:
-#   - Self-registration disabled.
-#   - GitHub OAuth IdP is the ONLY login path (local password form suppressed
-#     by binding the Browser flow to "Identity Provider Redirector").
-#   - Only pre-provisioned GitHub users may log in: the first-broker-login
-#     flow is configured to NOT auto-create accounts (manual step #3).
-#
-# -----------------------------------------------------------------------------
-# Manual post-import steps (one-time, after first successful sync):
-# -----------------------------------------------------------------------------
-# 1. Configure the `github` Identity Provider in the Keycloak admin UI:
-#      https://keycloak.shion1305.com -> realm `nc-chotatsu` -> Identity
-#      Providers -> github -> set "Client ID" and "Client Secret" from a
-#      GitHub OAuth App whose Authorization callback URL is:
-#        https://keycloak.shion1305.com/realms/nc-chotatsu/broker/github/endpoint
-#      (Register a new OAuth App, or reuse an existing one and add this
-#      callback URL.) The `PLACEHOLDER_REPLACE_AFTER_REALM_IMPORT` values below
-#      are the literal strings the operator imports; the admin overwrites them
-#      via the UI, and subsequent reconciles do NOT re-apply the placeholders.
-#
-# 2. Bind the Browser authentication flow to "Identity Provider Redirector"
-#    pinned to alias `github`, so users skip the password form and go straight
-#    to GitHub:
-#      Authentication -> Flows -> Browser -> add "Identity Provider Redirector"
-#      execution at the top, Required, config `Default Identity Provider =
-#      github`. Bind that copied flow as the realm's Browser flow.
-#    (Done via the UI: the v2alpha1 CRD's authenticationFlows shape is brittle.)
-#
-# 3. Restrict login to specific GitHub users. Copy the "first broker login"
-#    flow and set its "Create User If Unique" execution to DISABLED, then bind
-#    the copy as the realm's First Broker Login flow. With auto-provisioning
-#    off, an unknown GitHub identity cannot create an account and is denied;
-#    only users you pre-create are admitted.
-#      Users -> Add user (set the email matching the GitHub account, so
-#      "Handle Existing Account" links the GitHub identity by email at first
-#      login; trustEmail is set on the IdP below). Repeat per allowed user.
-#    WITHOUT this step ANY GitHub account could log in -- do not skip it.
-#
-# 4. Retrieve the auto-generated client secret for the `nc-chotatsu` client:
-#      Clients -> nc-chotatsu -> Credentials -> "Client secret"
-#    and persist it into Vault so ESO can sync the `nc-chotatsu-oidc-credentials`
-#    Secret in the `nc-press-chotatsu` namespace (see
-#    nc-press-chotatsu/oidc-external-secret.yaml):
+# Manual post-import steps (KeycloakRealmImport reconciles once; GitHub secrets
+# are UI-managed):
+# 1. github IdP: set Client ID/Secret from a GitHub OAuth App whose callback is
+#    https://keycloak.shion1305.com/realms/nc-chotatsu/broker/github/endpoint
+# 2. Bind the Browser flow to "Identity Provider Redirector" (default: github)
+#    so login skips the password form. (v2alpha1 CRD can't express flows.)
+# 3. Restrict to specific users: copy the "first broker login" flow, set
+#    "Create User If Unique" -> DISABLED, bind it. Pre-create allowed users
+#    (email matching their GitHub account; trustEmail links by email). WITHOUT
+#    this, ANY GitHub account can log in.
+# 4. Persist the generated `nc-chotatsu` client secret to Vault (mount/role
+#    already exist from the DB secret):
 #      vault kv put nc-press-chotatsu/oidc-credentials \
 #        client_id=nc-chotatsu client_secret=<value>
-#    (The `nc-press-chotatsu` KV mount + `eso-nc-press-chotatsu` Vault role
-#    already exist for the DB secret; no new Vault policy is required.)
-# =============================================================================
 apiVersion: k8s.keycloak.org/v2alpha1
 kind: KeycloakRealmImport
 metadata:
@@ -85,29 +34,17 @@ spec:
     loginWithEmailAllowed: true
     rememberMe: false
 
-    # `external` = HTTPS required for any non-loopback request. Cluster-internal
-    # plaintext still satisfies this because Envoy terminates TLS and the
-    # Keycloak CR's xforwarded proxy config trusts X-Forwarded-Proto: https.
     sslRequired: external
 
-    # -------------------------------------------------------------------------
-    # Clients
-    # -------------------------------------------------------------------------
-    # nc-chotatsu: confidential client driven by Envoy Gateway's
-    # SecurityPolicy.oidc (nc-press-chotatsu/securitypolicy.yaml). Envoy runs
-    # the Authorization Code flow and mints its own session cookie; the
-    # frontend needs no claim, so no protocolMappers are declared. The default
-    # `openid`/`profile`/`email` client scopes Keycloak auto-seeds are enough.
-    #
-    # The redirect_uri Envoy uses is `https://<host>/oauth2/callback` (its
-    # default for the OAuth2 filter).
+    # Confidential client for Envoy's SecurityPolicy.oidc. No protocolMappers:
+    # the frontend reads no claim, and the auto-seeded openid/profile/email
+    # scopes suffice. Secret is Keycloak-generated on first import (placeholder
+    # not re-applied); do NOT commit the real value.
     clients:
       - clientId: nc-chotatsu
         protocol: openid-connect
         publicClient: false
         clientAuthenticatorType: client-secret
-        # Keycloak generates the real value on first import and never re-applies
-        # this placeholder. Do NOT commit the actual secret.
         secret: PLACEHOLDER_REPLACE_AFTER_REALM_IMPORT
         standardFlowEnabled: true
         directAccessGrantsEnabled: false
@@ -117,13 +54,8 @@ spec:
         webOrigins:
           - https://nc-chotatsu.shion1305.com
 
-    # -------------------------------------------------------------------------
-    # Identity Providers
-    # -------------------------------------------------------------------------
-    # GitHub OAuth IdP. The admin overwrites clientId / clientSecret in the
-    # Keycloak UI post-import (manual step 1). The GitHub OAuth App's callback
-    # URL must point at:
-    #   https://keycloak.shion1305.com/realms/nc-chotatsu/broker/github/endpoint
+    # GitHub OAuth IdP. clientId/clientSecret set via the admin UI post-import
+    # (step 1); not re-applied on reconcile, so do NOT commit real creds.
     identityProviders:
       - alias: github
         providerId: github
@@ -133,9 +65,6 @@ spec:
         trustEmail: true
         firstBrokerLoginFlowAlias: "first broker login"
         config:
-          # Placeholders replaced via the admin UI after initial import; the
-          # realm import does NOT re-apply them on subsequent reconciles, so it
-          # is safe to let Keycloak own the values. Do NOT commit real creds.
           clientId: PLACEHOLDER_REPLACE_AFTER_REALM_IMPORT
           clientSecret: PLACEHOLDER_REPLACE_AFTER_REALM_IMPORT
           defaultScope: "user:email"
