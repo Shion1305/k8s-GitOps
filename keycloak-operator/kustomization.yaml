@@ -13,3 +13,4 @@ resources:
   - user-realm.yaml
   - ynufes-tech-realm.yaml
   - harbor-realm.yaml
+  - nc-chotatsu-realm.yaml

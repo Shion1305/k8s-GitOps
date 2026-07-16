@@ -1,0 +1,42 @@
+# Envoy Gateway-managed OIDC for nc-chotatsu.shion1305.com.
+#
+# Attaches to the nc-press-chotatsu-external HTTPRoute so every request to the
+# frontend must first complete an Authorization Code flow against the
+# `nc-chotatsu` Keycloak realm (keycloak-operator/nc-chotatsu-realm.yaml),
+# which itself brokers login to GitHub. Envoy validates the id_token, mints an
+# encrypted session cookie, and only then forwards the request upstream.
+#
+# The whole origin is one Next.js frontend (no Docker Registry v2 / machine
+# clients), so unlike zot this needs no path split and no denyRedirect: a
+# missing/expired cookie 302s the top-level navigation to Keycloak, which is
+# exactly the desired behaviour.
+#
+# `redirectURL` must be this exact string -- Envoy validates the OIDC
+# redirect_uri against it and will not substitute the request :authority.
+# `/oauth2/callback` is Envoy's default OAuth2 callback path and is also
+# listed as a redirectUri on the Keycloak client.
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: SecurityPolicy
+metadata:
+  name: nc-chotatsu-oidc
+  namespace: nc-press-chotatsu
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: nc-press-chotatsu-external
+  oidc:
+    provider:
+      issuer: https://keycloak.shion1305.com/realms/nc-chotatsu
+    clientIDRef:
+      name: nc-chotatsu-oidc-credentials
+    clientSecret:
+      name: nc-chotatsu-oidc-credentials
+    redirectURL: https://nc-chotatsu.shion1305.com/oauth2/callback
+    logoutPath: /logout
+    # `openid` is auto-added by Envoy; the frontend needs no other claim.
+    scopes:
+      - email
+      - profile
+    cookieConfig:
+      sameSite: Lax

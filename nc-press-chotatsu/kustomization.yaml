@@ -7,8 +7,10 @@ resources:
   - db-external-secret.yaml
   - vault-secret-store.yaml
   - external-secret.yaml
+  - oidc-external-secret.yaml
   - frontend-deployment.yaml
   - frontend-service.yaml
   - reference-grant.yaml
   - httproute-external.yaml
+  - securitypolicy.yaml
   - crawler-cronjob.yaml
