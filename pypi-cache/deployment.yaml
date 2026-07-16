@@ -60,7 +60,10 @@ spec:
             - --bind
             - 0.0.0.0:5000
             - --threads
-            - "4"
+            # proxpi's Gunicorn process has one worker by default.  Downloads
+            # are I/O-bound, so allow enough concurrent requests from several
+            # GARM runners that package transfers cannot starve /health.
+            - "16"
             - --no-control-socket
           env:
             # Persist the wheel cache on the PVC (default is an ephemeral /tmp dir).
@@ -91,12 +94,16 @@ spec:
               port: http
             initialDelaySeconds: 5
             periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 6
           livenessProbe:
             httpGet:
               path: /health
               port: http
             initialDelaySeconds: 10
             periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 5
           resources:
             requests:
               cpu: 50m
