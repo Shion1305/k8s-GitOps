@@ -42,6 +42,10 @@ spec:
       useListenerPortAsContainerPort: true
       envoyDaemonSet:
         pod:
+          # Must stay schedulable on the over-committed OCI node — preempts
+          # app-critical pods (e.g. argocd-controller) rather than losing its
+          # :443 bind. See priorityclass.yaml.
+          priorityClassName: envoy-gateway-critical
           affinity:
             nodeAffinity:
               requiredDuringSchedulingIgnoredDuringExecution:
