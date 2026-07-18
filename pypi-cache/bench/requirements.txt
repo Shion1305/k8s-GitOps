@@ -1,0 +1,12 @@
+# Fixed, heavy dependency closure used only by bench/run.sh to exercise the
+# proxpi cache. Pinned so the downloaded byte volume is constant and runs are
+# comparable over time. Mirrors the ATC CI's heaviest wheels (big manylinux
+# binaries: pyarrow / scipy / numpy / polars + a wide transitive tree via
+# marimo). NOT a runtime dependency of anything in this repo.
+numpy==2.1.3
+scipy==1.14.1
+pandas==2.2.3
+pyarrow==17.0.0
+polars==1.9.0
+scikit-learn==1.5.2
+marimo==0.9.0

@@ -47,12 +47,20 @@ a wheel comes from, never *what* it is.
 
 ## Operational notes
 
-- **Single replica + RWO PVC** (`longhorn-hdd`, 20Gi). Never scale to >1 replica
-  against the same volume; `strategy: Recreate` ensures the old pod detaches
-  before the new one attaches. The cache is a warm-up optimisation — losing the
-  PVC just means the next pulls repopulate it from PyPI.
-- **Eviction:** `PROXPI_CACHE_SIZE=16Gi` (LRU) sits below the 20Gi PVC so proxpi
-  evicts before longhorn fills.
+- **Single replica + node-local `emptyDir` cache** (`sizeLimit: 20Gi`). The
+  cache is a disposable warm-up optimisation, so it does **not** use longhorn:
+  replicated HDD storage put the only replica on a different node than proxpi,
+  forcing every "cached" wheel read across the ~0.6 MB/s home WireGuard link (the
+  cause of the old bimodal 30s-vs-4min `uv` latency). An `emptyDir` keeps all
+  cache I/O on proxpi's own node. Trade-off: the cache is lost on pod
+  restart/reschedule and re-warms from PyPI on the next pulls — acceptable for a
+  warm-up cache. Never scale to >1 replica; `strategy: Recreate` keeps one
+  writer.
+- **Placement:** `nodeSelector: kubernetes.io/arch: amd64` co-locates proxpi with
+  the `shion1305-amd` GARM runners — the only amd64 nodes are the home nodes, so
+  proxpi stays on the home LAN and off the cross-site OCI nodes.
+- **Eviction:** `PROXPI_CACHE_SIZE=16Gi` (LRU) sits below the 20Gi `emptyDir`
+  `sizeLimit` so proxpi evicts before the kubelet does.
 - **Index freshness:** `PROXPI_INDEX_TTL=1800s` — new releases appear within 30
   min; the wheel *files* are immutable and cached indefinitely (until LRU-evicted).
 - **Image:** `epicwink/proxpi` pinned by digest (Docker Hub is its only channel).
@@ -65,3 +73,13 @@ Verified end-to-end locally (proxpi + a real `pip`/`uv` install): the index and
 every wheel are served through proxpi (`GET /index/<pkg>/<file>` 200), and wheels
 persist to the cache dir (`files-pythonhosted-org/packages/.../<pkg>.whl`). A
 second install of the same package is served entirely from the cache.
+
+## Benchmark
+
+`bench/run.sh` measures cache-hit `uv` install latency and N-way concurrency
+against the live in-cluster proxpi, and prints a summary table. CI runs it via
+[`.github/workflows/pypi-cache-benchmark.yaml`](../.github/workflows/pypi-cache-benchmark.yaml)
+on the `shion1305-amd` runner (in-cluster, so it can reach the Service) whenever
+`pypi-cache/**` changes — run it before/after infra changes to quantify the
+effect. See `bench/run.sh` for the tunable knobs (`CONCURRENCY`, threshold
+gates).

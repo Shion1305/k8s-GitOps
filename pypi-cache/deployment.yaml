@@ -29,9 +29,7 @@ metadata:
     app.kubernetes.io/name: proxpi
 spec:
   replicas: 1
-  # RWO PVC with a single writer: never run two proxpi pods against the same
-  # volume. Recreate (not RollingUpdate) so the old pod releases the PVC before
-  # the new one attaches, avoiding a multi-attach stall on longhorn.
+  # Single writer against a node-local cache; never run two proxpi pods.
   strategy:
     type: Recreate
   selector:
@@ -42,6 +40,11 @@ spec:
       labels:
         app.kubernetes.io/name: proxpi
     spec:
+      # Co-locate with the shion1305-amd GARM runners: the only amd64 nodes are
+      # the home nodes, so this keeps proxpi on the home LAN, off the cross-site
+      # OCI nodes, without pinning a hostname.
+      nodeSelector:
+        kubernetes.io/arch: amd64
       securityContext:
         runAsNonRoot: true
         runAsUser: 10001
@@ -66,11 +69,11 @@ spec:
             - "16"
             - --no-control-socket
           env:
-            # Persist the wheel cache on the PVC (default is an ephemeral /tmp dir).
+            # Cache dir on the node-local cache volume.
             - name: PROXPI_CACHE_DIR
               value: /var/cache/proxpi
-            # LRU ceiling in bytes; keep below the 20Gi PVC so proxpi evicts
-            # before longhorn fills. 16 GiB.
+            # LRU ceiling in bytes; keep below the emptyDir sizeLimit so proxpi
+            # evicts before the kubelet does. 16 GiB.
             - name: PROXPI_CACHE_SIZE
               value: "17179869184"
             # Re-check the simple index this often (seconds). 30 min balances
@@ -116,8 +119,12 @@ spec:
             capabilities:
               drop: ["ALL"]
       volumes:
+        # The wheel cache is a disposable warm-up (losing it just re-fetches from
+        # PyPI once), so it uses a node-local emptyDir rather than longhorn: keeps
+        # every read on proxpi's own node instead of across the home WireGuard
+        # link. Node disk, not medium: Memory. sizeLimit > PROXPI_CACHE_SIZE.
         - name: cache
-          persistentVolumeClaim:
-            claimName: proxpi-cache
+          emptyDir:
+            sizeLimit: 20Gi
         - name: tmp
           emptyDir: {}

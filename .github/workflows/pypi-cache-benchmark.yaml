@@ -1,0 +1,36 @@
+# Quantify in-cluster proxpi cache performance. Runs on the shion1305-amd GARM
+# runner because it is in-cluster and can reach the proxpi Service (a
+# GitHub-hosted runner cannot) -- this measures the real CI workload path. Gated
+# to pypi-cache/** changes so the shared production cache is only load-tested
+# when its config actually changes. All logic lives in pypi-cache/bench/run.sh.
+
+name: pypi-cache benchmark
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "pypi-cache/**"
+      - ".github/workflows/pypi-cache-benchmark.yaml"
+  pull_request:
+    paths:
+      - "pypi-cache/**"
+      - ".github/workflows/pypi-cache-benchmark.yaml"
+  workflow_dispatch:
+    inputs:
+      concurrency:
+        description: "Parallel installs for the concurrency test"
+        required: false
+        default: "8"
+
+jobs:
+  benchmark:
+    runs-on: shion1305-amd
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+      - name: Benchmark proxpi cache
+        env:
+          CONCURRENCY: ${{ github.event.inputs.concurrency || '8' }}
+        run: bash ./pypi-cache/bench/run.sh
