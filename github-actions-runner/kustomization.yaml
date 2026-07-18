@@ -14,3 +14,7 @@ resources:
   - reference-grant.yaml
   - networkpolicy.yaml
   - init-job.yaml
+  - servicemonitor.yaml
+  # Grafana objects (namespace: grafana) shipped by this app, like gh-leaked-tokens.
+  - grafana-folder.yaml
+  - grafana-dashboard.yaml

@@ -16,3 +16,116 @@ resources:
   - tt-exporter/service.yaml
   - tt-exporter/servicemonitor.yaml
   - tt-exporter/dashboard.yaml
+
+# Vendored kube-prometheus-stack dashboards (see scripts/sync-grafana-dashboards.sh).
+# These generate ConfigMaps with the SAME names the chart used to render via
+# grafana.forceDeployDashboards, so the GrafanaDashboard CRs above keep their
+# configMapRefs unchanged. The vendored JSON pins the `datasource` template
+# variable to the primary Prometheus (regex /^Prometheus$/ + current uid
+# `prometheus`) so no second prometheus-type datasource can shadow it.
+# Regenerate after a chart bump: ./scripts/sync-grafana-dashboards.sh
+# (CI fails if the committed output is stale).
+generatorOptions:
+  disableNameSuffixHash: true
+
+configMapGenerator:
+  - name: kube-prometheus-stack-alertmanager-overview
+    namespace: grafana
+    files:
+      - dashboards/json/alertmanager-overview.json
+  - name: kube-prometheus-stack-apiserver
+    namespace: grafana
+    files:
+      - dashboards/json/apiserver.json
+  - name: kube-prometheus-stack-cluster-total
+    namespace: grafana
+    files:
+      - dashboards/json/cluster-total.json
+  - name: kube-prometheus-stack-controller-manager
+    namespace: grafana
+    files:
+      - dashboards/json/controller-manager.json
+  - name: kube-prometheus-stack-etcd
+    namespace: grafana
+    files:
+      - dashboards/json/etcd.json
+  - name: kube-prometheus-stack-grafana-overview
+    namespace: grafana
+    files:
+      - dashboards/json/grafana-overview.json
+  - name: kube-prometheus-stack-k8s-coredns
+    namespace: grafana
+    files:
+      - dashboards/json/k8s-coredns.json
+  - name: kube-prometheus-stack-k8s-resources-cluster
+    namespace: grafana
+    files:
+      - dashboards/json/k8s-resources-cluster.json
+  - name: kube-prometheus-stack-k8s-resources-namespace
+    namespace: grafana
+    files:
+      - dashboards/json/k8s-resources-namespace.json
+  - name: kube-prometheus-stack-k8s-resources-node
+    namespace: grafana
+    files:
+      - dashboards/json/k8s-resources-node.json
+  - name: kube-prometheus-stack-k8s-resources-pod
+    namespace: grafana
+    files:
+      - dashboards/json/k8s-resources-pod.json
+  - name: kube-prometheus-stack-k8s-resources-workload
+    namespace: grafana
+    files:
+      - dashboards/json/k8s-resources-workload.json
+  - name: kube-prometheus-stack-k8s-resources-workloads-namespace
+    namespace: grafana
+    files:
+      - dashboards/json/k8s-resources-workloads-namespace.json
+  - name: kube-prometheus-stack-kubelet
+    namespace: grafana
+    files:
+      - dashboards/json/kubelet.json
+  - name: kube-prometheus-stack-namespace-by-pod
+    namespace: grafana
+    files:
+      - dashboards/json/namespace-by-pod.json
+  - name: kube-prometheus-stack-namespace-by-workload
+    namespace: grafana
+    files:
+      - dashboards/json/namespace-by-workload.json
+  - name: kube-prometheus-stack-node-cluster-rsrc-use
+    namespace: grafana
+    files:
+      - dashboards/json/node-cluster-rsrc-use.json
+  - name: kube-prometheus-stack-node-rsrc-use
+    namespace: grafana
+    files:
+      - dashboards/json/node-rsrc-use.json
+  - name: kube-prometheus-stack-nodes
+    namespace: grafana
+    files:
+      - dashboards/json/nodes.json
+  - name: kube-prometheus-stack-persistentvolumesusage
+    namespace: grafana
+    files:
+      - dashboards/json/persistentvolumesusage.json
+  - name: kube-prometheus-stack-pod-total
+    namespace: grafana
+    files:
+      - dashboards/json/pod-total.json
+  - name: kube-prometheus-stack-prometheus
+    namespace: grafana
+    files:
+      - dashboards/json/prometheus.json
+  - name: kube-prometheus-stack-proxy
+    namespace: grafana
+    files:
+      - dashboards/json/proxy.json
+  - name: kube-prometheus-stack-scheduler
+    namespace: grafana
+    files:
+      - dashboards/json/scheduler.json
+  - name: kube-prometheus-stack-workload-total
+    namespace: grafana
+    files:
+      - dashboards/json/workload-total.json

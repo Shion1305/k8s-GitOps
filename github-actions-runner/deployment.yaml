@@ -64,7 +64,12 @@ spec:
 
               [metrics]
               enable = true
-              disable_auth = false
+              # /metrics only (the /api/v1 surface keeps its JWT auth). GARM's
+              # metrics token expires and would silently stop scraping; open
+              # /metrics is safe because default-deny ingress + the clusterwide
+              # allow-from-infra policy admit only Prometheus, Envoy, nodes and
+              # runner-pods to garm-server:9997.
+              disable_auth = true
 
               [jwt_auth]
               secret = "${GARM_JWT_SECRET}"
