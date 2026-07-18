@@ -52,12 +52,15 @@ prometheus:
       requests:
         cpu: 1000m
         memory: 3Gi
-# Grafana is managed by grafana-operator; disable the bundled chart instance
-# but still render the chart's bundled dashboard ConfigMaps so the operator
-# can adopt them via GrafanaDashboard CRs (see grafana/dashboards.yaml).
+# Grafana is managed by grafana-operator; disable the bundled chart instance.
+# The chart's dashboard ConfigMaps are NOT rendered either: they are vendored
+# into grafana/dashboards/json/ by scripts/sync-grafana-dashboards.sh with the
+# `datasource` template variable pinned to the primary Prometheus, and
+# kustomize regenerates same-name ConfigMaps from those files (see
+# grafana/kustomization.yaml). Re-run the sync script after a chart bump.
 grafana:
   enabled: false
-  forceDeployDashboards: true
+  forceDeployDashboards: false
 # AlertManager configuration
 alertmanager:
   enabled: true

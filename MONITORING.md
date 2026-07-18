@@ -42,18 +42,20 @@ imported by community ID. The live set:
 
 - **Node Metrics** / **Kubernetes** / **Monitoring** folders — the
   kube-prometheus-stack mixin dashboards (node-exporter, k8s compute/network,
-  Prometheus & Alertmanager self-monitoring), rendered from the chart's
-  ConfigMaps.
+  Prometheus & Alertmanager self-monitoring), vendored into
+  `grafana/dashboards/json/` by `scripts/sync-grafana-dashboards.sh`
+  (re-run after a chart bump; CI fails when the vendored output is stale).
 - **GitHub Actions Runners** — GARM controller, runner pools, workflow jobs,
   GitHub API rate-limit/errors, webhooks, and runner-pod resources
   (`github-actions-runner/grafana-dashboard.yaml`).
 - **Tenstorrent**, **GH Leaked Tokens**, and other app-owned dashboards.
 
-Note: all dashboards should pin the primary `Prometheus` datasource (uid
-`prometheus`). Any additional prometheus-type datasource registered into
-`main-grafana` must be named so it sorts **after** `Prometheus`, otherwise
-Grafana's datasource-variable picker auto-selects the wrong one on the mixin
-dashboards.
+Note: every dashboard must pin its datasource explicitly — custom dashboards
+hard-code `uid: prometheus` in each panel, and the vendored mixin dashboards
+pin their `datasource` template variable (regex `/^Prometheus$/`). Grafana's
+datasource-variable picker otherwise auto-selects the first prometheus-type
+datasource **by name** (not the default one), so an unpinned dashboard breaks
+as soon as a second prometheus datasource is registered into `main-grafana`.
 
 ## Features
 

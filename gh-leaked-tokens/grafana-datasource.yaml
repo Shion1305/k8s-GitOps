@@ -21,14 +21,7 @@ spec:
     # primary). Without a fixed UID the operator assigns a random one and the
     # dashboard shows "No data".
     uid: gh-leaked-tokens
-    # Name deliberately prefixed "Prometheus —" so it sorts AFTER the primary
-    # "Prometheus" datasource. kube-prometheus-stack dashboards use a
-    # `datasource` template variable with no regex/current; Grafana 12 (Scenes)
-    # auto-selects the first prometheus datasource by name, so an un-prefixed
-    # "GH Leaked Tokens…" (G < P) would shadow "Prometheus" on every node/k8s
-    # dashboard. Do NOT rename this back. This datasource is referenced by its
-    # stable uid, so the name change does not affect the Token Validity boards.
-    name: Prometheus — GH Leaked Tokens (long-term)
+    name: GH Leaked Tokens (long-term)
     type: prometheus
     access: proxy
     url: http://prometheus.gh-leaked-tokens.svc.cluster.local:9090

@@ -51,3 +51,16 @@ jobs:
           # Bump when the cluster's control-plane minor version changes.
           K8S_VERSION: "1.31.0"
         run: ./scripts/render-validate.sh
+
+      # The kube-prometheus-stack mixin dashboards are vendored with their
+      # datasource variable pinned (grafana/dashboards/json/). Fail if a chart
+      # bump changed the upstream dashboards without a regeneration commit.
+      - name: Vendored dashboards freshness
+        env:
+          K8S_VERSION: "1.31.0"
+        run: |
+          ./scripts/sync-grafana-dashboards.sh
+          git diff --exit-code -- grafana/dashboards/json || {
+            echo "::error::grafana/dashboards/json is stale — run ./scripts/sync-grafana-dashboards.sh and commit the result"
+            exit 1
+          }
