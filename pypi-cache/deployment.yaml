@@ -64,9 +64,10 @@ spec:
             - 0.0.0.0:5000
             - --threads
             # proxpi's Gunicorn process has one worker by default.  Downloads
-            # are I/O-bound, so allow enough concurrent requests from several
-            # GARM runners that package transfers cannot starve /health.
-            - "16"
+            # are I/O-bound, but cap request concurrency at requests/urllib3's
+            # default per-host keep-alive pool size to avoid excessive upstream
+            # connection churn during cold-cache bursts.
+            - "10"
             - --no-control-socket
           env:
             # Cache dir on the node-local cache volume.
