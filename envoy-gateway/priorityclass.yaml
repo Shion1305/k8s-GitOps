@@ -1,0 +1,19 @@
+# The edge gateway (envoy-default) fronts ALL public and internal traffic, so it
+# must stay schedulable even on the small, over-committed OCI node. This priority
+# sits ABOVE the app-critical tier (argocd-critical / postgres-operator-pod =
+# 1e6) so the gateway can preempt those to reclaim its slot, but BELOW the
+# storage/system tiers (longhorn-critical 1e9, system-* 2e9), which it must never
+# evict.
+#
+# Context: a rolling update once rescheduled the OCI gateway pod, which then
+# could not fit because argocd-application-controller (argocd-critical, ~1.5 CPU)
+# had claimed the node's CPU — taking down all public ingress. With priority 0
+# the gateway had no preemption victims.
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: envoy-gateway-critical
+value: 2000000
+preemptionPolicy: PreemptLowerPriority
+globalDefault: false
+description: "Edge gateway data plane — must stay schedulable; preempts app-critical, never storage/system."
