@@ -1,12 +1,13 @@
 # Data plane for the `envoy-default` GatewayClass.
 #
 # Runs as a DaemonSet (NOT a Deployment) on the OCI node instance-k8s-proxy AND
-# the amd64 home node shion-ubuntu-2505, binding 80/443/5432 via hostNetwork so
-# each node's own IP terminates the merged listeners:
+# the amd64 home nodes shion-ubuntu-2505 / shion-ubuntu-2605, binding 80/443/5432
+# via hostNetwork so each node's own IP terminates the merged listeners:
 #   - instance-k8s-proxy: 141.147.189.36 (public) + 10.130.5.21 (internal VIP)
-#   - shion-ubuntu-2505:  10.130.5.66 — so *.i.shion1305.com can terminate on a
-#     home node (point the *.i DNS record here) instead of hairpinning out to
-#     the OCI gateway and back over WireGuard.
+#   - shion-ubuntu-2505:  10.130.5.66  \  *.i.shion1305.com DNS round-robins across
+#   - shion-ubuntu-2605:  10.130.5.67  /  these two home nodes, so it terminates
+#     on a home node instead of hairpinning out to the OCI gateway and back over
+#     WireGuard.
 #
 # A DaemonSet is the correct primitive for a one-per-node hostNetwork proxy: its
 # rolling update replaces a node's pod in place (delete-then-create), so the new
@@ -51,6 +52,7 @@ spec:
                         values:
                           - instance-k8s-proxy
                           - shion-ubuntu-2505
+                          - shion-ubuntu-2605
           tolerations:
             - key: node-role.kubernetes.io/control-plane
               operator: Exists
