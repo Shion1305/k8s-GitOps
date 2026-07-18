@@ -1,22 +1,30 @@
-# Data plane configuration for the Envoy Gateway controller.
-# Pins the Envoy proxy Pod to instance-k8s-proxy and binds 80/443 via hostNetwork
-# so that *.i.shion1305.com (10.130.5.21) and test-external.shion1305.com (141.147.189.36)
-# resolve directly to this node.
+# Data plane for the `envoy-default` GatewayClass.
 #
-# hostNetwork / dnsPolicy are not native EnvoyProxy CRD fields (removed in v1.0.0,
-# tracking issue: envoyproxy/gateway#1928). The official escape hatch is the
-# StrategicMerge patch on envoyDeployment. NET_BIND_SERVICE is required because
-# the data plane binds privileged ports (<1024).
+# Runs as a DaemonSet (NOT a Deployment) on the OCI node instance-k8s-proxy AND
+# the amd64 home node shion-ubuntu-2505, binding 80/443/5432 via hostNetwork so
+# each node's own IP terminates the merged listeners:
+#   - instance-k8s-proxy: 141.147.189.36 (public) + 10.130.5.21 (internal VIP)
+#   - shion-ubuntu-2505:  10.130.5.66 — so *.i.shion1305.com can terminate on a
+#     home node (point the *.i DNS record here) instead of hairpinning out to
+#     the OCI gateway and back over WireGuard.
 #
-# --base-id 1 is required because Cilium runs its own Envoy (cilium-envoy) on
-# the same node in the host network namespace. Both default to base-id=0 and
-# fight over the shared-memory domain socket (errno=98 EADDRINUSE on bind).
+# A DaemonSet is the correct primitive for a one-per-node hostNetwork proxy: its
+# rolling update replaces a node's pod in place (delete-then-create), so the new
+# pod never contends with the old for the privileged :443 bind. A Deployment
+# with maxSurge deadlocks here — the surge pod cannot bind :443 while the old
+# pod still holds it.
+#
+# hostNetwork / dnsPolicy are not native EnvoyProxy CRD fields (removed in
+# v1.0.0, tracking issue: envoyproxy/gateway#1928). The official escape hatch is
+# the StrategicMerge patch below. --base-id 1 is required because Cilium runs
+# its own Envoy (cilium-envoy) in the host network namespace on every node; both
+# default to base-id=0 and fight over the shared-memory domain socket
+# (errno=98 EADDRINUSE on bind).
 #
 # useListenerPortAsContainerPort: true makes Envoy bind the Gateway's listener
-# ports directly (80/443) instead of the default 10000-offset ports
-# (10080/10443). Required for hostNetwork because there is no Service in front
-# to remap ports. NET_BIND_SERVICE (set in the patch below) lets the unprivileged
-# envoy user bind ports <1024.
+# ports directly (80/443) instead of the default 10000-offset ports. Required
+# for hostNetwork because there is no Service in front to remap ports.
+# NET_BIND_SERVICE lets the envoy user bind ports <1024.
 apiVersion: gateway.envoyproxy.io/v1alpha1
 kind: EnvoyProxy
 metadata:
@@ -31,11 +39,18 @@ spec:
     type: Kubernetes
     kubernetes:
       useListenerPortAsContainerPort: true
-      envoyDeployment:
-        replicas: 1
+      envoyDaemonSet:
         pod:
-          nodeSelector:
-            kubernetes.io/hostname: instance-k8s-proxy
+          affinity:
+            nodeAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                nodeSelectorTerms:
+                  - matchExpressions:
+                      - key: kubernetes.io/hostname
+                        operator: In
+                        values:
+                          - instance-k8s-proxy
+                          - shion-ubuntu-2505
           tolerations:
             - key: node-role.kubernetes.io/control-plane
               operator: Exists
