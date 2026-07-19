@@ -44,7 +44,7 @@ ExternalSecret (in app namespace)
 K8s Secret (in app namespace) consumed by the app
 ```
 
-Used today by `langfuse`, `openwebui`, `mlflow`, and `keycloak`. The `Role` + `RoleBinding` per consumer namespace are defined in `rbac-db-reader.yaml`.
+Used today by `openwebui`, `mlflow`, and `keycloak`. The `Role` + `RoleBinding` per consumer namespace are defined in `rbac-db-reader.yaml`.
 
 ### 3. Cluster-scoped Vault distribution (one secret → many namespaces)
 

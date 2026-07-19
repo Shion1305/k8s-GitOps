@@ -4,7 +4,7 @@
 #
 # This file is reconciled by the Keycloak Operator (KeycloakRealmImport CRD).
 # It declares the `user` realm, which is the central human-user pool brokered
-# into other realms (today: `zot`, `harbor`) via Identity Brokering / OIDC.
+# into the `harbor` realm via Identity Brokering / OIDC.
 #
 # Authentication policy:
 #   - Passkey / WebAuthn only (NO password, NO IdP login).
@@ -35,11 +35,10 @@
 #    required action set below.
 #
 # 3. Retrieve the auto-generated client secret for each per-child-realm broker
-#    client (today: `zot-broker`, `harbor-broker`) from the Keycloak admin UI:
+#    client (today: `harbor-broker`) from the Keycloak admin UI:
 #      realm `user` -> Clients -> <broker-client> -> Credentials -> "Client secret".
 #    Copy that value into the matching `keycloak-oidc` IdP config on the child
-#    realm side (e.g. realm `zot` -> Identity Providers -> user ->
-#    Client Secret; realm `harbor` -> Identity Providers -> user ->
+#    realm side (realm `harbor` -> Identity Providers -> user ->
 #    Client Secret). Do NOT commit the value to git.
 #
 # -----------------------------------------------------------------------------
@@ -138,24 +137,6 @@ spec:
     # IdP config -- see header step 3.
     # -------------------------------------------------------------------------
     clients:
-      - clientId: zot-broker
-        name: "zot realm broker"
-        description: "Broker client used by the `zot` realm to authenticate users via this realm."
-        protocol: openid-connect
-        publicClient: false
-        clientAuthenticatorType: client-secret
-        # NOTE: This placeholder is replaced by a Keycloak-generated secret on
-        # first import. Copy the real value from the admin UI into the `zot`
-        # realm's IdP config (Identity Providers -> user -> Client Secret).
-        # Do NOT commit the actual secret to git.
-        secret: PLACEHOLDER_REPLACE_AFTER_REALM_IMPORT
-        standardFlowEnabled: true
-        directAccessGrantsEnabled: false
-        serviceAccountsEnabled: false
-        redirectUris:
-          - https://keycloak.shion1305.com/realms/zot/broker/user/endpoint
-        webOrigins:
-          - https://keycloak.shion1305.com
       - clientId: harbor-broker
         name: "harbor realm broker"
         description: "Broker client used by the `harbor` realm to authenticate users via this realm."

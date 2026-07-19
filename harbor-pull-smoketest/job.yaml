@@ -2,7 +2,7 @@
 # end-to-end with no manual setup in the consumer namespace.
 #
 # Pull image: harbor.i.shion1305.com/shion1305/demo:latest — a small alpine
-# image that prints a line and exits, mirroring the zot-pull-smoketest payload.
+# image that prints a line and exits.
 #
 # `imagePullSecrets` is intentionally omitted: Kyverno's `harbor-pull-injection`
 # ClusterPolicy injects it at admission and clones the source Secret into this
