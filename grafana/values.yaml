@@ -8,6 +8,13 @@ global:
 prometheus:
   enabled: true
   prometheusSpec:
+    # Give the startup probe enough runway for a full WAL replay. On this
+    # HDD-backed longhorn volume replay can take far longer than the operator's
+    # default 15m budget (esp. under I/O contention), and a mid-replay probe
+    # kill restarts the replay from scratch — a loop that never lets the head
+    # compact, so the WAL only grows and each attempt gets slower. 90m breaks
+    # that spiral; a healthy start still passes in seconds.
+    maximumStartupDurationSeconds: 5400
     # Retention settings
     retention: 999d # High value to allow size to be the primary retention factor
     retentionSize: 340GB # About ~85% of total capacity for safety margin
