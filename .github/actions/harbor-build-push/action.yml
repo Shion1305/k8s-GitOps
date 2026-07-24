@@ -88,6 +88,13 @@ inputs:
       arm64 — matches the `harbor/demo` baseline.
     required: false
     default: linux/amd64,linux/arm64
+  push:
+    description: >-
+      Whether to push the built image to Harbor. Defaults to "true" for
+      backwards compatibility. Workflows that run for pull requests should
+      pass "false" for validation-only builds.
+    required: false
+    default: "true"
   sign:
     description: >-
       Whether to keyless-sign the pushed image with cosign. Off-by-default
@@ -153,7 +160,8 @@ runs:
     # JSON as if it were an image layer. So: signing only here; SBOM is
     # produced by Harbor's own Trivy via the GENERATE SBOM action on the
     # image artifact.
-    - uses: sigstore/cosign-installer@v4.1.2
+    - if: inputs.push == 'true'
+      uses: sigstore/cosign-installer@v4.1.2
       with:
         cosign-release: v2.4.1
 
@@ -161,14 +169,16 @@ runs:
     # $GITHUB_ENV (not the installer step's `env:`) so it persists for
     # the later push step — aqua-proxy re-reads it at every crane
     # invocation to dispatch to the pinned package version.
-    - name: Export AQUA_GLOBAL_CONFIG
+    - if: inputs.push == 'true'
+      name: Export AQUA_GLOBAL_CONFIG
       shell: bash
       run: echo "AQUA_GLOBAL_CONFIG=${{ github.action_path }}/aqua.yaml" >> "$GITHUB_ENV"
 
     # aqua_opts `-l -a`: `-a` triggers installAll which actually consumes
     # AQUA_GLOBAL_CONFIG; `-l` alone (the installer default) only links
     # aqua-proxy and skips package installs.
-    - uses: aquaproj/aqua-installer@v4.0.5
+    - if: inputs.push == 'true'
+      uses: aquaproj/aqua-installer@v4.0.5
       with:
         aqua_version: v2.59.1
         aqua_opts: -l -a
@@ -180,7 +190,8 @@ runs:
     # default audience (`https://github.com/<owner>`) which matches the
     # Vault role's `bound_audiences` — overriding `jwtGithubAudience` here
     # would cause a 400 at the Vault side.
-    - name: Fetch Harbor robot credentials from Vault
+    - if: inputs.push == 'true'
+      name: Fetch Harbor robot credentials from Vault
       uses: hashicorp/vault-action@v4
       with:
         url: https://vault.shion1305.com
@@ -196,7 +207,8 @@ runs:
     # (Vault returns 404 → action fails loud, but a renamed field would
     # bind an empty string to the env var and crane would 401 with a
     # generic message). Failing fast here surfaces the real cause.
-    - name: Verify robot credentials are non-empty
+    - if: inputs.push == 'true'
+      name: Verify robot credentials are non-empty
       shell: bash
       run: |
         set -euo pipefail
@@ -226,7 +238,8 @@ runs:
           --output type=oci,dest=/tmp/image.tar \
           "${CONTEXT}"
 
-    - name: Push and sign
+    - if: inputs.push == 'true'
+      name: Push and sign
       id: push
       shell: bash
       env:
