@@ -51,13 +51,9 @@ jobs:
         with:
           image: harbor.shion1305.com/shion1305/demo
           context: ./harbor/demo
-          # Validate PR builds without publishing; push for main and manual
-          # runs.
-          push: ${{ github.event_name != 'pull_request' }}
           # The demo intentionally moves `latest` so a `docker pull
           # harbor.shion1305.com/shion1305/demo` always pulls the most recent
           # smoke-test image. Production callers should NOT pass extra-tags
           # unless they have a deliberate reason — the action defaults
           # extra-tags to empty for that reason.
-          extra-tags: >-
-            ${{ github.event_name != 'pull_request' && 'latest' || '' }}
+          extra-tags: latest
