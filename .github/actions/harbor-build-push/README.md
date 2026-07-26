@@ -56,6 +56,7 @@ jobs:
       - uses: Shion1305/k8s-GitOps/.github/actions/harbor-build-push@main
         with:
           image: harbor.shion1305.com/shion1305/<your-app>
+          push: "true"
 ```
 
 That's it. The action handles everything else.
@@ -79,6 +80,7 @@ That's it. The action handles everything else.
 | `context`    | `.`                     | Docker build context path (relative to repo root). |
 | `dockerfile` | `Dockerfile`            | Dockerfile path relative to `context`. |
 | `platforms`  | `linux/amd64,linux/arm64` | Comma-separated `buildx` target platforms. |
+| `push`       | `"true"`                 | Whether to publish the built image. Set to `"false"` for validation-only builds; no Harbor credentials are fetched in that case. For a workflow that handles PRs and pushes, use `${{ github.event_name != 'pull_request' }}`. |
 | `sign`       | `"true"`                | Whether to keyless-sign with cosign (Fulcio + Rekor). Defaulted ON because mixing signed and unsigned images is a supply-chain footgun. Pass the string `"false"` to disable. |
 | `tag`        | `${{ github.sha }}`     | Primary tag pushed. Defaults to the calling repo's commit SHA so every build is uniquely addressable. |
 | `extra-tags` | `""`                    | Comma-separated additional tags applied to the same digest (e.g. `latest,v1.2.3`). Empty by default — opt in explicitly if you want a moving `latest`. |
@@ -110,6 +112,7 @@ jobs:
         uses: Shion1305/k8s-GitOps/.github/actions/harbor-build-push@main
         with:
           image: harbor.shion1305.com/shion1305/myapp
+          push: "true"
 
   deploy:
     needs: build-push
