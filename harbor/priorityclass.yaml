@@ -1,0 +1,8 @@
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: harbor-critical
+value: 1000000
+globalDefault: false
+preemptionPolicy: PreemptLowerPriority
+description: "Harbor registry control and data-plane workloads. Matches the app-critical tier so image distribution remains schedulable under node pressure."

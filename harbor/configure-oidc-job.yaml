@@ -75,6 +75,9 @@ spec:
       serviceAccountName: harbor-configure-oidc
       automountServiceAccountToken: false
       restartPolicy: OnFailure
+      priorityClassName: harbor-critical
+      nodeSelector:
+        kubernetes.io/hostname: shion-ubuntu-2505
       securityContext:
         runAsNonRoot: true
         runAsUser: 65532
