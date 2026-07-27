@@ -9,7 +9,6 @@ resources:
   - vault-secret-store.yaml
   - db-secret-store.yaml
   - external-secret.yaml
-  - zot-realm.yaml
   - user-realm.yaml
   - ynufes-tech-realm.yaml
   - harbor-realm.yaml

@@ -1,5 +1,5 @@
 # Primary external route. Issuer URL = https://keycloak.shion1305.com.
-# All OIDC clients (zot-registry, gha-exchanger, cloudflare-grafana, ...) point here.
+# All OIDC clients (harbor-ui, cloudflare-grafana, ...) point here.
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:

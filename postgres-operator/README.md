@@ -393,7 +393,7 @@ to false internally
 
 ### Why existing users worked
 
-The `openwebui`, `langfuse`, and `keycloak` users were created during the initial cluster bootstrap by Patroni/Spilo (via `initdb`), not by the operator's sync loop. `enable_database_access` only affects post-bootstrap operations on existing clusters.
+The `openwebui` and `keycloak` users were created during the initial cluster bootstrap by Patroni/Spilo (via `initdb`), not by the operator's sync loop. `enable_database_access` only affects post-bootstrap operations on existing clusters.
 
 ### Fix
 

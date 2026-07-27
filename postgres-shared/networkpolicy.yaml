@@ -25,7 +25,6 @@ spec:
                 - grafana
                 - harbor
                 - keycloak
-                - langfuse
                 - mlflow
                 - nc-press-chotatsu
                 - openwebui

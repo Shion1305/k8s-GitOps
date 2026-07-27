@@ -7,7 +7,7 @@ metadata:
     # Sync after postgres-shared (default wave 0) so the `harbor` user/DB
     # exist before Harbor core tries to connect. Without this, the first
     # sync still converges via Pod CrashLoopBackOff retries (see
-    # langfuse-app for the no-wave precedent), but waving avoids the
+    # other Helm-backed apps for the no-wave precedent), but waving avoids the
     # noisy startup window.
     argocd.argoproj.io/sync-wave: "1"
 spec:

@@ -20,10 +20,8 @@
 # unrelated Pod admission cluster-wide. Pods needing the secret will degrade
 # to ImagePullBackOff and self-heal once Kyverno recovers.
 #
-# Architectural note vs zot-pull-injection: structurally identical, just
-# matches a different registry hostname. The auth chain underneath is much
-# simpler — Harbor uses long-lived robot-account Basic auth, so there is no
-# token expiry to worry about and no ESO ClusterGenerator in the picture.
+# Harbor uses long-lived robot-account Basic auth, so no token exchange or
+# periodic credential refresh is needed.
 apiVersion: kyverno.io/v1
 kind: ClusterPolicy
 metadata:

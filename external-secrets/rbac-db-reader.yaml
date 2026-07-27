@@ -1,32 +1,3 @@
-# Per-namespace RBAC for reading postgres-operator DB credentials.
-# Each Role uses resourceNames to restrict access to only that namespace's secret.
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
-metadata:
-  name: eso-db-langfuse
-  namespace: postgres-operator-deployment
-rules:
-  - apiGroups: [""]
-    resources: ["secrets"]
-    resourceNames:
-      - langfuse.postgres-shared.credentials.postgresql.acid.zalan.do
-    verbs: ["get", "list", "watch"]
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
-metadata:
-  name: eso-db-langfuse
-  namespace: postgres-operator-deployment
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: Role
-  name: eso-db-langfuse
-subjects:
-  - kind: ServiceAccount
-    name: eso-db
-    namespace: langfuse
----
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:

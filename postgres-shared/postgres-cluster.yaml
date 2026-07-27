@@ -11,7 +11,6 @@ spec:
   numberOfInstances: 1
   users:
     openwebui: []
-    langfuse: []
     keycloak: []
     mlflow: []
     nc_press_chotatsu: []
@@ -21,7 +20,6 @@ spec:
     research_gh_leaks: []
   databases:
     openwebui: openwebui
-    langfuse: langfuse
     keycloak: keycloak
     mlflow: mlflow
     nc_press_chotatsu: nc_press_chotatsu

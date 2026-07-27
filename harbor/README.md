@@ -283,7 +283,7 @@ ESO's `harbor-pull` `ClusterExternalSecret` will materialize the dockerconfigjso
 kubectl annotate clusterexternalsecret harbor-pull force-sync="$(date +%s)" --overwrite
 ```
 
-The end-to-end push + pull smoketest (GHA workflow + cluster-side `harbor-pull-smoketest` Job) lives in a follow-up PR; that PR is the verification gate before zot is decommissioned.
+The end-to-end push + pull smoketest consists of the GHA workflow and the cluster-side `harbor-pull-smoketest` Job.
 
 ## Day 2 operations
 
@@ -407,7 +407,7 @@ Public pull and public portal access are not requirements for this cluster. Mini
 
 ### Why postgres-shared instead of a dedicated cluster
 
-Consistency with langfuse, keycloak, mlflow, openwebui — they all live in `postgres-shared`. Harbor's DB load is light (project metadata + manifest pointers, not blobs). Failure isolation against a shared cluster outage was deemed not worth the operational overhead of a second cluster.
+Consistency with keycloak, mlflow, and openwebui — they all live in `postgres-shared`. Harbor's DB load is light (project metadata + manifest pointers, not blobs). Failure isolation against a shared cluster outage was deemed not worth the operational overhead of a second cluster.
 
 ### Why secretKey / coreSecret / adminPassword in Vault, not chart-generated
 

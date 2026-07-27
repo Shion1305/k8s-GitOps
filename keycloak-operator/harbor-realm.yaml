@@ -10,8 +10,8 @@
 #     against this realm using the `harbor-ui` confidential client below.
 #     Harbor stores its OIDC settings in its own Postgres DB (seeded by the
 #     Helm chart's `core.configureUserSettings` env on first start), NOT
-#     via Envoy Gateway's SecurityPolicy.oidc. So unlike zot, there is no
-#     Envoy OIDC layer in front of Harbor for browser auth — Harbor speaks
+#     via Envoy Gateway's SecurityPolicy.oidc. There is no Envoy OIDC layer
+#     in front of Harbor for browser auth — Harbor speaks
 #     OIDC natively and just needs a working realm + client to point at.
 #   - Authorization is driven by the `groups` claim Harbor maps onto its
 #     internal projects (Harbor's `oidc_groups_claim=groups` setting reads
@@ -26,7 +26,7 @@
 # problem natively. Likewise there is no `harbor-registry` audience-target
 # client: Harbor's OIDC integration uses a single confidential client and
 # validates inbound tokens by `client_id`, not by an `aud` claim, so the
-# audience-mapper indirection used in the zot realm is unnecessary.
+# audience mapper is unnecessary.
 #
 # External portal access is intentionally not exposed. The public hostname
 # `harbor.shion1305.com` only serves the docker registry endpoints

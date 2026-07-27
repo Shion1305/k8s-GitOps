@@ -29,7 +29,7 @@ To exclude more, add names to the generator's `exclude.any[].resources.names`.
 
 | Receiver | Allowed source(s) | Port | File |
 |---|---|---|---|
-| shared Postgres (`postgres-operator-deployment`) | adminer, atc, harbor, keycloak, langfuse, mlflow, nc-press-chotatsu, openwebui, postgres-operator | 5432 | `postgres-shared/networkpolicy.yaml` |
+| shared Postgres (`postgres-operator-deployment`) | adminer, atc, harbor, keycloak, mlflow, nc-press-chotatsu, openwebui, postgres-operator | 5432 | `postgres-shared/networkpolicy.yaml` |
 | shared Postgres | postgres-operator (Patroni) | 8008 | `postgres-shared/networkpolicy.yaml` |
 | `vault` | external-secrets | 8200 | `vault/networkpolicy.yaml` |
 | `atc` (`app=postgres-mcp`) | openwebui | 8000 | `atc/network-policy-openwebui-to-mcp.yaml` |

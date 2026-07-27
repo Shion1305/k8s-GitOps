@@ -36,7 +36,7 @@ server:
     periodSeconds: 10
     failureThreshold: 5
   # Ingress disabled; HTTPRoutes in vault/httproute-*.yaml attach the per-host
-  # routing to Envoy Gateway (matches harbor/zot/keycloak pattern).
+  # routing to Envoy Gateway (matches harbor/keycloak pattern).
   ingress:
     enabled: false
   # 3-node raft cluster: a quorum (2 of 3) must survive any single-node event, so

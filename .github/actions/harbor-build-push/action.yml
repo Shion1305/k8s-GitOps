@@ -18,9 +18,9 @@
 # step, no AQUA_GLOBAL_CONFIG gymnastics.
 #
 # Why Vault JWT auth instead of long-lived robot-account GitHub Secrets:
-# Harbor's /v2/ token endpoint does not accept GitHub OIDC tokens directly
-# (unlike zot, which we wired up in demo-push-to-zot.yaml). The supported CI
-# path is a Harbor robot account — a project-scoped static credential. The
+# Harbor's /v2/ token endpoint does not accept GitHub OIDC tokens directly.
+# The supported CI path is a Harbor robot account — a project-scoped static
+# credential. The
 # naive implementation is to drop those creds into per-repo
 # `HARBOR_ROBOT_USER` / `HARBOR_ROBOT_TOKEN` GitHub Secrets, but that has
 # real downsides:
@@ -58,7 +58,7 @@
 # dirs/tarballs (no docker-daemon image-store round-trip), sends
 # `Authorization: Bearer` pre-emptively, and is more robust under CI
 # conditions. It reads ~/.docker/config.json and Just Works once the auth
-# blob is in place. Same reasoning as the zot demo workflow.
+# blob is in place.
 
 name: harbor - build & push
 description: >-

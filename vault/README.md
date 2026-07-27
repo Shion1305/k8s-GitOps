@@ -248,21 +248,19 @@ Each namespace has its own Vault policy and Kubernetes auth role, scoped to only
 
 | Vault Role | Scope | Bound SA | Allowed Paths |
 |------------|-------|----------|---------------|
-| `eso-langfuse` | namespace `langfuse` | `eso` | `secret/data/shared/langfuse` (read), metadata (read,list) |
 | `eso-openwebui` | namespace `openwebui` | `eso` | `secret/data/shared/openwebui` (read), metadata (read,list) |
 | `eso-keycloak` | namespace `keycloak` | `eso` | `secret/data/shared/keycloak` (read), metadata (read,list) |
 | `eso-atc` | namespace `atc` | `eso` | `atc/data/*` (read), `atc/metadata/*` (read,list) |
 | `eso-lumos-bot` | namespace `lumos-bot` | `eso` | `lumos-bot/data/*` (read), `lumos-bot/metadata/*` (read,list) |
 | `eso-freqtrade` | namespace `freqtrade` | `eso` | `freqtrade/data/*` (read), `freqtrade/metadata/*` (read,list) |
 | `eso-cert-manager` | namespace `cert-manager` | `eso` | `system/data/cert-manager` (read), `system/metadata/cert-manager` (read,list) |
-| `eso-zot` | namespace `zot` | `eso` | `zot/data/*` (read), `zot/metadata/*` (read,list) |
 | `eso-harbor` | namespace `harbor` | `eso` | `harbor/data/*` (read), `harbor/metadata/*` (read,list) |
 | `eso-github-app` | **cluster-scoped** | `external-secrets/external-secrets` | `github-app-shared/data/*` (read), `github-app-shared/metadata/*` (read,list) |
 | `eso-harbor-pull` | **cluster-scoped** | `external-secrets/external-secrets` | `harbor/data/robot-puller` (read), metadata (read,list) — backs the cluster-wide `harbor-pull` Secret distribution |
 
 `eso-github-app` is the only cluster-scoped role: it binds to the ESO operator's own ServiceAccount (`external-secrets/external-secrets`) rather than a per-namespace `eso` SA, because it backs a `ClusterSecretStore` distributing one shared secret to multiple namespaces. See `../external-secrets/README.md` (pattern 3).
 
-> **Note**: DB credentials for langfuse, openwebui, mlflow, and keycloak are synced directly from the postgres-operator via ESO's Kubernetes provider (not Vault). See `../external-secrets/README.md`.
+> **Note**: DB credentials for openwebui, mlflow, and keycloak are synced directly from the postgres-operator via ESO's Kubernetes provider (not Vault). See `../external-secrets/README.md`.
 
 To add a new namespace with Vault access, update `vault/scripts/setup-eso-policies.sh` and run it.
 
@@ -340,9 +338,8 @@ Current HDD capacity:
 
 ## Notes
 
-- Uses KV v2 secrets engines on several per-service mounts: `atc/`, `freqtrade/`, `lumos-bot/`, `zot/`, `system/`, `github-app-shared/`, plus the legacy shared `secret/` mount (still used by langfuse, openwebui, and keycloak under `secret/shared/<svc>`)
+- Uses KV v2 secrets engines on several per-service mounts: `atc/`, `freqtrade/`, `lumos-bot/`, `system/`, `github-app-shared/`, plus the legacy shared `secret/` mount (still used by openwebui and keycloak under `secret/shared/<svc>`)
 - Per-namespace Vault policies enforce least-privilege access
 - DB credentials use ESO Kubernetes provider for automatic rotation
 - Non-DB secrets use per-namespace `SecretStore` + `ServiceAccount` for Vault isolation
 - Longhorn `replicaAutoBalance: best-effort` ensures replicas spread across available nodes
-
