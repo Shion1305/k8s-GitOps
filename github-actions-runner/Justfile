@@ -9,6 +9,11 @@ credentials := env_var_or_default("GARM_CREDENTIALS_NAME", "shion1305-github-app
 runner_image := env_var_or_default("GARM_RUNNER_IMAGE", "harbor.shion1305.com/shion1305/garm-runner:2.335.1-ubuntu24.04")
 max_runners := env_var_or_default("GARM_MAX_RUNNERS", "6")
 min_idle_runners := env_var_or_default("GARM_MIN_IDLE_RUNNERS", "0")
+# Ceilings enforced by `just pool-audit`. Deliberately looser than the creation
+# defaults above so a busy repo may keep one warm runner, but not a standing
+# fleet. See "Pool Sizing" in README.md.
+audit_max_runners := env_var_or_default("GARM_AUDIT_MAX_RUNNERS", "8")
+audit_min_idle_runners := env_var_or_default("GARM_AUDIT_MIN_IDLE_RUNNERS", "1")
 amd_provider := env_var_or_default("GARM_AMD_PROVIDER", "kubernetes_amd64")
 arm_provider := env_var_or_default("GARM_ARM_PROVIDER", "kubernetes_arm64")
 amd_tags := env_var_or_default("GARM_AMD_TAGS", "shion1305-amd")
@@ -138,3 +143,14 @@ repo-list:
 # Show runner pools.
 pool-list:
   kubectl exec -n {{namespace}} {{deployment}} -- /opt/garm/bin/garm-cli pool list
+
+# Flag pools whose sizing drifted above the safe defaults. Pools are configured
+# imperatively via garm-cli, so nothing in Git prevents drift -- run this after
+# any manual pool tuning. See "Pool Sizing" in README.md.
+pool-audit:
+  #!/usr/bin/env bash
+  set -euo pipefail
+  kubectl exec -n {{namespace}} {{deployment}} -- \
+    /opt/garm/bin/garm-cli pool list --format json \
+    | MAX_OK='{{audit_max_runners}}' IDLE_OK='{{audit_min_idle_runners}}' \
+      ./scripts/pool-audit.py
