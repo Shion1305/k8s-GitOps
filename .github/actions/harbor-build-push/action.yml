@@ -180,7 +180,7 @@ runs:
     - if: inputs.push == 'true'
       uses: aquaproj/aqua-installer@v4.0.5
       with:
-        aqua_version: v2.59.1
+        aqua_version: v2.60.1
         aqua_opts: -l -a
 
     # Exchange the workflow's GitHub OIDC token for the Harbor robot
