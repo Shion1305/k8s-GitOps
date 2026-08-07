@@ -14,6 +14,18 @@ data:
       spec:
         nodeSelector:
           kubernetes.io/arch: amd64
+        # Spread runners across amd64 nodes. Without this the scheduler's
+        # ImageLocality score piles every runner onto whichever node already
+        # cached the (large) runner image, and that node's serialized image-pull
+        # queue becomes the bottleneck for the whole cluster. Soft
+        # (ScheduleAnyway) so a single reachable node still accepts runners.
+        topologySpreadConstraints:
+          - maxSkew: 2
+            topologyKey: kubernetes.io/hostname
+            whenUnsatisfiable: ScheduleAnyway
+            labelSelector:
+              matchLabels:
+                app.kubernetes.io/managed-by: garm
         # Re-pull the mutable image tag on every cold start so runners pick up
         # image rebuilds (e.g. the buildx wiring) instead of a stale cached layer.
         containers:
@@ -36,6 +48,14 @@ data:
       spec:
         nodeSelector:
           kubernetes.io/arch: arm64
+        # See the amd64 template above for why runners are spread by hostname.
+        topologySpreadConstraints:
+          - maxSkew: 2
+            topologyKey: kubernetes.io/hostname
+            whenUnsatisfiable: ScheduleAnyway
+            labelSelector:
+              matchLabels:
+                app.kubernetes.io/managed-by: garm
         # Re-pull the mutable image tag on every cold start so runners pick up
         # image rebuilds (e.g. the buildx wiring) instead of a stale cached layer.
         containers:
