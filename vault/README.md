@@ -30,7 +30,7 @@ Vault is exposed on three hostnames, each with a different purpose:
 | Hostname | Network | Allowed Paths | Use Case |
 |----------|---------|---------------|----------|
 | `vault.i.shion1305.com` | Internal (WireGuard only) | All (full UI + API) | Admin/operator UI, all interactive use, `api_addr` |
-| `vault.shion1305.com` | Public internet | Allowlisted: `/v1/auth/jwt/login`, `/v1/auth/token/renew-self`, `/v1/auth/token/revoke-self`, `GET /v1/harbor/data/robot-pusher` | CI (GitHub Actions) JWT login + token self-management + scoped KV reads |
+| `vault.shion1305.com` | Public internet | Allowlisted: `/v1/auth/jwt/login`, `/v1/auth/token/renew-self`, `/v1/auth/token/revoke-self`, and exact CI KV reads under `harbor/robot-pusher` and `k8s/ci-dashboard-restarter` | CI (GitHub Actions) JWT login + token self-management + scoped KV reads |
 | `vault.k.shion1305.com` | Public (legacy) | 301 redirect → `vault.i.shion1305.com` | Bookmark migration only; will be removed in a future PR |
 
 - **UI**: <https://vault.i.shion1305.com>
@@ -56,6 +56,46 @@ vault kv put <svc>/credentials \
 vault kv list <svc>/
 vault kv get <svc>/credentials
 ```
+
+### ATC dashboard rollout identity
+
+The ATC dashboard publish workflow exchanges its GitHub OIDC token for a
+10-minute Vault token with no inherited `default` policy. That token may read only
+`k8s/ci-dashboard-restarter`, which holds a one-year Kubernetes TokenRequest
+token for `atc/ci-dashboard-restarter`. Kubernetes RBAC limits that service
+account's workload-mutating authority to `get` and `patch` on
+`deployment/atc-dashboard`; it cannot mutate the executor or any other
+resource. The standard authenticated-user discovery and self-review grants
+remain read-only. The token is bound to the UID of the empty
+`atc/ci-dashboard-restarter-token-bound` Secret, which is its revocation
+handle.
+
+Bootstrap the full path from an authenticated operator shell:
+
+```bash
+export VAULT_ADDR=http://127.0.0.1:8200
+export VAULT_TOKEN=<admin-token>
+kubectl port-forward svc/vault-active 8200:8200 -n vault &
+bash vault/scripts/setup-atc-dashboard-restarter.sh
+```
+
+The script validates the minted token's real subject, groups, effective RBAC,
+and actual `iat`/`exp` lifetime before writing the Vault policy or credential
+or enabling the workflow. It creates the exact-path Vault policy and
+workflow-bound JWT role, stores the token without printing it, and only then
+enables `DASHBOARD_RESTART_ENABLED` in the application repository. It refuses
+to overwrite an existing credential:
+overwriting Vault cannot revoke the previous TokenRequest token. Any failure
+after minting deletes the bound Secret (revoking that attempt) and removes a
+partially written Vault credential before returning nonzero.
+
+To revoke or rotate a live credential, first set
+`DASHBOARD_RESTART_ENABLED=false`, delete the
+`atc/ci-dashboard-restarter-token-bound` Secret (which invalidates the bound
+token), and run `vault kv metadata delete k8s/ci-dashboard-restarter`. Then
+rerun the bootstrap script. The same sequence is safe after an interrupted
+attempt: both the Vault metadata and revocation handle must be absent before
+the script will mint another token.
 
 ### Secret Rotation
 
@@ -345,4 +385,3 @@ Current HDD capacity:
 - DB credentials use ESO Kubernetes provider for automatic rotation
 - Non-DB secrets use per-namespace `SecretStore` + `ServiceAccount` for Vault isolation
 - Longhorn `replicaAutoBalance: best-effort` ensures replicas spread across available nodes
-
