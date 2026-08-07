@@ -127,7 +127,10 @@ configs:
         - '.spec.rules[].backendRefs[].group'
         - '.spec.rules[].backendRefs[].kind'
         - '.spec.rules[].backendRefs[].weight'
-        - '.spec.rules[].matches'
+        # Admission supplies this exact catch-all match when a rule omits
+        # `matches`. Ignore only that default; path, method, header, and query
+        # changes on explicitly configured matches must remain visible.
+        - '.spec.rules[] | select(.matches == [{"path":{"type":"PathPrefix","value":"/"}}]) | .matches'
     resource.customizations.ignoreDifferences.gateway.networking.k8s.io_TLSRoute: |
       jqPathExpressions:
         - '.spec.parentRefs[].group'

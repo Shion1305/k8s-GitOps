@@ -57,6 +57,110 @@ fail() { printf '\033[31m✗\033[0m %s\n' "$*" >&2; }
 ok()   { printf '\033[32m✓\033[0m %s\n' "$*" >&2; }
 warn() { printf '\033[33m!\033[0m %s\n' "$*" >&2; }
 
+# HTTPRoute matches contain routing semantics (path, method, headers, and
+# query parameters). Ignoring the entire list makes ArgoCD report path changes
+# as Synced without applying them. Admission's exact catch-all default may be
+# ignored conditionally, but never the whole field.
+validate_argocd_diff_safety() {
+  local http_route_ignores ignore_program explicit_route near_default_route
+  local default_route
+  http_route_ignores="$(
+    yq -o=json \
+      '.configs.cm."resource.customizations.ignoreDifferences.gateway.networking.k8s.io_HTTPRoute" | from_yaml' \
+      "${ROOT}/argocd/values.yaml"
+  )"
+  if ! ignore_program="$(
+    jq -er '
+      .jqPathExpressions
+      | select(type == "array" and length > 0)
+      | "del((" + join("), (") + "))"
+    ' <<<"${http_route_ignores}"
+  )"; then
+    fail "argocd: HTTPRoute ignore-difference expressions are missing or invalid"
+    return 1
+  fi
+
+  explicit_route="$(
+    jq -cn '{
+      spec: {
+        parentRefs: [{group: "gateway.networking.k8s.io", kind: "Gateway"}],
+        rules: [{
+          backendRefs: [{group: "", kind: "Service", weight: 1}],
+          matches: [{
+            path: {type: "Exact", value: "/must-remain"},
+            method: "GET",
+            headers: [{name: "x-atc-test", value: "present"}],
+            queryParams: [{name: "mode", value: "safe"}]
+          }, {
+            path: {type: "PathPrefix", value: "/"},
+            method: "POST",
+            headers: [{name: "x-near-default", value: "constrained"}],
+            queryParams: [{name: "scope", value: "narrow"}]
+          }]
+        }]
+      }
+    }'
+  )"
+  if ! jq -e "${ignore_program} | .spec.rules[0].matches == [{
+    \"path\":{\"type\":\"Exact\",\"value\":\"/must-remain\"},
+    \"method\":\"GET\",
+    \"headers\":[{\"name\":\"x-atc-test\",\"value\":\"present\"}],
+    \"queryParams\":[{\"name\":\"mode\",\"value\":\"safe\"}]
+  }, {
+    \"path\":{\"type\":\"PathPrefix\",\"value\":\"/\"},
+    \"method\":\"POST\",
+    \"headers\":[{\"name\":\"x-near-default\",\"value\":\"constrained\"}],
+    \"queryParams\":[{\"name\":\"scope\",\"value\":\"narrow\"}]
+  }]" >/dev/null <<<"${explicit_route}"; then
+    fail "argocd: HTTPRoute ignore rules erase explicit routing semantics"
+    return 1
+  fi
+
+  near_default_route="$(
+    jq -cn '{
+      spec: {
+        parentRefs: [{group: "gateway.networking.k8s.io", kind: "Gateway"}],
+        rules: [{
+          backendRefs: [{group: "", kind: "Service", weight: 1}],
+          matches: [{
+            path: {type: "PathPrefix", value: "/"},
+            method: "POST",
+            headers: [{name: "x-near-default", value: "constrained"}],
+            queryParams: [{name: "scope", value: "narrow"}]
+          }]
+        }]
+      }
+    }'
+  )"
+  if ! jq -e "${ignore_program} | .spec.rules[0].matches == [{
+    \"path\":{\"type\":\"PathPrefix\",\"value\":\"/\"},
+    \"method\":\"POST\",
+    \"headers\":[{\"name\":\"x-near-default\",\"value\":\"constrained\"}],
+    \"queryParams\":[{\"name\":\"scope\",\"value\":\"narrow\"}]
+  }]" >/dev/null <<<"${near_default_route}"; then
+    fail "argocd: HTTPRoute ignore rules erase a constrained catch-all match"
+    return 1
+  fi
+
+  default_route="$(
+    jq -cn '{
+      spec: {
+        parentRefs: [{group: "gateway.networking.k8s.io", kind: "Gateway"}],
+        rules: [{
+          backendRefs: [{group: "", kind: "Service", weight: 1}],
+          matches: [{path: {type: "PathPrefix", value: "/"}}]
+        }]
+      }
+    }'
+  )"
+  if ! jq -e "${ignore_program} | (.spec.rules[0] | has(\"matches\") | not)" \
+    >/dev/null <<<"${default_route}"; then
+    fail "argocd: HTTPRoute admission's exact catch-all default is not ignored"
+    return 1
+  fi
+  ok "ArgoCD HTTPRoute diff coverage"
+}
+
 # Extract a field from an ArgoCD Application manifest. Returns empty string if
 # the field is missing — callers MUST handle the empty case explicitly.
 yq_get() {
@@ -355,6 +459,8 @@ validate_app() {
 
 main() {
   local app_file
+  validate_argocd_diff_safety || exit 1
+
   for app_file in "${APPS_DIR}"/*.yaml; do
     [[ -e "${app_file}" ]] || continue
     if ! validate_app "${app_file}"; then
