@@ -49,6 +49,10 @@ spec:
             type: Exact
             value: /v1/harbor/data/robot-pusher
           method: GET
+        - path:
+            type: Exact
+            value: /v1/k8s/data/ci-dashboard-restarter
+          method: GET
       backendRefs:
         - name: vault
           port: 8200
