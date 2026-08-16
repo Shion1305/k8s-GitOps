@@ -26,16 +26,22 @@ action was downloaded into — so we can ship `aqua.yaml` next to
 
 ## Who can call it
 
-Any repository under either of these owners:
+Each GitHub owner is bound to its own Vault role, which yields a robot
+account scoped to exactly one Harbor project:
 
-- **`Shion1305`** (personal user)
-- **`Shion1305Dev`** (organization)
+| GitHub owner | `vault-role` | `vault-secret-path` | Harbor project |
+|---|---|---|---|
+| `Shion1305` (user), `Shion1305Dev` (org) | `harbor-robot-pusher` (default) | `harbor/data/robot-pusher` (default) | `shion1305` |
+| `aal-hack` (org) | `harbor-robot-pusher-aal-hack` | `harbor/data/robot-pusher-aal-hack` | `aal-hack` |
 
-Repos outside those owners will fail at the Vault login step. This is
-enforced server-side in Vault — it cannot be bypassed by the calling
-workflow.
+Repos outside those owners fail at the Vault login step, and passing
+another owner's role name does not help: Vault checks `repository_owner`
+in the runner's OIDC token server-side, so the binding cannot be bypassed
+by the calling workflow.
 
 ## Minimum caller (copy-paste this)
+
+For a repo under `Shion1305` / `Shion1305Dev`:
 
 ```yaml
 name: build & push image
@@ -59,6 +65,18 @@ jobs:
           push: "true"
 ```
 
+For a repo under `aal-hack`, point the three owner-specific inputs at that
+owner's role, KV path and Harbor project — everything else is identical:
+
+```yaml
+      - uses: Shion1305/k8s-GitOps/.github/actions/harbor-build-push@main
+        with:
+          image: harbor.shion1305.com/aal-hack/<your-app>
+          vault-role: harbor-robot-pusher-aal-hack
+          vault-secret-path: harbor/data/robot-pusher-aal-hack
+          push: "true"
+```
+
 That's it. The action handles everything else.
 
 > **`permissions: id-token: write` is mandatory** on the calling job.
@@ -76,7 +94,9 @@ That's it. The action handles everything else.
 
 | Input        | Default                 | Description |
 |--------------|-------------------------|-------------|
-| `image`      | **required**            | Full image reference WITHOUT a tag, e.g. `harbor.shion1305.com/shion1305/myapp`. The robot account is scoped to the `shion1305` Harbor project, so the image MUST start with `harbor.shion1305.com/shion1305/`. Pushes elsewhere will be rejected at Harbor authz. |
+| `image`      | **required**            | Full image reference WITHOUT a tag, e.g. `harbor.shion1305.com/shion1305/myapp`. The robot account is scoped to one Harbor project, so the image MUST start with `harbor.shion1305.com/<that-project>/`. Pushes elsewhere will be rejected at Harbor authz. |
+| `vault-role` | `harbor-robot-pusher`   | Vault JWT role exchanged for the robot credentials. Must be the role bound to your repo's owner — see [Who can call it](#who-can-call-it). |
+| `vault-secret-path` | `harbor/data/robot-pusher` | KV v2 data path the role grants read access to. Must match `vault-role`; a mismatched pair 403s at the KV read. |
 | `context`    | `.`                     | Docker build context path (relative to repo root). |
 | `dockerfile` | `Dockerfile`            | Dockerfile path relative to `context`. |
 | `platforms`  | `linux/amd64,linux/arm64` | Comma-separated `buildx` target platforms. |
@@ -142,71 +162,76 @@ jobs:
          ▼
 ┌─────────────────────────────────┐     ┌────────────────────┐
 │ vault.shion1305.com (public)    │────▶│ Vault role:        │
-│ POST /v1/auth/jwt/login         │     │ harbor-robot-pusher│
+│ POST /v1/auth/jwt/login         │     │ <vault-role>       │
 │   {role, jwt}                   │     │ - bound_audiences  │
 └────────┬────────────────────────┘     │ - bound_claims:    │
          │ 3. Vault token (TTL 10m)     │   repository_owner │
-         ▼                              │   job_workflow_ref │
-┌─────────────────────────────────┐     └────────────────────┘
-│ vault.shion1305.com (public)    │     ┌────────────────────┐
-│ GET /v1/harbor/data/robot-pusher│────▶│ KV v2:             │
-└────────┬────────────────────────┘     │ harbor/robot-pusher│
-         │ 4. {username, password}      │ {username,password}│
          ▼                              └────────────────────┘
+┌─────────────────────────────────┐     ┌────────────────────┐
+│ vault.shion1305.com (public)    │     │ KV v2:             │
+│ GET /v1/<vault-secret-path>     │────▶│ the owner's robot  │
+└────────┬────────────────────────┘     │ {username,password}│
+         │ 4. {username, password}      └────────────────────┘
+         ▼
 ┌─────────────────────────────────┐
 │ runner: write ~/.docker/config  │
-│ runner: crane push --index      │────▶ harbor.shion1305.com/shion1305/<app>
+│ runner: crane push --index      │────▶ harbor.shion1305.com/<project>/<app>
 │ runner: cosign sign (keyless)   │
 └─────────────────────────────────┘
 ```
 
 What makes this safe:
 
-- The Vault role's `bound_claims` includes `job_workflow_ref` matching
-  callers that invoke this action. A repo created under `Shion1305Dev`
-  cannot obtain Harbor push creds unless it actually `uses:` this action.
+- Each owner's Vault role reads exactly one KV path, and the robot behind
+  it can push to exactly one Harbor project. A repo under `aal-hack`
+  cannot reach the `shion1305` project and vice versa.
 - The Vault token TTL is 10 minutes — single-use, no renewal. Even if a
   workflow log were exfiltrated, the credential is dead by the time anyone
   reads it.
 - The Harbor robot password itself never leaves the runner's job context.
-  `~/.docker/config.json` lives on the ephemeral GitHub-hosted VM that is
-  destroyed at job end.
+  `~/.docker/config.json` lives on the ephemeral runner that is destroyed
+  at job end.
+
+What this does NOT protect against: within an allowed owner, any repo with
+`id-token: write` on a job can mint that owner's robot credentials without
+going through this action. `job_workflow_ref` describes the caller's own
+workflow file, not the composite actions it loads, so there is no
+server-side claim that could prove "the caller used this action". Owner
+separation — one role, one robot, one project per owner — is the boundary
+that actually holds.
 
 ## One-time prerequisites you DON'T need to do
 
-You don't need to:
+If your repo's owner is already in the table under
+[Who can call it](#who-can-call-it), you don't need to:
 
 - Create any GitHub repo Secrets (no `HARBOR_ROBOT_USER`, no `HARBOR_ROBOT_TOKEN`).
 - Touch Harbor.
 - Touch Vault.
 - Configure a service account or workload identity.
 
-The Vault role and the Harbor robot account are already provisioned. Just
-add the caller workflow.
+That owner's Vault role and Harbor robot account are already provisioned.
+Just add the caller workflow.
+
+Onboarding a brand-new owner is a cluster-operator task — Harbor project,
+robot account, Vault path, Vault role and gateway allowlist entry. See
+[Onboard a new pushing GitHub owner](../../../harbor/README.md#onboard-a-new-pushing-github-owner).
 
 ## Troubleshooting
 
 ### `Error: Aud claim does not match expected values`
 
 GitHub minted the OIDC token with a default audience of
-`https://github.com/<your-repo-owner>`. The Vault role allows
-`https://github.com/Shion1305` and `https://github.com/Shion1305Dev`. If
-your repo owner is anything else, the workflow cannot use this pipeline.
-Move the repo to one of the allowed owners or open a PR against
-`vault/scripts/setup-eso-policies.sh` to add yours.
+`https://github.com/<your-repo-owner>`, and the `vault-role` you passed is
+not bound to that owner. Either you left `vault-role` at its default from
+an `aal-hack` repo (or set the `aal-hack` role from a `Shion1305*` repo) —
+fix the input per [Who can call it](#who-can-call-it) — or your owner has
+no role at all, in which case open a PR against
+`vault/scripts/setup-eso-policies.sh` to add one.
 
 ### `Error: bound claim 'repository_owner' does not match`
 
-Same root cause as above. Repo owner outside the allowlist.
-
-### `Error: bound claim 'job_workflow_ref' does not match`
-
-You are calling a fork of the action, not
-`Shion1305/k8s-GitOps/.github/actions/harbor-build-push`. Either:
-
-- Switch your `uses:` line to point at `Shion1305/k8s-GitOps/...`, or
-- Open a PR to add your fork's `job_workflow_ref` to the Vault role's
-  `bound_claims`.
+Same root cause as above. Repo owner outside the role's allowlist.
 
 ### `crane: command not found` during the push step
 
@@ -215,14 +240,22 @@ relies on `aqua_opts: -l -a` so that aqua-installer's `installAll` path
 runs and consumes `AQUA_GLOBAL_CONFIG`. If you forked this action and
 removed `-a`, restore it: lazy mode (`-l` alone) ignores the config file.
 
-### `Error: Unable to retrieve result for "harbor/data/robot-pusher" because it was not found`
+### `Error: Unable to retrieve result for "<vault-secret-path>" ... not found`
 
-The vault-action received a 404. Possible causes:
+The vault-action received a 404 (or a 403 rendered as one). Possible
+causes:
 
-1. The Vault HTTPRoute change has not propagated yet — try again in a few
+1. `vault-secret-path` does not match `vault-role` — the role's policy
+   only grants read on its own path. See
+   [Who can call it](#who-can-call-it).
+2. The path is not in the public Vault allowlist. `vault.shion1305.com`
+   proxies only explicitly listed paths
+   (`vault/httproute-external.yaml`), so a path missing there is rejected
+   at the gateway even when the Vault policy is correct.
+3. The Vault HTTPRoute change has not propagated yet — try again in a few
    minutes.
-2. The KV v2 path `harbor/robot-pusher` is empty or has been deleted. Open
-   an issue against this repo.
+4. The KV v2 path is empty or has been deleted. Open an issue against this
+   repo.
 
 ### `Error: Vault returned empty Harbor robot credentials.`
 
@@ -234,8 +267,9 @@ an issue against this repo.
 `HARBOR_ROBOT_USER` and `HARBOR_ROBOT_TOKEN` made it to the runner but
 Harbor rejected the push. Likely causes:
 
-- The image path doesn't start with `harbor.shion1305.com/shion1305/`. The
-  robot account only has push rights on the `shion1305` project.
+- The image path's project segment doesn't match the project the robot is
+  scoped to (see [Who can call it](#who-can-call-it)) — e.g. an `aal-hack`
+  repo pushing to `harbor.shion1305.com/shion1305/…`.
 - The robot account expired (Harbor robots default to 365d). Open an issue.
 
 ### `tlog upload failed: ... cosign sign failed`

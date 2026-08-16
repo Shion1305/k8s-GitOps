@@ -30,7 +30,7 @@ Vault is exposed on three hostnames, each with a different purpose:
 | Hostname | Network | Allowed Paths | Use Case |
 |----------|---------|---------------|----------|
 | `vault.i.shion1305.com` | Internal (WireGuard only) | All (full UI + API) | Admin/operator UI, all interactive use, `api_addr` |
-| `vault.shion1305.com` | Public internet | Allowlisted: `/v1/auth/jwt/login`, `/v1/auth/token/renew-self`, `/v1/auth/token/revoke-self`, and exact CI KV reads under `harbor/robot-pusher` and `k8s/ci-dashboard-restarter` | CI (GitHub Actions) JWT login + token self-management + scoped KV reads |
+| `vault.shion1305.com` | Public internet | Allowlisted: `/v1/auth/jwt/login`, `/v1/auth/token/renew-self`, `/v1/auth/token/revoke-self`, and exact CI KV reads under `harbor/robot-pusher`, `harbor/robot-pusher-aal-hack` and `k8s/ci-dashboard-restarter` | CI (GitHub Actions) JWT login + token self-management + scoped KV reads |
 | `vault.k.shion1305.com` | Public (legacy) | 301 redirect → `vault.i.shion1305.com` | Bookmark migration only; will be removed in a future PR |
 
 - **UI**: <https://vault.i.shion1305.com>

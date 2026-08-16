@@ -54,7 +54,7 @@ Intended pull traffic happens from inside the cluster against the internal hostn
             │       │   harbor/openid-credentials   harbor/admin-password            │
             │       │   harbor/secret-key           harbor/core-secret               │
             │       │   harbor/robot-puller         harbor/robot-pusher              │
-            │       │   harbor/broker-credentials                                    │
+            │       │   harbor/broker-credentials   harbor/robot-pusher-aal-hack     │
             │       └────────────────────────────────────────────────────────────────┘
             │                  │
             │                  ▼ ESO (per-namespace SecretStore + ExternalSecret)
@@ -128,18 +128,27 @@ There is intentionally no ESO `ClusterGenerator` in the picture (zot needed one 
 
 ### c. GitHub Actions push (Vault JWT → robot creds → crane push)
 
-Workflows under `Shion1305/*` and `Shion1305Dev/*` push to the `shion1305` project via the composite action at [`.github/actions/harbor-build-push/`](../.github/actions/harbor-build-push/). Robot credentials are NOT stored as GitHub repo Secrets — each run fetches them from Vault on demand using its GitHub OIDC token.
+GitHub Actions workflows push via the composite action at [`.github/actions/harbor-build-push/`](../.github/actions/harbor-build-push/). Robot credentials are NOT stored as GitHub repo Secrets — each run fetches them from Vault on demand using its GitHub OIDC token.
+
+Each pushing GitHub owner gets its own Vault role, KV path, robot account and Harbor project. The action's `vault-role` / `vault-secret-path` inputs select which set a run uses:
+
+| GitHub owner | Vault JWT role (`vault-role`) | Vault KV path (`vault kv` form) | Harbor project |
+| --- | --- | --- | --- |
+| `Shion1305`, `Shion1305Dev` | `harbor-robot-pusher` | `harbor/robot-pusher` | `shion1305` |
+| `aal-hack` | `harbor-robot-pusher-aal-hack` | `harbor/robot-pusher-aal-hack` | `aal-hack` |
+
+The `vault-secret-path` input takes the KV v2 **API** form of that path — `harbor/data/robot-pusher`, `harbor/data/robot-pusher-aal-hack` — which is also the form the Vault policy and `vault/httproute-external.yaml` allowlist use.
 
 ```
 GHA workflow → mint OIDC JWT (audience = https://github.com/<owner>)
-  → POST https://vault.shion1305.com/v1/auth/jwt/login {role: harbor-robot-pusher, jwt}
-      - Vault validates iss, aud, repository_owner, job_workflow_ref
-      - Vault returns short-lived (10m) token with policy harbor-robot-pusher-reader
-  → GET https://vault.shion1305.com/v1/harbor/data/robot-pusher
+  → POST https://vault.shion1305.com/v1/auth/jwt/login {role: <owner's role>, jwt}
+      - Vault validates iss, aud, repository_owner
+      - Vault returns short-lived (10m) token with that role's reader policy
+  → GET https://vault.shion1305.com/v1/harbor/data/<owner's robot>
       - Vault returns {username, password}
   → docker buildx → OCI-layout tarball
   → write ~/.docker/config.json with auth = base64("$HARBOR_ROBOT_USER:$HARBOR_ROBOT_TOKEN")
-  → crane push /tmp/oci harbor.shion1305.com/shion1305/<repo>:<sha>
+  → crane push /tmp/oci harbor.shion1305.com/<owner's project>/<repo>:<sha>
       - crane → POST /v2/ with Basic robot creds
       - Harbor 401 + WWW-Authenticate: Bearer realm=https://harbor.shion1305.com/service/token
       - crane → GET /service/token with Basic creds
@@ -149,7 +158,9 @@ GHA workflow → mint OIDC JWT (audience = https://github.com/<owner>)
   → cosign sign (keyless, Fulcio + Rekor)
 ```
 
-Robot accounts themselves still exist (Harbor requires them) — they're created in Harbor's UI and the token is shown exactly once, then written to Vault path `harbor/robot-pusher` (KV v2) by hand. The Vault role `harbor-robot-pusher` pins `job_workflow_ref` to callers that invoke this repo's composite action, so a new repo under either allowed owner cannot mint Harbor push creds without explicitly `uses:`-ing this action.
+Robot accounts themselves still exist (Harbor requires them) — they're created in Harbor's UI and the token is shown exactly once, then written to the owner's Vault KV path by hand.
+
+The roles bind on `repository_owner` only. There is deliberately no `job_workflow_ref` pin: that claim names the caller's own workflow file, not the composite actions it loads, so no server-side claim can prove a caller went through this action. Consequently **any repo under an allowed owner with `id-token: write` can mint that owner's robot credentials.** That is why a new pushing owner gets its own role + robot + project rather than being appended to an existing role's allowlist — the per-owner split is what caps the blast radius. `Shion1305`/`Shion1305Dev` share one role because both are single-operator; `aal-hack` has other members, so it is isolated.
 
 **Consumer guide**: see [`.github/actions/harbor-build-push/README.md`](../.github/actions/harbor-build-push/README.md) for the copy-paste caller, inputs/outputs, and troubleshooting.
 
@@ -270,17 +281,18 @@ In the portal:
 - **Projects → New Project**: name `shion1305`, **Public OFF** (the default; do not change). Public projects are world-readable on `harbor.shion1305.com`.
 - **Configuration → System Settings → Project Creation**: `Admin Only`. Prevents non-admins from creating projects (and accidentally flipping them public).
 - **Members**: add Keycloak group `harbor-admin` as project admin (after the first OIDC user is auto-onboarded — see Day 2 ops).
-- **Robot Accounts → New Robot Account**:
-  - `gha-pusher`: push + pull on Repository ONLY (uncheck artifact deletion, tag deletion, helm chart, scan, label permissions). Expiration 365 days. Save the token to:
-    - GitHub repo secrets `HARBOR_ROBOT_USER` (full username with the `robot$` project-scope prefix, e.g. `robot$shion1305+gha-pusher`) and `HARBOR_ROBOT_TOKEN`.
-    - Vault: `vault kv put harbor/robot-pusher username=<robot$...> password=<token>`
-  - `puller`: pull on Repository ONLY. Expiration 365 days. Save to:
-    - Vault: `vault kv put harbor/robot-puller username=<robot$...> password=<token>`
+- **Projects → shion1305 → Robot Accounts → New Robot Account**:
+  - `gha-pusher`: push + pull on Repository ONLY (uncheck artifact deletion, tag deletion, helm chart, scan, label permissions). Expiration 365 days. Save the token to Vault: `vault kv put harbor/robot-pusher username='robot$shion1305+gha-pusher' password='<token>'` — quote both values, the `$` in a robot name is otherwise expanded by your shell.
+- **Administration → Robot Accounts → New Robot Account** (system-level, NOT project-level):
+  - `cluster-puller`: pull on Repository ONLY, granted on every project the cluster deploys from — at first bootstrap that is just `shion1305`; each additional owner's project is added later without reissuing the token. Expiration 365 days. Save to Vault: `vault kv put harbor/robot-puller username='robot$cluster-puller' password='<token>'`.
+  - It is system-level because the cluster-wide `harbor-pull` Secret carries exactly one credential pair keyed by hostname, so a project-scoped robot there would 401 on every other project's images. See [Extend the cluster puller to a new project](#extend-the-cluster-puller-to-a-new-project) for the rationale and the alternative that was rejected.
+
+Repeat the project + pusher-robot half of this for each additional pushing GitHub owner — see [Onboard a new pushing GitHub owner](#onboard-a-new-pushing-github-owner).
 
 ESO's `harbor-pull` `ClusterExternalSecret` will materialize the dockerconfigjson into `harbor-pull-source/harbor-pull` within `refreshInterval` (1h). To shortcut the wait:
 
 ```bash
-kubectl annotate clusterexternalsecret harbor-pull force-sync="$(date +%s)" --overwrite
+kubectl annotate clusterexternalsecret harbor-pull external-secrets.io/force-sync="$(date +%s)" --overwrite
 ```
 
 The end-to-end push + pull smoketest (GHA workflow + cluster-side `harbor-pull-smoketest` Job) lives in a follow-up PR; that PR is the verification gate before zot is decommissioned.
@@ -306,12 +318,58 @@ The end-to-end push + pull smoketest (GHA workflow + cluster-side `harbor-pull-s
 
 ### Rotate a robot account
 
-1. Harbor portal → project → Robot Accounts → New Robot Account (same scope and permissions).
+1. Harbor portal → New Robot Account with the same scope and permissions. Pushers are project-level (**Projects → `<project>` → Robot Accounts**); the cluster puller is system-level (**Administration → Robot Accounts**) — see [Extend the cluster puller to a new project](#extend-the-cluster-puller-to-a-new-project).
 2. Save the new token.
-3. `vault kv put harbor/robot-puller username=<new> password=<new-token>` (or `harbor/robot-pusher`).
-4. Update GitHub repo secrets `HARBOR_ROBOT_USER` / `HARBOR_ROBOT_TOKEN` if rotating the pusher.
-5. ESO syncs; for the puller, `harbor-pull` re-materializes within 1h. To force: `kubectl annotate clusterexternalsecret harbor-pull force-sync="$(date +%s)" --overwrite`.
-6. Once running Pods have re-pulled with the new credentials, revoke the old robot in the portal.
+3. `vault kv put harbor/robot-puller username=<new> password=<new-token>` (or the pusher path for the owner being rotated — `harbor/robot-pusher`, `harbor/robot-pusher-aal-hack`).
+4. ESO syncs; for the puller, `harbor-pull` re-materializes within 1h. To force: `kubectl annotate clusterexternalsecret harbor-pull external-secrets.io/force-sync="$(date +%s)" --overwrite`. Pushers need no cluster-side sync — GitHub Actions reads Vault directly at job start.
+5. Once running Pods have re-pulled with the new credentials, revoke the old robot in the portal.
+
+### Onboard a new pushing GitHub owner
+
+Each pushing owner gets its own Harbor project, robot account, Vault KV path and Vault JWT role. Do not append an owner to an existing role's `repository_owner` allowlist unless it is operated by the same person — the roles have no `job_workflow_ref` pin, so every repo under an allowed owner can mint that role's credentials (see [GitHub Actions push](#c-github-actions-push-vault-jwt--robot-creds--crane-push)).
+
+1. **Harbor portal → Projects → New Project**: pick a lowercase project name for the owner — Harbor rejects uppercase (`[a-z0-9]+(?:[._-][a-z0-9]+)*`), so e.g. owner `Shion1305Dev` → project `shion1305`. **Public OFF.** Also set a storage quota well under the registry PVC (`harbor/values.yaml`, currently 200Gi): the pusher robot is deliberately denied delete rights and every build pushes a new SHA tag, so an unbounded third-party project can fill the shared volume. Record the chosen project name in the owner tables in this README and in [`.github/actions/harbor-build-push/README.md`](../.github/actions/harbor-build-push/README.md) — callers derive `image:` from it.
+2. **Projects → `<project>` → Robot Accounts → New Robot Account**: `gha-pusher`, push + pull on Repository ONLY, 365 days. Copy the token (shown once).
+3. **Vault**: `vault kv put harbor/robot-pusher-<owner> username='robot$<project>+gha-pusher' password='<token>'` — quote both values, Harbor robot names contain `$` and your shell would otherwise expand it.
+4. **`vault/scripts/setup-eso-policies.sh`**: add a `harbor-robot-pusher-<owner>-reader` policy scoped to that one KV path, and a `harbor-robot-pusher-<owner>` JWT role with `bound_audiences: ["https://github.com/<owner>"]` and `bound_claims: {repository_owner: ["<owner>"], repository_owner_id: ["<numeric-id>"]}`. Get the id with `gh api users/<owner> --jq .id` (works for orgs too). The `repository_owner_id` pin is **mandatory for any owner whose GitHub account you do not control** — login names are recyclable, and the default OIDC audience is derived from the same mutable name. Copy the `harbor-robot-pusher-aal-hack` block as the template. Re-run the script (idempotent).
+5. **`vault/httproute-external.yaml`**: append `/v1/harbor/data/robot-pusher-<owner>` (Exact, GET) to the public KV allowlist. The public Vault hostname only proxies explicitly listed paths, so skipping this makes the KV read 404 at Envoy even though the Vault policy is correct. ArgoCD syncs the route.
+6. **Pull side** (only if the cluster deploys these images): the cluster has exactly one pull credential for the whole registry host, so the system-level puller robot needs pull on the new project too — see [Extend the cluster puller to a new project](#extend-the-cluster-puller-to-a-new-project). Read the trust note there before doing this for an owner you do not control.
+7. Caller workflows pass `vault-role` / `vault-secret-path` / `image` for the new owner — see [`.github/actions/harbor-build-push/README.md`](../.github/actions/harbor-build-push/README.md).
+
+### Extend the cluster puller to a new project
+
+The cluster holds exactly ONE pull credential for `harbor.shion1305.com` — the `harbor-pull` dockerconfigjson Secret, templated with a single hostname-keyed entry. A project-scoped robot (`robot$<project>+<name>`) there can only serve one project's images; every other project's Pods land in `ImagePullBackOff`. So the puller is a **system-level** robot (`robot$<name>`, created under Administration, not inside a project) with pull granted on each project the cluster deploys from.
+
+kubelet would in fact support a per-project layout — it honours path-prefixed `auths` keys such as `harbor.shion1305.com/<project>` and retries every matching credential in turn. That alternative is rejected deliberately, not for lack of support: Kyverno clones this one Secret into every Harbor-consuming namespace, so per-project robots would all ride along in the same Secret and buy no isolation, while adding a Vault path, an ESO policy stanza and a template branch per project.
+
+If `harbor/robot-puller` currently holds a project-scoped robot, migrate it:
+
+1. **Harbor portal → Administration → Robot Accounts → New Robot Account**: name `cluster-puller`, **System** level, Permissions: Repository **Pull** only, applied to the projects the cluster pulls from (`shion1305`, `aal-hack`). Expiration 365 days. Copy the token (shown once).
+2. `vault kv put harbor/robot-puller username='robot$cluster-puller' password='<token>'`
+3. `kubectl annotate clusterexternalsecret harbor-pull external-secrets.io/force-sync="$(date +%s)" --overwrite` (otherwise up to 1h of drift).
+4. Confirm the credential actually rotated before revoking the old robot. Print the username only — decoding the whole dockerconfigjson would dump the robot password into your scrollback:
+   ```bash
+   kubectl get secret -n harbor-pull-source harbor-pull \
+     -o jsonpath='{.data.\.dockerconfigjson}' | base64 -d \
+     | jq -r '.auths[].auth' | base64 -d | cut -d: -f1
+   ```
+   Then roll one Pod per project that has a workload and check it reaches `Running`. A project with no workload yet cannot be exercised this way — verify coverage in the robot's permission list instead (**Administration → Robot Accounts → `cluster-puller` → Edit**, or `GET /api/v2.0/robots/<id>` and read `permissions[].namespace`).
+5. Revoke the old project-scoped puller in the portal.
+
+**Back-out**: do not revoke the old robot until step 4 passes. If it fails, `vault kv put harbor/robot-puller` the old robot's credentials back and force-sync again — the old robot is still valid until you revoke it in step 5, so the rollback is a single Vault write.
+
+Kyverno re-syncs the cloned Secret into every consumer namespace (`synchronize: true`), so already-running Pods keep their existing images and pick the new credential up on their next pull.
+
+Once the system robot exists, adding a further project is just **Administration → Robot Accounts → `cluster-puller` → Edit → add pull on the new project**. The token does not change, so Vault and ESO stay untouched.
+
+**Trust boundary — read before extending the puller to a third-party owner's project.** Push isolation does not imply pull isolation. Granting the cluster puller access to `<owner>`'s project means any Pod in this cluster may reference an image that owner's members produced, and there is no gate downstream: `harbor-pull-injection` matches on registry hostname only (never on the project segment), the repo has no Kyverno `verifyImages` policy, and Harbor's per-project "require signature" deployment security is not enabled — so the cosign signatures the push action produces are not verified by anything. Combined with the absent `job_workflow_ref` pin, any repo under that owner can put an image in that project.
+
+Mitigate before, not after, extending the puller:
+
+- Reference third-party images **by digest**, not by a mutable tag, wherever this repo deploys them.
+- Or enable Harbor's per-project cosign requirement / add a Kyverno `verifyImages` rule pinning the expected Fulcio subject and issuer per project, which makes the existing signatures load-bearing.
+
+Neither is configured today. `shion1305` is operator-only so the exposure was previously nil; `aal-hack` is the first project where it is not.
 
 ### Add a new Keycloak user as a Harbor admin
 
@@ -342,7 +400,7 @@ The `harbor-ui` client's `redirectUris` doesn't include `https://harbor.i.shion1
 
 ### "Push fails with 'unauthorized: authentication required'"
 
-GHA secrets `HARBOR_ROBOT_USER` / `HARBOR_ROBOT_TOKEN` are missing, or the robot account was revoked / expired in Harbor. Check the robot's status in the portal under the project's Robot Accounts tab.
+The robot account was revoked or expired in Harbor. Check its status in the portal under the project's Robot Accounts tab. If the push instead fails with `denied: requested access to the resource is denied`, the workflow authenticated as the wrong owner's robot — the image's project segment must match the project that `vault-role` is bound to.
 
 ### "Pull fails with ImagePullBackOff"
 
@@ -362,8 +420,16 @@ kubectl get secret -n <pod-ns> harbor-pull
 kubectl get pod -n <pod-ns> <pod> -o yaml | grep -A1 imagePullSecrets
 
 # 5. Has the robot account expired?
-# Harbor portal → project → Robot Accounts → expiration column
+# Harbor portal → Administration → Robot Accounts → expiration column
+# (the cluster puller is system-level, not under a project)
+
+# 6. Does the puller cover this image's project?
+kubectl get secret -n harbor-pull-source harbor-pull \
+  -o jsonpath='{.data.\.dockerconfigjson}' | base64 -d | jq -r '.auths[].auth' \
+  | base64 -d | cut -d: -f1
 ```
+
+Reading step 6: a project-scoped puller prints `robot$<project>+<name>`; a system-level one prints `robot$<name>` with no `+`. If it is project-scoped and the failing image belongs to a different project, that is the cause. If it is system-level, check that robot's permission list actually includes the failing image's project (**Administration → Robot Accounts → `cluster-puller` → Edit**, or `GET /api/v2.0/robots/<id>` and read `permissions[].namespace`). Either way the fix is in [Extend the cluster puller to a new project](#extend-the-cluster-puller-to-a-new-project).
 
 ### "Portal shows 'connection refused' or 500 on first sync"
 

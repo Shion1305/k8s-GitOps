@@ -36,15 +36,18 @@
 # Vault and never leave the runner's job context.
 #
 # Vault binding scope:
-# Vault role `harbor-robot-pusher` is configured with
-# `bound_audiences=https://github.com/Shion1305,https://github.com/Shion1305Dev`
-# and a `bound_claims` filter on `repository_owner ∈ {Shion1305,
-# Shion1305Dev}`. So this action can only obtain robot creds when called
-# from a repo under one of those two GitHub orgs/users. A fork in some
-# unrelated namespace will fail at the Vault login step. `bound_audiences`
-# matches the GitHub default `aud` claim (`https://github.com/<owner>`), so
-# callers do NOT need to override `jwtGithubAudience` on the Vault action —
-# leaving it unset is correct.
+# Each pushing GitHub owner gets its own Vault role, KV path and Harbor
+# project; `vault-role` / `vault-secret-path` select which pair this call
+# uses. The default role `harbor-robot-pusher` is bound to
+# `repository_owner ∈ {Shion1305, Shion1305Dev}` and yields creds for the
+# `shion1305` Harbor project; `harbor-robot-pusher-aal-hack` is bound to
+# `repository_owner = aal-hack` and yields creds for the `aal-hack`
+# project. A repo under any other owner fails at the Vault login step, and
+# passing another owner's role name does not help — the bound claims are
+# checked server-side against the runner's OIDC token.
+# `bound_audiences` matches the GitHub default `aud` claim
+# (`https://github.com/<owner>`), so callers do NOT need to override
+# `jwtGithubAudience` on the Vault action — leaving it unset is correct.
 #
 # Why `id-token: write` is required on the CALLING JOB:
 # Composite actions run inline in the caller's job and inherit the caller
@@ -70,10 +73,25 @@ inputs:
   image:
     description: >-
       Full image reference WITHOUT tag, e.g.
-      `harbor.shion1305.com/shion1305/demo`. The robot account scoped to
-      the `shion1305` Harbor project can only push under that project's
-      namespace.
+      `harbor.shion1305.com/shion1305/demo`. The robot account behind
+      `vault-role` is scoped to a single Harbor project and can only push
+      under that project's namespace.
     required: true
+  vault-role:
+    description: >-
+      Vault JWT role exchanged for the Harbor robot credentials. Must be
+      the role bound to the calling repo's `repository_owner`:
+      `harbor-robot-pusher` for Shion1305 / Shion1305Dev,
+      `harbor-robot-pusher-aal-hack` for aal-hack.
+    required: false
+    default: harbor-robot-pusher
+  vault-secret-path:
+    description: >-
+      KV v2 data path holding the robot `username` / `password` that
+      `vault-role` grants read access to. Must match the role — a
+      mismatched pair fails with a 403 at the KV read.
+    required: false
+    default: harbor/data/robot-pusher
   context:
     description: Docker build context path (relative to repo root).
     required: false
@@ -184,23 +202,23 @@ runs:
         aqua_opts: -l -a
 
     # Exchange the workflow's GitHub OIDC token for the Harbor robot
-    # credentials kept in Vault at `harbor/data/robot-pusher` (KV v2). The
-    # vault-action does the OIDC mint + JWT login + KV read in one step
-    # and exposes the results as masked env vars. We rely on the GitHub
-    # default audience (`https://github.com/<owner>`) which matches the
-    # Vault role's `bound_audiences` — overriding `jwtGithubAudience` here
-    # would cause a 400 at the Vault side.
+    # credentials kept in Vault under the KV v2 path selected by
+    # `vault-secret-path`. The vault-action does the OIDC mint + JWT login
+    # + KV read in one step and exposes the results as masked env vars. We
+    # rely on the GitHub default audience (`https://github.com/<owner>`)
+    # which matches the Vault role's `bound_audiences` — overriding
+    # `jwtGithubAudience` here would cause a 400 at the Vault side.
     - if: inputs.push == 'true'
       name: Fetch Harbor robot credentials from Vault
       uses: hashicorp/vault-action@v4
       with:
         url: https://vault.shion1305.com
         method: jwt
-        role: harbor-robot-pusher
+        role: ${{ inputs.vault-role }}
         exportEnv: true
         secrets: |
-          harbor/data/robot-pusher username | HARBOR_ROBOT_USER ;
-          harbor/data/robot-pusher password | HARBOR_ROBOT_TOKEN
+          ${{ inputs.vault-secret-path }} username | HARBOR_ROBOT_USER ;
+          ${{ inputs.vault-secret-path }} password | HARBOR_ROBOT_TOKEN
 
     # Guard against the silent-failure case where the vault-action step
     # "succeeds" but the KV path is missing one of the expected fields
@@ -210,11 +228,13 @@ runs:
     - if: inputs.push == 'true'
       name: Verify robot credentials are non-empty
       shell: bash
+      env:
+        VAULT_SECRET_PATH: ${{ inputs.vault-secret-path }}
       run: |
         set -euo pipefail
         if [ -z "${HARBOR_ROBOT_USER:-}" ] || [ -z "${HARBOR_ROBOT_TOKEN:-}" ]; then
           echo "::error::Vault returned empty Harbor robot credentials." \
-               "Check that harbor/data/robot-pusher contains both" \
+               "Check that ${VAULT_SECRET_PATH} contains both" \
                "'username' and 'password' fields."
           exit 1
         fi
