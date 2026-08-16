@@ -31,6 +31,7 @@ spec:
                 - openwebui
                 - postgres-operator
                 - scalable-llm
+                - tokuchan-dev
       toPorts:
         - ports:
             - port: "5432"
