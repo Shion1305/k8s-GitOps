@@ -19,6 +19,7 @@ spec:
     litellm: [] # LiteLLM front for scalable-llm (KubeAI on Tenstorrent)
     fde_knowledge_engine: []
     research_gh_leaks: []
+    tokuchan_dev: []
   databases:
     openwebui: openwebui
     langfuse: langfuse
@@ -29,6 +30,7 @@ spec:
     litellm: litellm
     fde_knowledge_engine: fde_knowledge_engine
     research_gh_leaks: research_gh_leaks
+    tokuchan_dev: tokuchan_dev
   postgresql:
     version: "17"
   resources:
