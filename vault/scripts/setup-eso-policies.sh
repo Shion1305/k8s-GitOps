@@ -150,12 +150,14 @@ path "nc-press-chotatsu/metadata/*" {
 EOF
 echo "✓ Created policy: eso-nc-press-chotatsu"
 
-# Policy for tokuchan-dev namespace (separate KV v2 engine mounted at tokuchan-dev/)
+# Policy for tokuchan-dev namespace. One KV v2 engine per app, mounted at
+# tokuchan/, with one path per environment (dev/, stg/, prd/). Each
+# environment's policy is scoped to its own prefix, so dev cannot read prd.
 vault policy write eso-tokuchan-dev - <<EOF
-path "tokuchan-dev/data/*" {
+path "tokuchan/data/dev/*" {
   capabilities = ["read"]
 }
-path "tokuchan-dev/metadata/*" {
+path "tokuchan/metadata/dev/*" {
   capabilities = ["read", "list"]
 }
 EOF
