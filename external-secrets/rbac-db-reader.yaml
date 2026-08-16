@@ -213,3 +213,29 @@ subjects:
   - kind: ServiceAccount
     name: eso-db
     namespace: grafana
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: eso-db-tokuchan-dev
+  namespace: postgres-operator-deployment
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    resourceNames:
+      - tokuchan-dev.postgres-shared.credentials.postgresql.acid.zalan.do
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: eso-db-tokuchan-dev
+  namespace: postgres-operator-deployment
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: eso-db-tokuchan-dev
+subjects:
+  - kind: ServiceAccount
+    name: eso-db
+    namespace: tokuchan-dev

@@ -150,6 +150,17 @@ path "nc-press-chotatsu/metadata/*" {
 EOF
 echo "✓ Created policy: eso-nc-press-chotatsu"
 
+# Policy for tokuchan-dev namespace (separate KV v2 engine mounted at tokuchan-dev/)
+vault policy write eso-tokuchan-dev - <<EOF
+path "tokuchan-dev/data/*" {
+  capabilities = ["read"]
+}
+path "tokuchan-dev/metadata/*" {
+  capabilities = ["read", "list"]
+}
+EOF
+echo "✓ Created policy: eso-tokuchan-dev"
+
 # Policy for fde-knowledge-engine namespace (separate KV v2 engine mounted at fde-knowledge-engine/)
 vault policy write eso-fde-knowledge-engine - <<EOF
 path "fde-knowledge-engine/data/*" {
@@ -339,6 +350,14 @@ vault write auth/kubernetes/role/eso-harbor \
   policies=eso-harbor \
   ttl=1h
 echo "✓ Created role: eso-harbor"
+
+# tokuchan-dev (TOKUちゃん backend: Discord bot + API)
+vault write auth/kubernetes/role/eso-tokuchan-dev \
+  bound_service_account_names=eso \
+  bound_service_account_namespaces=tokuchan-dev \
+  policies=eso-tokuchan-dev \
+  ttl=1h
+echo "✓ Created role: eso-tokuchan-dev"
 
 # nc-press-chotatsu
 vault write auth/kubernetes/role/eso-nc-press-chotatsu \
@@ -547,6 +566,7 @@ echo "  eso-cert-manager→ SA eso/cert-manager    → system/data/cert-manager"
 echo "  eso-zot         → SA eso/zot             → zot/data/*"
 echo "  eso-harbor      → SA eso/harbor          → harbor/data/*"
 echo "  eso-nc-press-chotatsu → SA eso/nc-press-chotatsu → nc-press-chotatsu/data/*"
+echo "  eso-tokuchan-dev → SA eso/tokuchan-dev  → tokuchan-dev/data/*"
 echo "  eso-fde-knowledge-engine → SA eso/fde-knowledge-engine → fde-knowledge-engine/data/*"
 echo "  eso-gh-leaked-tokens → SA eso/gh-leaked-tokens → gh-leaked-tokens/data/*"
 echo "  eso-github-app  → SA external-secrets/external-secrets → github-app-shared/data/*"
