@@ -283,7 +283,15 @@ kubectl logs -n external-secrets -l app.kubernetes.io/name=external-secrets
 kubectl describe clustersecretstore vault-cluster
 
 # Force secret refresh
-kubectl annotate clusterexternalsecret <name> force-sync="$(date +%s)" --overwrite
+# On a ClusterExternalSecret the key MUST be namespaced — the controller
+# propagates only `external-secrets.io/force-sync` down to the child
+# ExternalSecrets, so a bare `force-sync` annotation silently no-ops.
+kubectl annotate clusterexternalsecret <name> \
+  external-secrets.io/force-sync="$(date +%s)" --overwrite
+
+# On a plain ExternalSecret any annotation change triggers a resync, so the
+# bare key is fine there.
+kubectl annotate externalsecret -n <ns> <name> force-sync="$(date +%s)" --overwrite
 ```
 
 ### Storage issues

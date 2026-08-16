@@ -51,6 +51,10 @@ spec:
           method: GET
         - path:
             type: Exact
+            value: /v1/harbor/data/robot-pusher-aal-hack
+          method: GET
+        - path:
+            type: Exact
             value: /v1/k8s/data/ci-dashboard-restarter
           method: GET
       backendRefs:

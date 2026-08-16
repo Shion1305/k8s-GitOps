@@ -486,6 +486,47 @@ vault write auth/jwt/role/harbor-robot-pusher - <<'EOF'
 EOF
 echo "✓ Created JWT role: harbor-robot-pusher"
 
+# Second pusher identity, for the `aal-hack` GitHub organization. It gets its
+# own policy / role / KV path / Harbor project instead of being appended to
+# the `harbor-robot-pusher` allowlist above, because that role deliberately
+# has no `job_workflow_ref` pin: every repo under an allowed owner can mint
+# its credentials. `aal-hack` has members other than the cluster operator, so
+# folding it into the same role would hand those members push rights on the
+# `shion1305` project. Separate roles keep each owner confined to its own
+# Harbor project.
+vault policy write harbor-robot-pusher-aal-hack-reader - <<EOF
+path "harbor/data/robot-pusher-aal-hack" {
+  capabilities = ["read"]
+}
+EOF
+echo "✓ Created policy: harbor-robot-pusher-aal-hack-reader"
+
+# `repository_owner_id` is pinned alongside the name because `aal-hack` is
+# not an owner this cluster controls the lifecycle of. GitHub login names
+# are recyclable: if the org is renamed or deleted, anyone can register the
+# freed `aal-hack` login and mint a token whose `repository_owner` — and
+# whose default `aud`, which is derived from the same name — both match.
+# The numeric owner ID is immutable, so it closes that squat. (The
+# harbor-robot-pusher role above is unpinned: both of its owners are the
+# operator's own accounts and are not going to be released.)
+vault write auth/jwt/role/harbor-robot-pusher-aal-hack - <<'EOF'
+{
+  "role_type": "jwt",
+  "user_claim": "repository",
+  "bound_audiences": ["https://github.com/aal-hack"],
+  "bound_claims_type": "glob",
+  "bound_claims": {
+    "repository_owner": ["aal-hack"],
+    "repository_owner_id": ["314553423"]
+  },
+  "token_policies": ["harbor-robot-pusher-aal-hack-reader"],
+  "token_ttl": "600",
+  "token_max_ttl": "600",
+  "token_explicit_max_ttl": "600"
+}
+EOF
+echo "✓ Created JWT role: harbor-robot-pusher-aal-hack"
+
 echo ""
 echo "=== Removing old broad policy ==="
 vault policy delete eso-policy 2>/dev/null && echo "✓ Deleted old policy: eso-policy" || echo "ⓘ Policy eso-policy not found (already removed)"
@@ -514,4 +555,5 @@ echo "  eso-cluster-puller → SA external-secrets/external-secrets → zot/data
 echo "  eso-harbor-pull → SA external-secrets/external-secrets → harbor/data/robot-puller"
 echo ""
 echo "GitHub Actions JWT roles:"
-echo "  harbor-robot-pusher → repository_owner ∈ {Shion1305, Shion1305Dev} → harbor/data/robot-pusher"
+echo "  harbor-robot-pusher          → repository_owner ∈ {Shion1305, Shion1305Dev} → harbor/data/robot-pusher"
+echo "  harbor-robot-pusher-aal-hack → repository_owner = aal-hack                  → harbor/data/robot-pusher-aal-hack"
