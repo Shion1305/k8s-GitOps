@@ -16,7 +16,6 @@ spec:
     mlflow: []
     nc_press_chotatsu: []
     harbor: []
-    litellm: [] # LiteLLM front for scalable-llm (KubeAI on Tenstorrent)
     fde_knowledge_engine: []
     research_gh_leaks: []
     tokuchan_dev: []
@@ -27,7 +26,6 @@ spec:
     mlflow: mlflow
     nc_press_chotatsu: nc_press_chotatsu
     harbor: harbor
-    litellm: litellm
     fde_knowledge_engine: fde_knowledge_engine
     research_gh_leaks: research_gh_leaks
     tokuchan_dev: tokuchan_dev

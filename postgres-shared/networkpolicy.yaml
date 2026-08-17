@@ -30,7 +30,6 @@ spec:
                 - nc-press-chotatsu
                 - openwebui
                 - postgres-operator
-                - scalable-llm
                 - tokuchan-dev
       toPorts:
         - ports:
