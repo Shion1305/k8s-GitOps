@@ -6,7 +6,7 @@ injector:
 server:
   image:
     repository: hashicorp/vault
-    tag: 2.0.3
+    tag: 2.0.4
   # vault 2.0.1 ships the binary with the cap_ipc_lock file capability, so it
   # refuses to start unless the container is granted IPC_LOCK (mlock keeps
   # secrets out of swap). disable_mlock does not help: the entrypoint fails at
@@ -98,7 +98,7 @@ server:
     # full simultaneous restart (e.g. a node reboot) recovers without a human
     # supplying keys.
     - name: unseal-sidecar
-      image: hashicorp/vault:2.0.3
+      image: hashicorp/vault:2.0.4
       securityContext:
         runAsNonRoot: true
         runAsUser: 100
