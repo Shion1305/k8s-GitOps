@@ -1,7 +1,7 @@
 image:
   registry: ghcr.io
   repository: zalando/postgres-operator
-  tag: v1.15.1
+  tag: v2.0.1
   pullPolicy: IfNotPresent
 # Use ConfigMap instead of OperatorConfigurationCRD to avoid CRD schema
 # defaults causing ArgoCD to normalize the configuration to {}, which
