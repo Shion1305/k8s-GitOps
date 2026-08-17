@@ -34,7 +34,7 @@ spec:
     #    kube-ai-crd app (sync-wave -1), so skip it here to avoid a collision.
     - repoURL: https://www.kubeai.org
       chart: kubeai
-      targetRevision: 0.23.2
+      targetRevision: 0.23.4
       helm:
         skipCrds: true
         valueFiles:
