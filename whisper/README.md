@@ -14,9 +14,13 @@ enumerate boards. The inference chart then creates a `ResourceClaimTemplate`
 that selects `boardName == "p150"` with `ExactCount: 1`; every Whisper Pod gets
 one generated claim and the DRA driver injects only its allocated device node.
 
-The Application is assigned Argo CD sync wave 10, after the wave-0
-`tt-operator` Application. Its only host paths are the model/compile cache and
-the node's 1 Gi hugepage filesystem; accelerator access is exclusively DRA.
+The Application is assigned Argo CD sync wave 10 so its child Application is
+registered after the wave-0 `tt-operator` Application. Sync waves do not wait
+for resources managed by that child Application to become healthy; the
+workload therefore also relies on Kubernetes scheduling to wait until the DRA
+driver and a matching DeviceClass are ready. Its only host paths are the
+model/compile cache and the node's 1 Gi hugepage filesystem; accelerator access
+is exclusively DRA.
 
 ## Deployment choices
 
