@@ -5,13 +5,28 @@ Tenstorrent Blackhole P150 board through the upstream `tt-media-server` API.
 The Pod receives its board through the `tenstorrent.com` DRA driver and runs
 without a `/dev/tenstorrent` host mount.
 
+## tt-operator integration
+
+`tt-operator` is a separate, cluster-scoped prerequisite rather than the owner
+of the Whisper Deployment. It publishes the `tenstorrent.com` DeviceClass and
+per-node ResourceSlices, runs the DRA kubelet plugin, and uses Fabric Manager to
+enumerate boards. The inference chart then creates a `ResourceClaimTemplate`
+that selects `boardName == "p150"` with `ExactCount: 1`; every Whisper Pod gets
+one generated claim and the DRA driver injects only its allocated device node.
+
+The Application is assigned Argo CD sync wave 10, after the wave-0
+`tt-operator` Application. Its only host paths are the model/compile cache and
+the node's 1 Gi hugepage filesystem; accelerator access is exclusively DRA.
+
 ## Deployment choices
 
 - The upstream chart is pinned to commit
   `650deab8b8c1cb8314ab672ee61388bc2e22e6cb`. This is chart `0.2.0`, including
   DRA allocation and startup probes; the latest tagged release still contains
   chart `0.1.0` with direct device host mounts.
-- One replica requests one `p150` board, leaving the second board available.
+- One replica requests one `p150` board, leaving the second board unallocated
+  by DRA. The Pod reserves the node's full hugepage pool, however, so another
+  hugepage-dependent Tenstorrent workload cannot run concurrently.
 - The Pod requests all 8 Gi of the node's configured 1 Gi hugepages. The
   upstream 32 Gi default cannot schedule on this node.
 - Model artifacts and compilation caches persist on the selected node under
@@ -22,12 +37,22 @@ without a `/dev/tenstorrent` host mount.
 - The API is reachable only through the WireGuard-backed internal Gateway at
   `https://whisper.i.shion1305.com`.
 
-The API bearer token is generated once by External Secrets Operator. It is not
-stored in Git. Retrieve it only into a local shell when needed:
+The API bearer key lives at Vault path `whisper/api`, property `api-key`, and is
+materialized by External Secrets Operator. Before the first sync, enable the
+dedicated KV v2 mount, write a generated key, and apply the scoped ESO policy
+and Kubernetes auth role:
 
 ```bash
-export WHISPER_API_KEY="$(kubectl -n whisper get secret whisper-api-key \
-  -o jsonpath='{.data.password}' | base64 --decode)"
+vault secrets enable -path=whisper kv-v2
+vault kv put whisper/api api-key=<generated-api-key>
+bash vault/scripts/setup-eso-policies.sh
+```
+
+Never place the key in Git or command output captured in CI. Retrieve it from
+the documented Vault path only into a local shell when making a request:
+
+```bash
+export WHISPER_API_KEY="$(vault kv get -field=api-key whisper/api)"
 ```
 
 ## Verify

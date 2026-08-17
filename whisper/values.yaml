@@ -32,4 +32,4 @@ defaults:
       valueFrom:
         secretKeyRef:
           name: whisper-api-key
-          key: password
+          key: api-key

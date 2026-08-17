@@ -3,6 +3,10 @@ kind: Application
 metadata:
   name: whisper
   namespace: argocd
+  annotations:
+    # tt-operator is a wave-0 child of root-app. Apply this workload only after
+    # its shared DeviceClass, ResourceSlices, DRA plugin, and Fabric Manager.
+    argocd.argoproj.io/sync-wave: "10"
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:

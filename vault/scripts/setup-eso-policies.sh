@@ -95,6 +95,17 @@ path "claude-code/metadata/*" {
 EOF
 echo "✓ Created policy: eso-claude-code"
 
+# Policy for whisper namespace (separate KV v2 engine mounted at whisper/)
+vault policy write eso-whisper - <<EOF
+path "whisper/data/*" {
+  capabilities = ["read"]
+}
+path "whisper/metadata/*" {
+  capabilities = ["read", "list"]
+}
+EOF
+echo "✓ Created policy: eso-whisper"
+
 # Policy for cert-manager namespace (system/ KV v2 mount, cert-manager only)
 vault policy write eso-cert-manager - <<EOF
 path "system/data/cert-manager" {
@@ -309,6 +320,14 @@ vault write auth/kubernetes/role/eso-claude-code \
   policies=eso-claude-code \
   ttl=1h
 echo "✓ Created role: eso-claude-code"
+
+# Whisper
+vault write auth/kubernetes/role/eso-whisper \
+  bound_service_account_names=eso \
+  bound_service_account_namespaces=whisper \
+  policies=eso-whisper \
+  ttl=1h
+echo "✓ Created role: eso-whisper"
 
 # cert-manager
 vault write auth/kubernetes/role/eso-cert-manager \

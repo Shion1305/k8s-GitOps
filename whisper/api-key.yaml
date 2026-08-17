@@ -1,17 +1,5 @@
-apiVersion: generators.external-secrets.io/v1alpha1
-kind: Password
-metadata:
-  name: whisper-api-key
-  namespace: whisper
-  annotations:
-    argocd.argoproj.io/sync-wave: "-2"
-spec:
-  length: 48
-  digits: 8
-  symbols: 0
-  noUpper: false
-  allowRepeat: true
----
+# Materializes the API bearer key from Vault (whisper/api, property `api-key`).
+# The value is written to Vault out-of-band and is never committed.
 apiVersion: external-secrets.io/v1
 kind: ExternalSecret
 metadata:
@@ -20,7 +8,10 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-wave: "-1"
 spec:
-  refreshPolicy: CreatedOnce
+  refreshInterval: 5m
+  secretStoreRef:
+    name: vault
+    kind: SecretStore
   target:
     name: whisper-api-key
     creationPolicy: Owner
@@ -30,9 +21,8 @@ spec:
         labels:
           app.kubernetes.io/name: whisper
           app.kubernetes.io/managed-by: external-secrets
-  dataFrom:
-    - sourceRef:
-        generatorRef:
-          apiVersion: generators.external-secrets.io/v1alpha1
-          kind: Password
-          name: whisper-api-key
+  data:
+    - secretKey: api-key
+      remoteRef:
+        key: api
+        property: api-key
