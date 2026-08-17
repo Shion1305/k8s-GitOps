@@ -241,9 +241,10 @@ render_helm_source() {
 }
 
 render_path_source() {
-  # $1 = app name, $2 = source index, $3 = path, $4 = optional dir override
+  # $1 = app name, $2 = source index, $3 = path, $4 = optional dir override,
+  # $5 = optional source JSON (for Helm options on path-based charts)
   # (used when the path lives inside a cloned external repo).
-  local app="$1" idx="$2" path="$3" dir_override="${4:-}"
+  local app="$1" idx="$2" path="$3" dir_override="${4:-}" src="${5:-}"
   local dir
   if [[ -n "${dir_override}" ]]; then
     dir="${dir_override}/${path}"
@@ -263,10 +264,45 @@ render_path_source() {
       return 1
     fi
   elif compgen -G "${dir}/Chart.yaml" >/dev/null 2>&1; then
-    # In-repo (or cloned) Helm chart: render with default values. Some apps
-    # (e.g. gh-analysis) use an external git repo whose path points at a
-    # chart directory rather than a chart-repo entry.
-    if ! helm template "${app}" "${dir}" --namespace "${app}" \
+    # In-repo (or cloned) Helm chart. Some apps use an external git repo whose
+    # path points at a chart directory rather than a chart-repo entry. Honor
+    # the same releaseName, valueFiles, and parameters Argo CD applies.
+    local release_name="${app}"
+    if [[ -n "${src}" ]]; then
+      release_name=$(jq -r '.helm.releaseName // ""' <<<"${src}")
+      [[ -z "${release_name}" ]] && release_name="${app}"
+    fi
+
+    local -a helm_args=("template" "${release_name}" "${dir}")
+    local value_files vf vf_path
+    if [[ -n "${src}" ]]; then
+      value_files=$(jq -r '.helm.valueFiles // [] | .[]' <<<"${src}")
+      while IFS= read -r vf; do
+        [[ -z "${vf}" ]] && continue
+        if [[ "${vf}" == \$values/* ]]; then
+          vf_path="${vf/#\$values\//${ROOT}/}"
+        else
+          vf_path="${dir}/${vf}"
+        fi
+        if [[ ! -f "${vf_path}" ]]; then
+          fail "${app}: values file ${vf} (resolved: ${vf_path}) not found"
+          return 1
+        fi
+        helm_args+=("-f" "${vf_path}")
+      done <<<"${value_files}"
+
+      local params p name value
+      params=$(jq -c '.helm.parameters // [] | .[]' <<<"${src}")
+      while IFS= read -r p; do
+        [[ -z "${p}" ]] && continue
+        name=$(jq -r '.name' <<<"${p}")
+        value=$(jq -r '.value' <<<"${p}")
+        helm_args+=("--set" "${name}=${value}")
+      done <<<"${params}"
+    fi
+    helm_args+=("--namespace" "${app}")
+
+    if ! helm "${helm_args[@]}" \
         2>"${WORK_DIR}/${app}-helm.err"; then
       fail "${app}: helm template failed for in-tree chart ${path}"
       cat "${WORK_DIR}/${app}-helm.err" >&2
@@ -379,7 +415,7 @@ validate_app() {
           target_dir_override="${clone_dir}"
         fi
         printf -- '---\n' >>"${rendered}"
-        render_path_source "${app_name}" "${idx}" "${path}" "${target_dir_override}" \
+        render_path_source "${app_name}" "${idx}" "${path}" "${target_dir_override}" "${src}" \
           >>"${rendered}" || return 1
         idx=$((idx+1))
       elif [[ -n "${ref}" ]]; then
@@ -398,9 +434,10 @@ validate_app() {
       src=$(yq -o=json '.spec.source' "${app_file}")
       render_helm_source "${app_name}" 0 "${src}" >>"${rendered}" || return 1
     elif [[ -n "${path}" ]]; then
-      local repo rev clone_dir="" target_dir_override=""
+      local repo rev clone_dir="" target_dir_override="" src
       repo=$(yq_get "${app_file}" '.spec.source.repoURL')
       rev=$(yq_get "${app_file}" '.spec.source.targetRevision')
+      src=$(yq -o=json '.spec.source' "${app_file}")
       if is_external_git_repo "${repo}"; then
         if ! clone_dir=$(clone_external_repo "${repo}" "${rev}"); then
           fail "${app_name}: failed to clone ${repo}@${rev}"
@@ -408,7 +445,7 @@ validate_app() {
         fi
         target_dir_override="${clone_dir}"
       fi
-      render_path_source "${app_name}" 0 "${path}" "${target_dir_override}" \
+      render_path_source "${app_name}" 0 "${path}" "${target_dir_override}" "${src}" \
         >>"${rendered}" || return 1
     else
       warn "${app_name}: single-source app has no chart or path — skipping"
