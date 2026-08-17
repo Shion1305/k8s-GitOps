@@ -1,0 +1,35 @@
+node-feature-discovery:
+  enabled: true
+  # NFD 0.18.3 renders master.resources at the PodSpec level in its post-delete
+  # hook, which Kubernetes rejects. Argo prunes the NFD resources directly;
+  # disable only that broken Helm cleanup hook.
+  postDeleteCleanup: false
+
+tt-k8s-driver-manager:
+  enabled: false
+
+tt-fabric-manager:
+  enabled: true
+
+tt-dra-driver:
+  enabled: true
+  # The published image is public; the subchart default references a
+  # site-specific pull secret that is not present in this cluster.
+  imagePullSecrets: []
+
+tt-telemetry:
+  enabled: true
+  namespace: tt-operator-system
+  # Prometheus scrapes each node-local collector directly, so the optional
+  # central aggregator and its placeholder Ingress are unnecessary.
+  aggregator:
+    enabled: false
+  podMonitor:
+    enabled: true
+    namespace: tt-operator-system
+
+jobset:
+  enabled: false
+
+kubepmix:
+  enabled: false
