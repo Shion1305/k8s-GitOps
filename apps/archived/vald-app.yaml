@@ -8,7 +8,7 @@ spec:
   sources:
     - repoURL: https://vald.vdaas.org/charts
       chart: vald
-      targetRevision: v1.7.17
+      targetRevision: v1.8.0
       helm:
         valueFiles:
           - $values/vald/values.yaml
