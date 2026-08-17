@@ -47,7 +47,7 @@ spec:
             fsGroup: 1000
           containers:
             - name: snapshot
-              image: hashicorp/vault:2.0.3
+              image: hashicorp/vault:2.0.4
               env:
                 - name: VAULT_ADDR
                   value: http://vault-active.vault.svc.cluster.local:8200
