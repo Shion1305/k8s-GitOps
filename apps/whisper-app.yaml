@@ -1,0 +1,35 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: whisper
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  sources:
+    # The released v0.20.0 chart still uses direct host device mounts. Pin the
+    # reviewed upstream chart commit that introduced DRA and startup probes.
+    - repoURL: https://github.com/tenstorrent/tt-inference-server.git
+      targetRevision: 650deab8b8c1cb8314ab672ee61388bc2e22e6cb
+      path: charts/tt-inference-server
+      helm:
+        releaseName: whisper
+        valueFiles:
+          - $values/whisper/values.yaml
+    - repoURL: https://github.com/Shion1305/k8s-GitOps.git
+      targetRevision: HEAD
+      ref: values
+    - repoURL: https://github.com/Shion1305/k8s-GitOps.git
+      targetRevision: HEAD
+      path: whisper
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: whisper
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true

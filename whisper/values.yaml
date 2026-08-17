@@ -1,0 +1,35 @@
+model: whisper-large-v3
+device: p150
+engine: media
+impl: whisper
+
+# openai/whisper-large-v3 is public. Keep credentials out of Git and download
+# anonymously into the persistent node-local cache on first startup.
+hfToken: ""
+
+fullnameOverride: whisper
+
+cache:
+  hostPath: /var/lib/tt-inference-server/cache/whisper-large-v3-p150
+
+defaults:
+  replicaCount: 1
+  dra:
+    deviceClassName: tenstorrent.com
+  nodeSelector:
+    feature.node.kubernetes.io/pci-1200_1e52.present: "true"
+  resources:
+    limits:
+      # This node has eight 1 Gi hugepages. The upstream 32 Gi default targets
+      # larger systems and would make this workload permanently unschedulable.
+      hugepages-1Gi: 8Gi
+    requests:
+      cpu: "6"
+      memory: 6Gi
+      hugepages-1Gi: 8Gi
+  extraEnv:
+    - name: API_KEY
+      valueFrom:
+        secretKeyRef:
+          name: whisper-api-key
+          key: password
