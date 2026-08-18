@@ -212,6 +212,62 @@ validate_whisper_cache_safety() {
   ok "Whisper persistent model-cache policy"
 }
 
+# Hugging Face credentials must come from the namespace-scoped Vault mount.
+# Never let a token enter Helm values, and keep the ExternalSecret, Pod env,
+# and Kustomize resource registration aligned.
+validate_whisper_hf_token_safety() {
+  local values_file external_secret inline_token secret_name secret_key
+  local remote_key remote_property registered
+  values_file="${ROOT}/whisper/values.yaml"
+  external_secret="${ROOT}/whisper/hf-token.yaml"
+
+  inline_token="$(yq -r '.hfToken // ""' "${values_file}")"
+  if [[ -n "${inline_token}" ]]; then
+    fail "whisper: hfToken must remain empty; use the Vault-backed Secret"
+    return 1
+  fi
+
+  secret_name="$(
+    yq -r '
+      .defaults.extraEnv[]?
+      | select(.name == "HF_TOKEN")
+      | .valueFrom.secretKeyRef.name // ""
+    ' "${values_file}"
+  )"
+  secret_key="$(
+    yq -r '
+      .defaults.extraEnv[]?
+      | select(.name == "HF_TOKEN")
+      | .valueFrom.secretKeyRef.key // ""
+    ' "${values_file}"
+  )"
+  if [[ "${secret_name}" != "whisper-hf-token" || "${secret_key}" != "token" ]]; then
+    fail "whisper: HF_TOKEN must reference whisper-hf-token/token"
+    return 1
+  fi
+
+  if [[ ! -f "${external_secret}" ]]; then
+    fail "whisper: Vault-backed Hugging Face ExternalSecret is missing"
+    return 1
+  fi
+  remote_key="$(yq -r '.spec.data[0].remoteRef.key // ""' "${external_secret}")"
+  remote_property="$(yq -r '.spec.data[0].remoteRef.property // ""' "${external_secret}")"
+  if [[ "${remote_key}" != "huggingface" || "${remote_property}" != "token" ]]; then
+    fail "whisper: Hugging Face ExternalSecret must read huggingface/token"
+    return 1
+  fi
+
+  registered="$(
+    yq -r '.resources[]? | select(. == "hf-token.yaml")' \
+      "${ROOT}/whisper/kustomization.yaml"
+  )"
+  if [[ "${registered}" != "hf-token.yaml" ]]; then
+    fail "whisper: hf-token.yaml must be registered in the Kustomization"
+    return 1
+  fi
+  ok "Whisper Vault-backed Hugging Face token policy"
+}
+
 # Extract a field from an ArgoCD Application manifest. Returns empty string if
 # the field is missing — callers MUST handle the empty case explicitly.
 yq_get() {
@@ -550,6 +606,7 @@ main() {
   validate_argocd_diff_safety || exit 1
   validate_argocd_submodule_safety || exit 1
   validate_whisper_cache_safety || exit 1
+  validate_whisper_hf_token_safety || exit 1
 
   for app_file in "${APPS_DIR}"/*.yaml; do
     [[ -e "${app_file}" ]] || continue

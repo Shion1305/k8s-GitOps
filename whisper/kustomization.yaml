@@ -4,5 +4,6 @@ kind: Kustomization
 resources:
   - vault-secret-store.yaml
   - api-key.yaml
+  - hf-token.yaml
   - httproute-internal.yaml
   - reference-grant.yaml
