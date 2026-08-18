@@ -40,8 +40,10 @@ do not grant repo-server credentials for those unrelated repositories.
   upstream 32 Gi default cannot schedule on this node.
 - Model artifacts and compilation caches persist on the selected node under
   `/var/lib/tt-inference-server/cache/whisper-large-v3-p150`. `HF_HOME` points
-  into that mount, so partial Hugging Face downloads survive container
-  restarts and subsequent starts can reuse the downloaded weights.
+  at the existing mount root because the deployed image reads the directory
+  before Hugging Face can create a missing child path. Partial downloads
+  therefore survive container restarts and subsequent starts reuse the
+  downloaded weights.
 - The model-specific startup deadline is 12 hours. This accommodates unusually
   slow Hugging Face transfers without repeatedly restarting the container;
   downloads that exceed one attempt still resume from the persistent cache.
