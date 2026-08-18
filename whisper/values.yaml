@@ -12,6 +12,16 @@ fullnameOverride: whisper
 cache:
   hostPath: /var/lib/tt-inference-server/cache/whisper-large-v3-p150
 
+# The model-specific leaf overrides defaults in the upstream chart. Allow a
+# slow first download to run for 12 hours before the startup probe retries it.
+models:
+  whisper-large-v3:
+    media:
+      p150:
+        impls:
+          whisper:
+            progressDeadlineSeconds: 43200
+
 defaults:
   replicaCount: 1
   dra:
@@ -28,6 +38,10 @@ defaults:
       memory: 6Gi
       hugepages-1Gi: 8Gi
   extraEnv:
+    # Hugging Face otherwise defaults to the container writable layer, so a
+    # startup-probe restart would discard a partially downloaded model.
+    - name: HF_HOME
+      value: /home/container_app_user/cache_root/huggingface
     - name: API_KEY
       valueFrom:
         secretKeyRef:

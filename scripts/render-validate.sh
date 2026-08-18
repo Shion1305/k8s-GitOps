@@ -178,6 +178,40 @@ validate_argocd_submodule_safety() {
   ok "ArgoCD Git submodule policy"
 }
 
+# The upstream image writes Hugging Face downloads below HF_HOME, while the
+# chart's persistent cache is mounted at /home/container_app_user/cache_root.
+# Keep those paths aligned so a startup-probe restart resumes a partial model
+# download instead of discarding it with the container writable layer.
+validate_whisper_cache_safety() {
+  local values_file hf_home progress_deadline
+  values_file="${ROOT}/whisper/values.yaml"
+  hf_home="$(
+    yq -r '
+      .defaults.extraEnv[]?
+      | select(.name == "HF_HOME")
+      | .value // ""
+    ' "${values_file}"
+  )"
+  if [[ "${hf_home}" != "/home/container_app_user/cache_root/huggingface" ]]; then
+    fail "whisper: HF_HOME must use the persistent cache mount"
+    return 1
+  fi
+
+  # This leaf overrides defaults in the pinned upstream chart. Twelve hours
+  # tolerates the observed slow Hub transfer; the persistent cache still lets
+  # a later restart resume if the transfer takes longer.
+  progress_deadline="$(
+    yq -r '
+      .models.whisper-large-v3.media.p150.impls.whisper.progressDeadlineSeconds // 0
+    ' "${values_file}"
+  )"
+  if [[ ! "${progress_deadline}" =~ ^[0-9]+$ ]] || (( progress_deadline < 43200 )); then
+    fail "whisper: model startup progress deadline must be at least 43200 seconds"
+    return 1
+  fi
+  ok "Whisper persistent model-cache policy"
+}
+
 # Extract a field from an ArgoCD Application manifest. Returns empty string if
 # the field is missing — callers MUST handle the empty case explicitly.
 yq_get() {
@@ -515,6 +549,7 @@ main() {
   local app_file
   validate_argocd_diff_safety || exit 1
   validate_argocd_submodule_safety || exit 1
+  validate_whisper_cache_safety || exit 1
 
   for app_file in "${APPS_DIR}"/*.yaml; do
     [[ -e "${app_file}" ]] || continue
