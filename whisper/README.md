@@ -22,6 +22,11 @@ driver and a matching DeviceClass are ready. Its only host paths are the
 model/compile cache and the node's 1 Gi hugepage filesystem; accelerator access
 is exclusively DRA.
 
+Argo CD repo-server has Git submodule initialization disabled cluster-wide.
+The pinned upstream repository contains unrelated private/SSH submodules, but
+the inference chart itself does not use them. Keep the chart source pinned and
+do not grant repo-server credentials for those unrelated repositories.
+
 ## Deployment choices
 
 - The upstream chart is pinned to commit

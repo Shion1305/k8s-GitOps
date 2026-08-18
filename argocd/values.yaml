@@ -177,6 +177,10 @@ configs:
   # without having to dial the upstream over (self-signed) HTTPS.
   params:
     server.insecure: "true"
+    # No managed Git source uses submodules. Disable recursive initialization
+    # so unrelated private/SSH submodules in public upstream repositories do
+    # not block manifest generation for a chart or manifest subdirectory.
+    reposerver.enable.git.submodule: "false"
 # Server configuration
 server:
   # Disable default ingress since we have a custom one
