@@ -161,6 +161,23 @@ validate_argocd_diff_safety() {
   ok "ArgoCD HTTPRoute diff coverage"
 }
 
+# Repo-server initializes submodules recursively by default, even when an
+# Application only consumes a chart from the parent repository. None of this
+# cluster's Git sources require submodules, and unrelated private/SSH
+# submodules must not block manifest generation for an otherwise public repo.
+validate_argocd_submodule_safety() {
+  local enabled
+  enabled="$(
+    yq -r '.configs.params."reposerver.enable.git.submodule" // "true"' \
+      "${ROOT}/argocd/values.yaml"
+  )"
+  if [[ "${enabled}" != "false" ]]; then
+    fail "argocd: repo-server Git submodules must be explicitly disabled"
+    return 1
+  fi
+  ok "ArgoCD Git submodule policy"
+}
+
 # Extract a field from an ArgoCD Application manifest. Returns empty string if
 # the field is missing — callers MUST handle the empty case explicitly.
 yq_get() {
@@ -497,6 +514,7 @@ validate_app() {
 main() {
   local app_file
   validate_argocd_diff_safety || exit 1
+  validate_argocd_submodule_safety || exit 1
 
   for app_file in "${APPS_DIR}"/*.yaml; do
     [[ -e "${app_file}" ]] || continue
