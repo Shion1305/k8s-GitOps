@@ -47,25 +47,29 @@ do not grant repo-server credentials for those unrelated repositories.
 - The model-specific startup deadline is 12 hours. This accommodates unusually
   slow Hugging Face transfers without repeatedly restarting the container;
   downloads that exceed one attempt still resume from the persistent cache.
-- The public model is downloaded anonymously. Never add a Hugging Face token
-  to `values.yaml`; add a Vault-backed `ExternalSecret` if authenticated Hub
-  access becomes necessary.
+- The Whisper model itself is public. A fine-grained Hugging Face token is
+  injected from Vault only to download the gated
+  `pyannote/speaker-diarization-3.0` and `pyannote/segmentation-3.0` models.
+  Never add the token value to `values.yaml`.
 - The API is reachable only through the WireGuard-backed internal Gateway at
   `https://whisper.i.shion1305.com`.
 
-The API bearer key lives at Vault path `whisper/api`, property `api-key`, and is
-materialized by External Secrets Operator. Before the first sync, enable the
-dedicated KV v2 mount, write a generated key, and apply the scoped ESO policy
-and Kubernetes auth role:
+The API bearer key lives at Vault path `whisper/api`, property `api-key`. The
+Hugging Face token lives separately at `whisper/huggingface`, property `token`.
+Both are materialized by External Secrets Operator. Before the first sync,
+enable the dedicated KV v2 mount, write both values, and apply the scoped ESO
+policy and Kubernetes auth role:
 
 ```bash
 vault secrets enable -path=whisper kv-v2
 vault kv put whisper/api api-key=<generated-api-key>
+vault kv put whisper/huggingface token="${HF_TOKEN}"
 bash vault/scripts/setup-eso-policies.sh
 ```
 
-Never place the key in Git or command output captured in CI. Retrieve it from
-the documented Vault path only into a local shell when making a request:
+Never place either secret in Git or command output captured in CI. Retrieve the
+API key from its documented Vault path only into a local shell when making a
+request:
 
 ```bash
 export WHISPER_API_KEY="$(vault kv get -field=api-key whisper/api)"
@@ -80,6 +84,7 @@ retained between attempts. Follow the rollout and DRA allocation:
 
 ```bash
 kubectl -n argocd get application whisper
+kubectl -n whisper get externalsecret whisper-api-key whisper-hf-token
 kubectl -n whisper get deploy,pods,resourceclaims
 kubectl -n whisper describe pod -l app.kubernetes.io/name=tt-inference-server
 kubectl get resourceslices

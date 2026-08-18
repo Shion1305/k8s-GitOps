@@ -42,6 +42,11 @@ defaults:
     # huggingface_hub can create a missing child directory.
     - name: HF_HOME
       value: /home/container_app_user/cache_root
+    - name: HF_TOKEN
+      valueFrom:
+        secretKeyRef:
+          name: whisper-hf-token
+          key: token
     - name: API_KEY
       valueFrom:
         secretKeyRef:
