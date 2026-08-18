@@ -39,7 +39,12 @@ do not grant repo-server credentials for those unrelated repositories.
 - The Pod requests all 8 Gi of the node's configured 1 Gi hugepages. The
   upstream 32 Gi default cannot schedule on this node.
 - Model artifacts and compilation caches persist on the selected node under
-  `/var/lib/tt-inference-server/cache/whisper-large-v3-p150`.
+  `/var/lib/tt-inference-server/cache/whisper-large-v3-p150`. `HF_HOME` points
+  into that mount, so partial Hugging Face downloads survive container
+  restarts and subsequent starts can reuse the downloaded weights.
+- The model-specific startup deadline is 12 hours. This accommodates unusually
+  slow Hugging Face transfers without repeatedly restarting the container;
+  downloads that exceed one attempt still resume from the persistent cache.
 - The public model is downloaded anonymously. Never add a Hugging Face token
   to `values.yaml`; add a Vault-backed `ExternalSecret` if authenticated Hub
   access becomes necessary.
@@ -66,8 +71,10 @@ export WHISPER_API_KEY="$(vault kv get -field=api-key whisper/api)"
 
 ## Verify
 
-The first startup downloads model weights and compiles TT-Metal kernels, so it
-can take up to 90 minutes. Follow the rollout and DRA allocation:
+The first startup downloads roughly 3.1 GB of model weights and compiles
+TT-Metal kernels. Under a slow Hugging Face connection this can take many
+hours; the startup probe allows 12 hours per attempt and partial downloads are
+retained between attempts. Follow the rollout and DRA allocation:
 
 ```bash
 kubectl -n argocd get application whisper
