@@ -178,10 +178,10 @@ validate_argocd_submodule_safety() {
   ok "ArgoCD Git submodule policy"
 }
 
-# The upstream image writes Hugging Face downloads below HF_HOME, while the
-# chart's persistent cache is mounted at /home/container_app_user/cache_root.
-# Keep those paths aligned so a startup-probe restart resumes a partial model
-# download instead of discarding it with the container writable layer.
+# The deployed media-server image reads HF_HOME before huggingface_hub can
+# create it. Point directly at the chart's existing persistent cache mount so
+# startup cannot fail on a missing subdirectory and partial downloads survive
+# container restarts.
 validate_whisper_cache_safety() {
   local values_file hf_home progress_deadline
   values_file="${ROOT}/whisper/values.yaml"
@@ -192,8 +192,8 @@ validate_whisper_cache_safety() {
       | .value // ""
     ' "${values_file}"
   )"
-  if [[ "${hf_home}" != "/home/container_app_user/cache_root/huggingface" ]]; then
-    fail "whisper: HF_HOME must use the persistent cache mount"
+  if [[ "${hf_home}" != "/home/container_app_user/cache_root" ]]; then
+    fail "whisper: HF_HOME must use the existing persistent cache mount root"
     return 1
   fi
 

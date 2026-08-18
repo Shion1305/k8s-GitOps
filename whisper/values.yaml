@@ -38,10 +38,10 @@ defaults:
       memory: 6Gi
       hugepages-1Gi: 8Gi
   extraEnv:
-    # Hugging Face otherwise defaults to the container writable layer, so a
-    # startup-probe restart would discard a partially downloaded model.
+    # Use the existing mount root: this image reads HF_HOME before
+    # huggingface_hub can create a missing child directory.
     - name: HF_HOME
-      value: /home/container_app_user/cache_root/huggingface
+      value: /home/container_app_user/cache_root
     - name: API_KEY
       valueFrom:
         secretKeyRef:
