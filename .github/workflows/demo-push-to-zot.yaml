@@ -41,7 +41,7 @@ jobs:
       # use the exact same pinned version.
       - uses: aquaproj/aqua-installer@v4.0.5
         with:
-          aqua_version: v2.59.1
+          aqua_version: v2.60.1
 
       # Mint a fresh OIDC token immediately before push. GHA OIDC tokens
       # expire in ~10 min.
