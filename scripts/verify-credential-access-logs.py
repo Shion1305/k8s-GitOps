@@ -256,7 +256,8 @@ def runtime_check(directory, loggers):
                         assert identity != HOST, "Credential authority/SNI reached logs"
             if all(marker in combined for marker in control_markers):
                 break
-            assert time.monotonic() < deadline, "Unrelated-host logging or listener diagnostics disappeared"
+            assert time.monotonic() < deadline, ("Missing unrelated controls: " + ", ".join(
+                marker for marker in control_markers if marker not in combined))
             time.sleep(0.1)
         for marker in control_markers:
             assert logs.stdout.count(marker) == 1, "Unexpected duplicate logger"
