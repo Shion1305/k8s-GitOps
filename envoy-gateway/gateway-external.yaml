@@ -50,3 +50,17 @@ spec:
       allowedRoutes:
         namespaces:
           from: All
+    - name: https-research-shion-dev
+      port: 443
+      protocol: HTTPS
+      hostname: "*.research.shion.dev"
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - name: wildcard-research-shion-dev-tls
+      allowedRoutes:
+        namespaces:
+          from: Selector
+          selector:
+            matchLabels:
+              kubernetes.io/metadata.name: gh-leaked-tokens
