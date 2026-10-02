@@ -193,7 +193,9 @@ def runtime_check(directory, loggers):
                     "-p", "127.0.0.1::10080",
                     "-p", "127.0.0.1::10443", "-p", "127.0.0.1::10444", ENVOY,
                     "-c", "/fixture/envoy.json", "--disable-hot-restart", "--concurrency", "1",
-                    "--log-level", "warning").strip()
+                    # The production default buffers files for 10s. Shorten
+                    # only this isolated fixture's flush interval, not filters.
+                    "--file-flush-interval-msec", "100", "--log-level", "warning").strip()
     private_markers, control_markers = [], []
     try:
         ports = {port: int(run("docker", "port", container, str(port)).strip().rsplit(":", 1)[1])
