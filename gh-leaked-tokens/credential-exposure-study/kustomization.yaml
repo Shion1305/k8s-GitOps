@@ -4,9 +4,12 @@ namespace: gh-leaked-tokens
 resources:
   - db-secret-store.yaml
   - db-external-secrets.yaml
+  - admin-external-secrets.yaml
   - deployment.yaml
   - service.yaml
   - httproute.yaml
+  - admin-httproute.yaml
+  - admin-securitypolicy.yaml
 images:
   - name: harbor.i.shion1305.com/shion1305/credential-exposure-study
     newTag: latest

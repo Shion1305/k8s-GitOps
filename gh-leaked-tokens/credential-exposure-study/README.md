@@ -5,6 +5,10 @@ This bundle mirrors the reviewed application deployment from
 Keep application deployment changes aligned with that source and its
 [release runbook](https://github.com/Shion1305/gh-base64token-investigate/blob/main/survey/deploy/README.md).
 
+The optional private `/admin` dashboard uses a separate Vault-backed review
+export, Keycloak login and an explicit owner allowlist. See
+[dashboard provisioning](DASHBOARD.md).
+
 Merging this bundle enables the existing `gh-leaked-tokens` Argo CD application
 to deploy the site automatically. The `shared-postgres` and `external-secrets`
 applications independently reconcile the database roles and credential-reader
@@ -49,7 +53,9 @@ The `latest` image is resolved when a Pod starts. Publishing a replacement alone
 does not restart a running Pod; verify the deployed digest after each rollout.
 Research participation starts closed. A healthy public page does not verify
 shared reports or authorize delivery: rehearse a synthetic report with the
-restricted role, verify response-status persistence and private-path log
-exclusion, and complete recipient/evidence review before sending real notices.
-The separate [bearer-log exclusion task](https://github.com/Shion1305/k8s-GitOps/issues/642)
-is a delivery prerequisite. This bundle does not change shared Gateway logs.
+restricted role, verify response-status persistence, and complete
+recipient/evidence review before sending real notices. The owner accepted
+ordinary infrastructure request logging and closed
+[bearer-log exclusion #642](https://github.com/Shion1305/k8s-GitOps/issues/642)
+as not planned. Capability URLs may remain in those logs; exclusion is not a
+delivery prerequisite. This bundle does not change shared Gateway logs.
