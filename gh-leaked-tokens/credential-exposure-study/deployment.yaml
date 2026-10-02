@@ -43,17 +43,15 @@ spec:
                   key: DB_URL
                   # Public pages can ship first; /r/ fails closed without this.
                   optional: true
-            - name: ADMIN_DASHBOARD_USERNAME
+            - name: ADMIN_OIDC_ISSUER
+              value: https://keycloak.shion1305.com/realms/credential-exposure
+            - name: ADMIN_OIDC_AUDIENCE
+              value: credential-exposure-admin
+            - name: ADMIN_OIDC_ALLOWED_SUBJECTS
               valueFrom:
                 secretKeyRef:
-                  name: credential-exposure-admin-auth
-                  key: username
-                  optional: true
-            - name: ADMIN_DASHBOARD_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: credential-exposure-admin-auth
-                  key: password
+                  name: credential-exposure-admin-oidc
+                  key: allowed-subjects
                   optional: true
             - name: ADMIN_DASHBOARD_DATA_FILE
               value: /var/run/notification-dashboard/dashboard.json

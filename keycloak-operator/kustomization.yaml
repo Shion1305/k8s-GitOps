@@ -14,3 +14,4 @@ resources:
   - ynufes-tech-realm.yaml
   - harbor-realm.yaml
   - nc-chotatsu-realm.yaml
+  - credential-exposure-realm.yaml

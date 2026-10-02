@@ -6,7 +6,8 @@ Keep application deployment changes aligned with that source and its
 [release runbook](https://github.com/Shion1305/gh-base64token-investigate/blob/main/survey/deploy/README.md).
 
 The optional private `/admin` dashboard uses a separate Vault-backed review
-export and Basic authentication. See [dashboard provisioning](DASHBOARD.md).
+export, Keycloak login and an explicit owner allowlist. See
+[dashboard provisioning](DASHBOARD.md).
 
 Merging this bundle enables the existing `gh-leaked-tokens` Argo CD application
 to deploy the site automatically. The `shared-postgres` and `external-secrets`
