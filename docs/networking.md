@@ -122,12 +122,12 @@ different namespace.
 Envoy Gateway ships extension APIs in `gateway.envoyproxy.io/v1alpha1`:
 
 - `SecurityPolicy` — OIDC / JWT / authn enforcement, attached to one or
-  more `HTTPRoute`s. Used by the zot UI; see
-  `zot/securitypolicy.yaml`.
+  more `HTTPRoute`s. The retired Zot configuration in
+  `zot/securitypolicy.yaml` remains as a historical example.
 - `BackendTrafficPolicy` — connection / retry / timeout / circuit-
   breaker tuning per backend.
-- `EnvoyExtensionPolicy` — Lua / external-processing filters. Used by
-  the zot SPA mgmt rewrite.
+- `EnvoyExtensionPolicy` — Lua / external-processing filters. The retired Zot
+  SPA configuration demonstrates a response rewrite.
 
 301 redirects use `HTTPRoute.rules.filters.requestRedirect`. The
 Gateway API CEL validator restricts `statusCode` to 301 or 302; 308 is
@@ -225,4 +225,4 @@ kubectl rollout restart -n kube-system deployment/coredns
 - `envoy-gateway/` — Gateway / GatewayClass / Certificate manifests
 - `keycloak-operator/httproute-external.yaml` + `httproute-legacy-redirect.yaml`
   — canonical example of the apex + redirect pattern
-- `zot/securitypolicy.yaml` — example of OIDC `SecurityPolicy` attachment
+- `zot/securitypolicy.yaml` — archived example of OIDC `SecurityPolicy` attachment
