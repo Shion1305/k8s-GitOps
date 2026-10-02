@@ -1,0 +1,95 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: credential-exposure-study
+spec:
+  replicas: 1
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: credential-exposure-study
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: credential-exposure-study
+    spec:
+      automountServiceAccountToken: false
+      nodeSelector:
+        kubernetes.io/arch: amd64
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: survey
+          image: harbor.i.shion1305.com/shion1305/credential-exposure-study:latest
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 3000
+          env:
+            - name: DB_URL
+              valueFrom:
+                secretKeyRef:
+                  name: credential-exposure-study-db
+                  key: DB_URL
+            - name: SHARED_REPORT_DB_URL
+              valueFrom:
+                secretKeyRef:
+                  name: credential-exposure-reports-db
+                  key: DB_URL
+                  # Public pages can ship first; /r/ fails closed without this.
+                  optional: true
+            - name: PG_POOL_MAX
+              value: "5"
+            # Open only after live personalized-link, consent, and save checks.
+            - name: SURVEY_PARTICIPATION_OPEN
+              value: "false"
+          startupProbe:
+            httpGet:
+              path: /
+              port: http
+            periodSeconds: 2
+            failureThreshold: 30
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+            periodSeconds: 20
+            timeoutSeconds: 3
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 3
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+              ephemeral-storage: 64Mi
+            limits:
+              cpu: "1"
+              memory: 512Mi
+              ephemeral-storage: 256Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            - name: next-cache
+              mountPath: /app/.next/cache
+      volumes:
+        - name: tmp
+          emptyDir:
+            medium: Memory
+            sizeLimit: 32Mi
+        - name: next-cache
+          emptyDir:
+            sizeLimit: 64Mi

@@ -10,6 +10,7 @@ resources:
   - prometheus.yaml
   - servicemonitor.yaml
   - cronjob.yaml
+  - credential-exposure-study
   - grafana-db-secret-store.yaml
   - grafana-db-external-secret.yaml
   - grafana-datasource.yaml
