@@ -117,17 +117,6 @@ path "system/metadata/cert-manager" {
 EOF
 echo "✓ Created policy: eso-cert-manager"
 
-# Policy for zot namespace (separate KV v2 engine mounted at zot/)
-vault policy write eso-zot - <<EOF
-path "zot/data/*" {
-  capabilities = ["read"]
-}
-path "zot/metadata/*" {
-  capabilities = ["read", "list"]
-}
-EOF
-echo "✓ Created policy: eso-zot"
-
 # Policy for harbor namespace (separate KV v2 engine mounted at harbor/)
 vault policy write eso-harbor - <<EOF
 path "harbor/data/*" {
@@ -190,9 +179,9 @@ echo "✓ Created policy: eso-gh-leaked-tokens"
 
 # NOTE: An `eso-harbor-broker` role for the Keycloak namespace to read
 # `harbor/broker-credentials` is intentionally NOT created here. There is no
-# precedent yet for ESO-managed broker client secrets in the keycloak ns
-# (the existing zot-broker IdP secret is written manually into the realm via
-# the Keycloak admin UI; see keycloak-operator/user-realm.yaml). If/when
+# precedent yet for ESO-managed broker client secrets in the keycloak ns;
+# broker secrets are written manually into the realm via the Keycloak admin
+# UI (see keycloak-operator/user-realm.yaml). If/when
 # broker-secret automation is wired up via a vault-secret-store in the
 # keycloak ns, add an `eso-harbor-broker` policy + role mirroring that pattern.
 
@@ -232,20 +221,6 @@ path "clearnet-website-monitoring/metadata/*" {
 }
 EOF
 echo "✓ Created policy: eso-clearnet-website-monitoring"
-
-# Policy for the cluster-wide zot-pull automation. Reads only the Keycloak
-# `cluster-puller` service-account credentials at zot/cluster-puller.
-# Consumed by the ClusterSecretStore `vault-zot-cluster-puller` (zot-pull/),
-# which feeds the ClusterGenerator that mints pull bearer tokens.
-vault policy write eso-cluster-puller - <<EOF
-path "zot/data/cluster-puller" {
-  capabilities = ["read"]
-}
-path "zot/metadata/cluster-puller" {
-  capabilities = ["read", "list"]
-}
-EOF
-echo "✓ Created policy: eso-cluster-puller"
 
 # Policy for the cluster-wide harbor-pull automation. Reads only the Harbor
 # robot-account credentials at harbor/robot-puller. Consumed by the
@@ -337,14 +312,6 @@ vault write auth/kubernetes/role/eso-cert-manager \
   ttl=1h
 echo "✓ Created role: eso-cert-manager"
 
-# zot
-vault write auth/kubernetes/role/eso-zot \
-  bound_service_account_names=eso \
-  bound_service_account_namespaces=zot \
-  policies=eso-zot \
-  ttl=1h
-echo "✓ Created role: eso-zot"
-
 # harbor
 vault write auth/kubernetes/role/eso-harbor \
   bound_service_account_names=eso \
@@ -408,16 +375,6 @@ vault write auth/kubernetes/role/eso-clearnet-website-monitoring \
   policies=eso-clearnet-website-monitoring \
   ttl=1h
 echo "✓ Created role: eso-clearnet-website-monitoring"
-
-# cluster-puller (cluster-scoped store; binds to the ESO operator SA so the
-# ClusterSecretStore `vault-zot-cluster-puller` can read zot/cluster-puller
-# from any namespace context the controller runs in).
-vault write auth/kubernetes/role/eso-cluster-puller \
-  bound_service_account_names=external-secrets \
-  bound_service_account_namespaces=external-secrets \
-  policies=eso-cluster-puller \
-  ttl=1h
-echo "✓ Created role: eso-cluster-puller"
 
 # harbor-pull (cluster-scoped store; binds to the ESO operator SA so the
 # ClusterSecretStore `vault-harbor-pull` can read harbor/robot-puller from
@@ -564,7 +521,6 @@ echo "  eso-lumos-bot   → SA eso/lumos-bot       → lumos-bot/data/*"
 echo "  eso-freqtrade   → SA eso/freqtrade       → freqtrade/data/*"
 echo "  eso-claude-code → SA eso/claude-code     → claude-code/data/*"
 echo "  eso-cert-manager→ SA eso/cert-manager    → system/data/cert-manager"
-echo "  eso-zot         → SA eso/zot             → zot/data/*"
 echo "  eso-harbor      → SA eso/harbor          → harbor/data/*"
 echo "  eso-nc-press-chotatsu → SA eso/nc-press-chotatsu → nc-press-chotatsu/data/*"
 echo "  eso-tokuchan-dev → SA eso/tokuchan-dev  → tokuchan/data/dev/*"
@@ -572,7 +528,6 @@ echo "  eso-fde-knowledge-engine → SA eso/fde-knowledge-engine → fde-knowled
 echo "  eso-gh-leaked-tokens → SA eso/gh-leaked-tokens → gh-leaked-tokens/data/*"
 echo "  eso-github-app  → SA external-secrets/external-secrets → github-app-shared/data/*"
 echo "  eso-cloudflare-grafana → SA eso/monitoring     → cloudflare-grafana/data/*"
-echo "  eso-cluster-puller → SA external-secrets/external-secrets → zot/data/cluster-puller"
 echo "  eso-harbor-pull → SA external-secrets/external-secrets → harbor/data/robot-puller"
 echo ""
 echo "GitHub Actions JWT roles:"

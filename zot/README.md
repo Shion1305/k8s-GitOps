@@ -1,6 +1,61 @@
-# zot — OCI Registry
+# zot — retired OCI registry
 
-Project-zot v2 deployed cluster-wide as the canonical container image registry for `registry.shion1305.com`.
+The Zot deployment and pull smoke test are retired from the desired GitOps
+configuration. Harbor is the maintained registry. The manifests below are kept
+as historical configuration, not as active deployment instructions.
+
+## Retirement
+
+The Applications `zot`, `zot-pull`, `zot-pull-source`, and
+`zot-pull-smoketest` are archived under `apps/archived/`, which `root-app`
+excludes. The Zot demo push workflow is removed. The shared Kyverno and
+Keycloak kustomizations no longer include Zot's pull policy or realm import,
+and the Vault setup script no longer provisions its roles or policies.
+
+Archival alone does **not** finish runtime cleanup. The four Applications
+have no `resources-finalizer.argocd.argoproj.io` finalizer, so pruning them
+can orphan their resources. See [Argo CD application deletion](https://argo-cd.readthedocs.io/en/stable/user-guide/app_deletion/).
+
+After this change is merged and reconciled:
+
+1. Confirm Harbor push/pull works and inspect live workloads and external CI
+   callers for either `registry.shion1305.com` or
+   `registry.i.shion1305.com`. The only declared consumer in this repository
+   is the archived smoke test; external consumers are not covered by that scan.
+2. Confirm the four Zot Applications are absent and `kyverno-policies` and
+   `keycloak-operator` have reconciled the removal of `zot-pull-injection`
+   and the `zot` realm import CR.
+3. Inventory orphaned resources before removal. Remove the Zot workload,
+   Service, routes, gateway policies, monitoring and ESO resources using the
+   retained manifests as an inventory. Remove the smoke-test Job and its
+   namespace. Inspect and remove the cluster-scoped `zot-pull` and
+   `zot-cluster-puller-credentials` ClusterExternalSecrets,
+   `vault-zot-cluster-puller` ClusterSecretStore and
+   `keycloak-cluster-puller-token` ClusterGenerator, then the
+   `zot-pull-source` namespace. Check consumer namespaces for remaining
+   generated `zot-pull` Secrets.
+4. Preserve Zot's PVC and backing PV until registry data retention is decided.
+   The archived configuration requests 500 GiB on the `longhorn` StorageClass;
+   inspect the live PV reclaim policy before any storage deletion. Do not
+   delete the `zot` namespace as a shortcut while retaining this data.
+5. Remove the Zot realm and the `zot-broker` client in the `user` realm through
+   Keycloak administration. Removing a [realm import CR](https://www.keycloak.org/operator/realm-import)
+   neither deletes an existing realm nor updates its clients. Preserve the
+   shared `user` realm and its other broker clients.
+6. Remove the existing Vault Kubernetes auth roles and policies `eso-zot`
+   and `eso-cluster-puller` after their consumers are gone. Removing their
+   setup-script entries does not revoke existing access. Retain the `zot/`
+   KV data until its retention is decided. Inspect any dedicated registry
+   DNS records before removing them; shared wildcard records must remain.
+
+The PR changes repository configuration only; these runtime cleanup steps
+are separate operations. Restoring the Applications alone is insufficient
+for rollback: the policy, realm/broker declarations, Vault provisioning and
+demo workflow must also be restored if needed.
+
+## Historical deployment
+
+Project-zot v2 served `registry.shion1305.com` with the following configuration.
 
 ## Hostnames and routing
 
@@ -41,7 +96,7 @@ Three distinct caller types reach zot. Browser UI auth is mediated by Envoy Gate
 
 ### 1. GitHub Actions push (`Authorization: Bearer <gh-oidc>`)
 
-`crane` reads `~/.docker/config.json` and sends `registrytoken` pre-emptively as Bearer. Validated by `http.auth.bearer.oidc[token.actions.githubusercontent.com]`. CEL claim mapping derives `username = claims.repository` and assigns the right pusher group from `repository_owner`. See `.github/workflows/demo-push-to-zot.yaml`.
+`crane` reads `~/.docker/config.json` and sends `registrytoken` pre-emptively as Bearer. Validated by `http.auth.bearer.oidc[token.actions.githubusercontent.com]`. CEL claim mapping derives `username = claims.repository` and assigns the right pusher group from `repository_owner`. The former `.github/workflows/demo-push-to-zot.yaml` is available in Git history.
 
 ### 2. Kubelet/containerd pull (`Authorization: Basic base64("oidc:<jwt>")`)
 

@@ -7,7 +7,7 @@
 #   admissionController – mutating/validating webhook (always required).
 #   backgroundController – periodic reconciliation of mutate/generate rules
 #                          against existing resources. Required for our
-#                          generate-on-Pod-create flow (zot-pull Secret clone).
+#                          generate-on-Pod-create flow (harbor-pull Secret clone).
 #   reportsController   – aggregates PolicyReport CRs. Useful for observability.
 #   cleanupController   – CleanupPolicy CRD support; enabled by default.
 #
@@ -25,7 +25,7 @@ admissionController:
       memory: 384Mi
   # Required so Kyverno's policy validation webhook can confirm the
   # background controller will have permission to perform the
-  # `generate.clone` action in our `zot-pull-injection` ClusterPolicy.
+  # `generate.clone` action in our `harbor-pull-injection` ClusterPolicy.
   # Without this the policy itself is rejected at apply time with
   # "requires permissions list,get for resource v1/Secret in namespace ...".
   rbac:
@@ -51,9 +51,9 @@ backgroundController:
     limits:
       memory: 256Mi
   # The default chart RBAC does not grant the background controller any
-  # permission on Secrets. Our `zot-pull-injection` ClusterPolicy uses
+  # permission on Secrets. Our `harbor-pull-injection` ClusterPolicy uses
   # `generate.clone` to copy the source dockerconfigjson Secret from
-  # `zot-pull-source` into every consumer namespace, which requires the
+  # `harbor-pull-source` into every consumer namespace, which requires the
   # background controller SA to read the source and write the target.
   rbac:
     clusterRole:

@@ -295,7 +295,6 @@ Each namespace has its own Vault policy and Kubernetes auth role, scoped to only
 | `eso-lumos-bot` | namespace `lumos-bot` | `eso` | `lumos-bot/data/*` (read), `lumos-bot/metadata/*` (read,list) |
 | `eso-freqtrade` | namespace `freqtrade` | `eso` | `freqtrade/data/*` (read), `freqtrade/metadata/*` (read,list) |
 | `eso-cert-manager` | namespace `cert-manager` | `eso` | `system/data/cert-manager` (read), `system/metadata/cert-manager` (read,list) |
-| `eso-zot` | namespace `zot` | `eso` | `zot/data/*` (read), `zot/metadata/*` (read,list) |
 | `eso-harbor` | namespace `harbor` | `eso` | `harbor/data/*` (read), `harbor/metadata/*` (read,list) |
 | `eso-tokuchan-dev` | namespace `tokuchan-dev` | `eso` | `tokuchan/data/dev/*` (read), `tokuchan/metadata/dev/*` (read,list) |
 | `eso-github-app` | **cluster-scoped** | `external-secrets/external-secrets` | `github-app-shared/data/*` (read), `github-app-shared/metadata/*` (read,list) |
@@ -383,7 +382,7 @@ Current HDD capacity:
 
 ## Notes
 
-- Uses KV v2 secrets engines on several per-service mounts: `atc/`, `freqtrade/`, `lumos-bot/`, `zot/`, `system/`, `github-app-shared/`, plus the legacy shared `secret/` mount (still used by langfuse, openwebui, and keycloak under `secret/shared/<svc>`)
+- Uses KV v2 secrets engines on several per-service mounts: `atc/`, `freqtrade/`, `lumos-bot/`, `harbor/`, `system/`, `github-app-shared/`, plus the legacy shared `secret/` mount (still used by langfuse, openwebui, and keycloak under `secret/shared/<svc>`)
 - Per-namespace Vault policies enforce least-privilege access
 - DB credentials use ESO Kubernetes provider for automatic rotation
 - Non-DB secrets use per-namespace `SecretStore` + `ServiceAccount` for Vault isolation

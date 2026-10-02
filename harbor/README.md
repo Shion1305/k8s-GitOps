@@ -295,7 +295,7 @@ ESO's `harbor-pull` `ClusterExternalSecret` will materialize the dockerconfigjso
 kubectl annotate clusterexternalsecret harbor-pull external-secrets.io/force-sync="$(date +%s)" --overwrite
 ```
 
-The end-to-end push + pull smoketest (GHA workflow + cluster-side `harbor-pull-smoketest` Job) lives in a follow-up PR; that PR is the verification gate before zot is decommissioned.
+The end-to-end push + pull smoketest uses `.github/workflows/demo-push-to-harbor.yaml` and the cluster-side `harbor-pull-smoketest` Job. Zot retirement and the remaining runtime cleanup are documented in [the archived Zot configuration](../zot/README.md#retirement).
 
 ## Day 2 operations
 

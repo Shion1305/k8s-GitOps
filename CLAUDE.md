@@ -121,9 +121,9 @@ This cluster uses a layered secret management approach:
 - **Realms**:
   - `master`: Keycloak admin only (do not modify declaratively)
   - `user`: central human-user pool (passkey-only); brokered into child realms
-  - `zot`: Docker registry auth (zot UI + GitHub Actions token-exchange)
+  - `harbor`: Container registry UI authentication
   - `ynufes-tech`: GitHub-OAuth realm for the cloudflare-grafana audience
-- **GitHub Actions Integration**: Uses OIDC token exchange via `gha-exchanger` client (in the `zot` realm)
+- **GitHub Actions Integration**: Exchanges GitHub OIDC tokens with Vault for Harbor robot credentials
 
 ## Storage
 
