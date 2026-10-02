@@ -10,6 +10,7 @@ import argparse
 import base64
 import copy
 import json
+import os
 from pathlib import Path
 import socket
 import ssl
@@ -182,11 +183,17 @@ def request(port, host, path, sni=None, extra_headers=""):
 
 def runtime_check(directory, loggers):
     (directory / "envoy.json").write_text(json.dumps(runtime_config(*loggers)))
-    container = run("docker", "run", "--detach", "--rm", "--read-only", "--user", "0",
-                    "--cap-drop", "ALL", "--security-opt", "no-new-privileges", "--tmpfs", "/tmp",
-                    "-v", f"{directory}:/fixture:ro", "-p", "127.0.0.1::10080",
+    # Match the temporary files' owner; no DAC override capability is needed.
+    common = ["--read-only", "--user", str(os.getuid()),
+              "--cap-drop", "ALL", "--security-opt", "no-new-privileges", "--tmpfs", "/tmp",
+              "-v", f"{directory}:/fixture:ro"]
+    run("docker", "run", "--rm", *common, ENVOY, "-c", "/fixture/envoy.json",
+        "--disable-hot-restart", "--concurrency", "1", "--mode", "validate")
+    container = run("docker", "run", "--detach", *common,
+                    "-p", "127.0.0.1::10080",
                     "-p", "127.0.0.1::10443", "-p", "127.0.0.1::10444", ENVOY,
-                    "-c", "/fixture/envoy.json", "--disable-hot-restart", "--log-level", "warning").strip()
+                    "-c", "/fixture/envoy.json", "--disable-hot-restart", "--concurrency", "1",
+                    "--log-level", "warning").strip()
     private_markers, control_markers = [], []
     try:
         ports = {port: int(run("docker", "port", container, str(port)).strip().rsplit(":", 1)[1])
@@ -255,6 +262,11 @@ def runtime_check(directory, loggers):
             assert logs.stdout.count(marker) == 1, "Unexpected duplicate logger"
         print(f"Envoy 1.39: {len(private_markers)} private HTTP cases + private TLS failure suppressed; "
               f"{len(control_markers)} unrelated HTTP/TLS controls logged exactly once")
+    except Exception:
+        # Only this isolated fixture's synthetic logs exist in the container.
+        diagnostic = subprocess.run(["docker", "logs", container], text=True, capture_output=True)
+        print(diagnostic.stderr[-4000:])
+        raise
     finally:
         subprocess.run(["docker", "rm", "--force", container], capture_output=True, check=False)
 
