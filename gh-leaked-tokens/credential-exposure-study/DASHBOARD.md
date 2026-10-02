@@ -101,6 +101,62 @@ changed allowlist needs an approved restart because it is an environment
 variable; a JSON-only refresh does not. See the
 [Kubernetes Secret update rules](https://kubernetes.io/docs/concepts/configuration/secret/).
 
+## Detailed evidence files
+
+The evidence extension tracked in
+[application issue #175](https://github.com/Shion1305/gh-base64token-investigate/issues/175)
+keeps detailed observations separate from the compact dashboard index. The
+`notification-evidence` projected volume mounts 27 dedicated Secrets,
+`credential-exposure-admin-evidence-01` through
+`credential-exposure-admin-evidence-27`, read-only at
+`/var/run/notification-evidence`, selected by `ADMIN_DASHBOARD_EVIDENCE_DIR`.
+It uses mode `0440`, the existing Pod group `10001`, and no `subPath`.
+Every source is optional so an unprovisioned shard does not prevent public
+pages from starting. The existing owner authorization still precedes
+evidence reads; missing or inconsistent files make evidence unavailable.
+
+Each ExternalSecret extracts one same-name Vault path under the existing
+`gh-leaked-tokens/` KV v2 mount through the namespace SecretStore `vault`.
+The reviewed packing plan places `manifest.json` in shard `01` only.
+Each path contains a flat map of filenames to UTF-8 JSON strings. ESO uses
+[`dataFrom.extract`](https://external-secrets.io/latest/guides/all-keys-one-secret/)
+to preserve those keys; it does not generate or transform evidence. No new
+Vault policy, Kubernetes RBAC, database grant or OIDC setting is required.
+
+All files appear directly in the projected directory. `manifest.json` must
+occur in exactly one Secret, and every evidence filename must be unique
+across all sources. Kubernetes projects these sources into a shared path;
+it does not validate the application's evidence membership or digests. The
+private export and publication checks must reject duplicate filenames,
+unexpected keys and missing or extra files before any write. Filenames,
+case data and private export artifacts do not belong in this repository.
+
+The app limits each evidence part to 256 KiB and the manifest to 900 KiB.
+The publication plan must also bound each complete Secret conservatively:
+the serialized base64-encoded `data` map plus at least 1 KiB reserved for
+metadata must remain at or below 900 KiB. The dashboard index retains its
+separate bound. Check the actual exported bytes, not estimates or only the
+sum of unencoded values; adding shards requires a reviewed manifest change.
+
+The manifest binds the exact dashboard SHA-256 and each case/member/file.
+After approval, publish and verify the evidence-only shards first, then
+the shard containing the manifest, and update the dashboard index last.
+Use version-0 CAS for new paths and the current version for replacements.
+ESO and the two mounted directories refresh independently; this order
+reduces inconsistent reads but is not an atomic publication mechanism.
+The app must reject any mixed generation until all bound bytes match.
+An evidence-only update to an unchanged index still requires those checks.
+
+After an approved deployment/publication, verify ExternalSecret readiness
+and the mounted file count, bounds and digests without printing contents.
+Verify owner-only evidence in the browser and fail-closed behavior with a
+missing or mismatched fixture. Check that public pages remain healthy.
+An environment or projected-source-list change requires a Pod rollout;
+file-only updates arrive through the directory mount. See
+[Kubernetes projected volumes](https://kubernetes.io/docs/concepts/storage/projected-volumes/).
+Preparing these manifests does not publish data, establish successful live
+checks, activate disclosure delivery or authorize credential replay.
+
 ## Release checks
 
 Publish the reviewed application image and provision the private bootstrap

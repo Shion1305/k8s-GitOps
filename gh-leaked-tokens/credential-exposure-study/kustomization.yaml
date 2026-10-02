@@ -5,6 +5,7 @@ resources:
   - db-secret-store.yaml
   - db-external-secrets.yaml
   - admin-external-secrets.yaml
+  - admin-evidence-external-secrets.yaml
   - deployment.yaml
   - service.yaml
   - httproute.yaml
