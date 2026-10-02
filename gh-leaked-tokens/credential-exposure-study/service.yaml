@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: credential-exposure-study
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: credential-exposure-study
+  ports:
+    - name: http
+      port: 3000
+      targetPort: http

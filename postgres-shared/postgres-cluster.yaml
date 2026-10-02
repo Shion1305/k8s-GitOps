@@ -18,6 +18,10 @@ spec:
     harbor: []
     fde_knowledge_engine: []
     research_gh_leaks: []
+    survey_app: []
+    disclosure_report_app: []
+    survey_web: [nologin]
+    disclosure_report_web: [nologin]
     tokuchan_dev: []
   databases:
     openwebui: openwebui
