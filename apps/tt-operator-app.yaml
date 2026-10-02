@@ -10,7 +10,7 @@ spec:
   sources:
     - repoURL: ghcr.io/tenstorrent/helm
       chart: tt-operator
-      targetRevision: 0.2.0
+      targetRevision: 0.3.0
       helm:
         releaseName: tt-operator
         valueFiles:
