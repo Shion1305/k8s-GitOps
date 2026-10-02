@@ -31,6 +31,20 @@ metadata:
   namespace: envoy-gateway-system
 spec:
   mergeGateways: true
+  # Capability URLs must not reach stdout/Loki, even on rejected requests.
+  # An unset type covers HTTP access logs and unmatched listener errors. One
+  # custom setting replaces EG's default logger; omitted format keeps its JSON.
+  telemetry:
+    accessLog:
+      settings:
+        - matches:
+            - >-
+              (!has(request.host) || !request.host.matches('(?i)^credentials[.]research[.]shion[.]dev[.]?([:][0-9]+)?$')) &&
+              (!has(connection.requested_server_name) || !connection.requested_server_name.matches('(?i)^credentials[.]research[.]shion[.]dev[.]?([:][0-9]+)?$'))
+          sinks:
+            - type: File
+              file:
+                path: /dev/stdout
   provider:
     type: Kubernetes
     kubernetes:
