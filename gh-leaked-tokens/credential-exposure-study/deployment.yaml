@@ -43,6 +43,20 @@ spec:
                   key: DB_URL
                   # Public pages can ship first; /r/ fails closed without this.
                   optional: true
+            - name: ADMIN_DASHBOARD_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: credential-exposure-admin-auth
+                  key: username
+                  optional: true
+            - name: ADMIN_DASHBOARD_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: credential-exposure-admin-auth
+                  key: password
+                  optional: true
+            - name: ADMIN_DASHBOARD_DATA_FILE
+              value: /var/run/notification-dashboard/dashboard.json
             - name: PG_POOL_MAX
               value: "5"
             # Open only after live personalized-link, consent, and save checks.
@@ -81,11 +95,24 @@ spec:
             capabilities:
               drop: [ALL]
           volumeMounts:
+            - name: notification-dashboard
+              mountPath: /var/run/notification-dashboard
+              readOnly: true
             - name: tmp
               mountPath: /tmp
             - name: next-cache
               mountPath: /app/.next/cache
       volumes:
+        # Keep public pages available before dashboard provisioning. /admin
+        # rejects access when authentication or the private export is missing.
+        - name: notification-dashboard
+          secret:
+            secretName: credential-exposure-admin-review
+            optional: true
+            defaultMode: 0440
+            items:
+              - key: dashboard.json
+                path: dashboard.json
         - name: tmp
           emptyDir:
             medium: Memory

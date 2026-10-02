@@ -4,6 +4,7 @@ namespace: gh-leaked-tokens
 resources:
   - db-secret-store.yaml
   - db-external-secrets.yaml
+  - admin-external-secrets.yaml
   - deployment.yaml
   - service.yaml
   - httproute.yaml
