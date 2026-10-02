@@ -14,7 +14,7 @@ packages:
 - name: hashicorp/vault@v2.0.4
 - name: google/go-containerregistry@v0.21.9
 # Used by scripts/render-validate.sh (.github/workflows/render-validate.yaml).
-- name: kubernetes-sigs/kustomize@kustomize/v5.8.1
+- name: kubernetes-sigs/kustomize@kustomize/v5.8.2
 - name: yannh/kubeconform@v0.8.0
 - name: mikefarah/yq@v4.53.3
 - name: jqlang/jq@jq-1.8.2
