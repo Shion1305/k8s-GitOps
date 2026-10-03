@@ -1,13 +1,16 @@
 # Credential exposure notices
 
 This bundle mirrors the reviewed application deployment from
-[`gh-base64token-investigate/survey/deploy`](https://github.com/Shion1305/gh-base64token-investigate/tree/825e7a966265ded067490a14f7955441c0ccd765/survey/deploy).
+[`gh-base64token-investigate/survey/deploy`](https://github.com/Shion1305/gh-base64token-investigate/tree/a378d8b3607261c074d4b7b8f62bc41dc7b6bdd0/survey/deploy).
 Keep application deployment changes aligned with that source and its
 [release runbook](https://github.com/Shion1305/gh-base64token-investigate/blob/main/survey/deploy/README.md).
 
-The optional private `/admin` dashboard uses a separate Vault-backed review
-export, Keycloak login and an explicit owner allowlist. See
-[dashboard provisioning](DASHBOARD.md).
+The private `/admin` revision uses a dedicated projection-only PostgreSQL login on
+`research_gh_leaks`, with its credential supplied through the namespace Vault store.
+Keycloak login and the explicit owner allowlist remain separate checks. It removes
+dashboard JSON and evidence-shard Secret transport; retained private artifacts are
+imported offline by a privileged operator before cutover. This draft is prepared,
+not deployed. See [dashboard rollout and rollback](DASHBOARD.md).
 
 Merging this bundle enables the existing `gh-leaked-tokens` Argo CD application
 to deploy the site automatically. The `shared-postgres` and `external-secrets`

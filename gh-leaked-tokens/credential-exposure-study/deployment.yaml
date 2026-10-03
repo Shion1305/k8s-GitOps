@@ -53,10 +53,13 @@ spec:
                   name: credential-exposure-admin-oidc
                   key: allowed-subjects
                   optional: true
-            - name: ADMIN_DASHBOARD_DATA_FILE
-              value: /var/run/notification-dashboard/dashboard.json
-            - name: ADMIN_DASHBOARD_EVIDENCE_DIR
-              value: /var/run/notification-evidence
+            - name: ADMIN_DASHBOARD_DB_URL
+              valueFrom:
+                secretKeyRef:
+                  name: credential-exposure-admin-db
+                  key: DB_URL
+                  # Public pages remain available; /admin fails closed without this.
+                  optional: true
             - name: PG_POOL_MAX
               value: "5"
             # Open only after live personalized-link, consent, and save checks.
@@ -95,114 +98,11 @@ spec:
             capabilities:
               drop: [ALL]
           volumeMounts:
-            - name: notification-dashboard
-              mountPath: /var/run/notification-dashboard
-              readOnly: true
-            - name: notification-evidence
-              mountPath: /var/run/notification-evidence
-              readOnly: true
             - name: tmp
               mountPath: /tmp
             - name: next-cache
               mountPath: /app/.next/cache
       volumes:
-        # Keep public pages available before dashboard provisioning. /admin
-        # rejects access when authentication or the private export is missing.
-        - name: notification-dashboard
-          secret:
-            secretName: credential-exposure-admin-review
-            optional: true
-            defaultMode: 0440
-            items:
-              - key: dashboard.json
-                path: dashboard.json
-        # All evidence files share a flat directory. The private publication
-        # preflight rejects duplicate filenames and includes manifest.json once.
-        - name: notification-evidence
-          projected:
-            defaultMode: 0440
-            sources:
-              - secret:
-                  name: credential-exposure-admin-evidence-01
-                  optional: true
-              - secret:
-                  name: credential-exposure-admin-evidence-02
-                  optional: true
-              - secret:
-                  name: credential-exposure-admin-evidence-03
-                  optional: true
-              - secret:
-                  name: credential-exposure-admin-evidence-04
-                  optional: true
-              - secret:
-                  name: credential-exposure-admin-evidence-05
-                  optional: true
-              - secret:
-                  name: credential-exposure-admin-evidence-06
-                  optional: true
-              - secret:
-                  name: credential-exposure-admin-evidence-07
-                  optional: true
-              - secret:
-                  name: credential-exposure-admin-evidence-08
-                  optional: true
-              - secret:
-                  name: credential-exposure-admin-evidence-09
-                  optional: true
-              - secret:
-                  name: credential-exposure-admin-evidence-10
-                  optional: true
-              - secret:
-                  name: credential-exposure-admin-evidence-11
-                  optional: true
-              - secret:
-                  name: credential-exposure-admin-evidence-12
-                  optional: true
-              - secret:
-                  name: credential-exposure-admin-evidence-13
-                  optional: true
-              - secret:
-                  name: credential-exposure-admin-evidence-14
-                  optional: true
-              - secret:
-                  name: credential-exposure-admin-evidence-15
-                  optional: true
-              - secret:
-                  name: credential-exposure-admin-evidence-16
-                  optional: true
-              - secret:
-                  name: credential-exposure-admin-evidence-17
-                  optional: true
-              - secret:
-                  name: credential-exposure-admin-evidence-18
-                  optional: true
-              - secret:
-                  name: credential-exposure-admin-evidence-19
-                  optional: true
-              - secret:
-                  name: credential-exposure-admin-evidence-20
-                  optional: true
-              - secret:
-                  name: credential-exposure-admin-evidence-21
-                  optional: true
-              - secret:
-                  name: credential-exposure-admin-evidence-22
-                  optional: true
-              - secret:
-                  name: credential-exposure-admin-evidence-23
-                  optional: true
-              - secret:
-                  name: credential-exposure-admin-evidence-24
-                  optional: true
-              - secret:
-                  name: credential-exposure-admin-evidence-25
-                  optional: true
-              - secret:
-                  name: credential-exposure-admin-evidence-26
-                  optional: true
-              - secret:
-                  name: credential-exposure-admin-evidence-27
-                  optional: true
         - name: tmp
           emptyDir:
             medium: Memory
