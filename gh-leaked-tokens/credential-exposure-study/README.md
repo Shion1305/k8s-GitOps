@@ -52,6 +52,15 @@ grants are ready, restart the application and verify its digest and route.
 The shared-report Secret is optional at Pod creation, so an earlier Pod can
 start without it and must be restarted to receive `SHARED_REPORT_DB_URL`.
 
+Discord response notifications use `DISCORD_NOTIFICATION_WEBHOOK_URL`, populated
+from the `credential-exposure-discord` Kubernetes Secret. Its ExternalSecret reads
+the `webhook_url` property at `gh-leaked-tokens/credential-exposure-discord` in
+Vault through the existing namespace SecretStore. Store the URL in Vault before
+rollout; never put its value in Git. The Secret reference is optional so public
+pages and response saves remain available without notification configuration.
+Restart the application after changing the webhook because environment variables
+are read when the Pod starts. This setting does not enable research participation.
+
 The `latest` image is resolved when a Pod starts. Publishing a replacement alone
 does not restart a running Pod; verify the deployed digest after each rollout.
 Research participation starts closed. A healthy public page does not verify
