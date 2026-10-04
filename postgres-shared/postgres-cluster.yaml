@@ -40,7 +40,7 @@ spec:
       cpu: 100m
       memory: 1Gi
     limits:
-      cpu: 8000m
+      cpu: 16000m
       memory: 16Gi
   patroni:
     pg_hba:
