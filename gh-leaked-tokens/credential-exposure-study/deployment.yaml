@@ -60,6 +60,13 @@ spec:
                   key: DB_URL
                   # Public pages remain available; /admin fails closed without this.
                   optional: true
+            - name: DISCORD_NOTIFICATION_WEBHOOK_URL
+              valueFrom:
+                secretKeyRef:
+                  name: credential-exposure-discord
+                  key: webhook-url
+                  # Notifications are optional; response saves remain available.
+                  optional: true
             - name: PG_POOL_MAX
               value: "5"
             # Open only after live personalized-link, consent, and save checks.
