@@ -168,8 +168,11 @@ configs:
         - '.spec.conversion'
   # RBAC configuration
   rbac:
-    policy.default: role:admin
-    policy.csv: ""
+    # No privileges are granted to other GitHub-authenticated users.
+    policy.default: role:authenticated
+    policy.csv: |
+      # Dex subject for GitHub user ID 20254962 (Shion1305).
+      g, CggyMDI1NDk2MhIGZ2l0aHVi, role:admin
   # Reference to existing secrets
   secret:
     createSecret: false # We'll keep existing argocd-secret
