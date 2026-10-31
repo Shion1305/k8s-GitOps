@@ -290,11 +290,14 @@ includes Python 3.12, Git and SSH; workflows install `uv` with
 service containers or `docker run` need a different runner. The current Modal
 controller starts its Docker daemon inside Modal, not on the runner.
 
-The separate [2605 workspace storage app](../garm-workspaces/README.md) is
-being rolled out before changing this provider's `/runner` volume. Its SATA
-StorageClass and disposable PVC can be tested without moving active GARM
-jobs; the provider continues to use `emptyDir` until the canary passes and a
-separate Pod-template change is deployed.
+The [2605 workspace storage app](../garm-workspaces/README.md) gives each new
+runner Pod a disposable `/runner` PVC on the SATA SSD. The 16 GiB request is
+metadata, not an enforced quota; monitor actual free space with concurrent
+jobs. The 2605 provider sets `CARGO_HOME=/runner/.cargo` and
+`XDG_CACHE_HOME=/runner/.cache`, so Cargo downloads and common tool caches use
+the SATA volume as well. The preinstalled Rust commands stay on the image's
+`/usr/local/cargo/bin` PATH and `RUSTUP_HOME=/usr/local/rustup` remains in the
+image. The generic amd64 and arm64 providers retain their `emptyDir` volumes.
 
 After confirming the private repository still has fork PR workflows disabled,
 apply this sizing only to its common 2605 pool:

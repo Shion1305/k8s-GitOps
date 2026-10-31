@@ -53,11 +53,31 @@ data:
         nodeSelector:
           kubernetes.io/arch: amd64
           kubernetes.io/hostname: shion-ubuntu-2605
+        # The provider omits its default emptyDir when this named volume is
+        # present. Kubernetes owns the claim for this ephemeral runner Pod.
+        volumes:
+          - name: runner
+            ephemeral:
+              volumeClaimTemplate:
+                spec:
+                  accessModes:
+                    - ReadWriteOnce
+                  storageClassName: garm-2605-workspace
+                  resources:
+                    requests:
+                      storage: 16Gi
         containers:
           - name: runner
             # The 2605 pool requires an image@sha256 reference, so a cached
             # copy of that exact image is safe to reuse on each ephemeral Pod.
             imagePullPolicy: IfNotPresent
+            # Keep Rust binaries/toolchains in their prebuilt image layers.
+            # Put Cargo downloads and other caches on the SATA /runner PVC.
+            env:
+              - name: CARGO_HOME
+                value: /runner/.cargo
+              - name: XDG_CACHE_HOME
+                value: /runner/.cache
     flavors:
       default:
         requests:
