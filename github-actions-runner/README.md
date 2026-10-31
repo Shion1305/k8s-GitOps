@@ -214,6 +214,46 @@ runner or cache changes: compare the toolchain install, cache restore, and
 total job times in the two runs. This workflow uses the same setup action as
 the example above.
 
+### Dedicated Rust arm64 pool
+
+For Rust jobs on the Raspberry Pi, use a separate runner image with Rust 1.99.1
+already installed. Its [Dockerfile](runner-image-rust/Dockerfile) copies the
+minimal toolchain from a digest-pinned official Rust image into a digest-pinned
+GARM runner image. The toolchain stays under `/usr/local`: the GARM entrypoint
+copies `/home/runner` into a fresh `/runner` volume at every start, so putting
+the toolchain there would repeat the large copy on every ephemeral Pod.
+`rustfmt` and `clippy` are added to the image because the ISUCON Rust CI uses
+both. The image workflow builds arm64 natively on a GitHub-hosted ARM runner.
+
+Publish with the
+[`garm-runner-rust - build & push image`](../.github/workflows/build-garm-rust-runner-image.yaml)
+workflow. Its run summary prints the immutable
+`harbor.shion1305.com/shion1305/garm-runner-rust@sha256:...` reference. Update
+the GARM base digest in the Rust Dockerfile when publishing a new generic
+runner base. Put the published Rust image reference in the local
+`GARM_RUST_ARM_RUNNER_IMAGE` setting, then create one Rust pool per repository:
+
+```bash
+cd github-actions-runner
+just pool-add-arm-rust k8s-GitOps
+```
+
+This recipe requires a digest-pinned image, sets `min-idle-runners` to 0 and
+`max-runners` to 1 initially, and gives the pool only the custom
+`shion1305-arm-rust` tag. Keep the existing `shion1305-arm` pool for other
+jobs. The pools share the Pi's CPU and disk, so review their combined runner
+limits before adding more Rust repositories. A Rust workflow selects the new
+pool with `runs-on: shion1305-arm-rust`. A repository that requests a different
+Rust version can still install it through `rustup`, but the preinstalled
+version saves setup time only when it matches that repository's
+`rust-toolchain.toml`.
+
+The manual Rust smoke workflow offers an `arm_runner` choice. Select
+`shion1305-arm-rust` after the new image and pool are ready. It verifies the
+preinstalled compiler before calling the setup action. Compare the action's
+setup duration, image pull and Pod startup time, cache restore, and node disk
+usage with a run on the generic `shion1305-arm` pool.
+
 Rust code compiled **inside a container build** uses a separate cache path.
 The [Harbor build action](../.github/actions/harbor-build-push/action.yml)
 imports `${image}:buildcache` when `push: true` and exports it on default-branch

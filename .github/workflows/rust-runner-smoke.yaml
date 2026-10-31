@@ -2,6 +2,15 @@ name: Rust runner smoke
 
 on:
   workflow_dispatch:
+    inputs:
+      arm_runner:
+        description: arm64 GARM pool to validate
+        type: choice
+        required: true
+        default: shion1305-arm
+        options:
+          - shion1305-arm
+          - shion1305-arm-rust
 
 permissions:
   contents: read
@@ -9,11 +18,11 @@ permissions:
 jobs:
   rust-smoke:
     name: Rust smoke (${{ matrix.arch }})
-    runs-on: ${{ matrix.runner }}
+    runs-on: ${{ matrix.arch == 'arm64' && inputs.arm_runner || matrix.runner }}
     timeout-minutes: 30
     env:
       # Match rust-smoke/rust-toolchain.toml so rust-cache can query rustc at repo root.
-      RUSTUP_TOOLCHAIN: '1.92.0'
+      RUSTUP_TOOLCHAIN: '1.99.1'
     strategy:
       fail-fast: false
       matrix:
@@ -31,6 +40,15 @@ jobs:
         env:
           EXPECTED_MACHINE: ${{ matrix.machine }}
         run: test "$(uname -m)" = "$EXPECTED_MACHINE"
+
+      - name: Verify preinstalled Rust toolchain
+        if: matrix.arch == 'arm64' && inputs.arm_runner == 'shion1305-arm-rust'
+        run: |
+          test "$RUSTUP_HOME" = /usr/local/rustup
+          rustup toolchain list
+          rustc --version | grep -F '1.99.1'
+          cargo fmt --version
+          cargo clippy --version
 
       - name: Install Rust and restore Cargo cache
         uses: actions-rust-lang/setup-rust-toolchain@v2
