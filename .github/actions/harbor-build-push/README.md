@@ -101,12 +101,36 @@ That's it. The action handles everything else.
 | `dockerfile` | `Dockerfile`            | Dockerfile path relative to `context`. |
 | `platforms`  | `linux/amd64,linux/arm64` | Comma-separated `buildx` target platforms. |
 | `push`       | `"true"`                 | Whether to publish the built image. Set to `"false"` for validation-only builds; no Harbor credentials are fetched in that case. For a workflow that handles PRs and pushes, use `${{ github.event_name != 'pull_request' }}`. |
+| `cache`      | `"true"`                 | Import `<image>:buildcache` from Harbor when `push` is true. Refresh it only on the default branch. Set to `"false"` to opt out. |
 | `sign`       | `"true"`                | Whether to keyless-sign with cosign (Fulcio + Rekor). Defaulted ON because mixing signed and unsigned images is a supply-chain footgun. Pass the string `"false"` to disable. |
 | `tag`        | `${{ github.sha }}`     | Primary tag pushed. Defaults to the calling repo's commit SHA so every build is uniquely addressable. |
 | `extra-tags` | `""`                    | Comma-separated additional tags applied to the same digest (e.g. `latest,v1.2.3`). Empty by default — opt in explicitly if you want a moving `latest`. |
 
 All inputs are strings. Composite actions don't have typed inputs, so
 booleans are conveyed as the literal strings `"true"` / `"false"`.
+
+## Build cache
+
+Pushed builds reuse BuildKit layers stored at `<image>:buildcache` in the same
+private Harbor project. The action obtains the existing project-scoped robot
+credentials from Vault before building, imports the cache, and exports an
+updated cache on default-branch pushes or manual dispatches. Pull request
+builds can read the cache when their caller sets `push: "true"`, but do not
+replace it. Builds with `push: "false"` do not fetch registry credentials and
+therefore do not use this private cache.
+
+The first build starts without a cache; BuildKit proceeds even when the cache
+tag does not exist. The cache export is best effort, so a registry cache outage
+does not block publishing the final image. Check the build log for `importing
+cache manifest` and `exporting cache to registry` when measuring cache hits.
+Harbor stores the cache as a separate artifact under the image repository;
+do not delete the `buildcache` tag if you want cross-builder reuse.
+
+This preserves intermediate Dockerfile layers, such as a Rust dependency
+compilation stage, even when the shared BuildKit pod restarts. It does not
+persist the contents of Dockerfile `RUN --mount=type=cache` directories; those
+remain local to the builder. Native `cargo` jobs should use an Actions cache or
+a compiler cache separately.
 
 ## Outputs
 

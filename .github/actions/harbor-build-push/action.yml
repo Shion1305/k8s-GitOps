@@ -113,6 +113,13 @@ inputs:
       pass "false" for validation-only builds.
     required: false
     default: "true"
+  cache:
+    description: >-
+      Import the image's Harbor BuildKit cache when pushing, and refresh it
+      on the default branch. The cache is stored at
+      <image>:buildcache. Set to "false" to opt out.
+    required: false
+    default: "true"
   sign:
     description: >-
       Whether to keyless-sign the pushed image with cosign. Off-by-default
@@ -239,6 +246,19 @@ runs:
           exit 1
         fi
 
+    # buildx forwards the caller's registry auth to the remote BuildKit daemon.
+    # Configure it before the build so private cache import/export can use the
+    # same project-scoped robot account as the final crane push.
+    - if: inputs.push == 'true'
+      name: Configure Harbor registry authentication
+      shell: bash
+      run: |
+        set -euo pipefail
+        umask 077
+        printf '%s' "$HARBOR_ROBOT_TOKEN" | \
+          docker login harbor.shion1305.com \
+            --username "$HARBOR_ROBOT_USER" --password-stdin
+
     # Build to an OCI-layout tarball. crane push reads OCI-layout dirs and
     # pushes manifests with the OCI media type, which Harbor accepts.
     # Multi-arch: buildx writes an OCI image index referencing one manifest
@@ -250,11 +270,25 @@ runs:
         PLATFORMS: ${{ inputs.platforms }}
         CONTEXT: ${{ inputs.context }}
         DOCKERFILE: ${{ inputs.dockerfile }}
+        IMAGE: ${{ inputs.image }}
+        PUSH: ${{ inputs.push }}
+        CACHE: ${{ inputs.cache }}
+        CACHE_WRITE: ${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
       run: |
         set -euo pipefail
+        cache_args=()
+        if [[ "${PUSH}" == "true" && "${CACHE}" == "true" ]]; then
+          cache_ref="${IMAGE}:buildcache"
+          cache_args+=(--cache-from "type=registry,ref=${cache_ref}")
+          # PR builds may read the trusted cache, but cannot replace it.
+          if [[ "${CACHE_WRITE}" == "true" ]]; then
+            cache_args+=(--cache-to "type=registry,ref=${cache_ref},mode=max,ignore-error=true")
+          fi
+        fi
         docker buildx build \
           --platform "${PLATFORMS}" \
           --file "${CONTEXT}/${DOCKERFILE}" \
+          "${cache_args[@]}" \
           --output type=oci,dest=/tmp/image.tar \
           "${CONTEXT}"
 
@@ -275,18 +309,6 @@ runs:
         # Extract OCI tarball so crane can read it as an OCI layout dir.
         mkdir -p /tmp/oci
         tar -xf /tmp/image.tar -C /tmp/oci
-
-        # crane and cosign both read ~/.docker/config.json. Build it from
-        # the robot creds Vault just handed us: Harbor accepts basic auth
-        # on /v2/token and exchanges it for a short-lived bearer that
-        # crane/cosign then use for the actual push. HARBOR_ROBOT_USER
-        # and HARBOR_ROBOT_TOKEN come from the vault-action step above
-        # and are already registered as masks, so they will not leak in
-        # logs even if `set -x` were enabled.
-        mkdir -p ~/.docker
-        auth=$(printf '%s:%s' "$HARBOR_ROBOT_USER" "$HARBOR_ROBOT_TOKEN" | base64 -w0)
-        jq -n --arg a "$auth" \
-          '{auths: {"harbor.shion1305.com": {auth: $a}}}' > ~/.docker/config.json
 
         # --index pushes the OCI image index (multi-arch manifest list)
         # produced by buildx's --platform=...,... build. Without --index,

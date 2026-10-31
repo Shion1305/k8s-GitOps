@@ -40,7 +40,9 @@ jobs:
   build-push:
     strategy:
       matrix:
-        runner: [ubuntu-latest, shion1305-amd, shion1305-arm]
+        # PR code stays on a GitHub-hosted runner. Self-hosted legs run only
+        # for trusted main pushes and manual dispatches.
+        runner: ${{ fromJSON(github.event_name == 'pull_request' && '["ubuntu-latest"]' || '["ubuntu-latest","shion1305-amd","shion1305-arm"]') }}
     runs-on: ${{ matrix.runner }}
     permissions:
       contents: read
@@ -51,9 +53,14 @@ jobs:
         with:
           image: harbor.shion1305.com/shion1305/demo
           context: ./harbor/demo
-          # The demo intentionally moves `latest` so a `docker pull
-          # harbor.shion1305.com/shion1305/demo` always pulls the most recent
-          # smoke-test image. Production callers should NOT pass extra-tags
+          push: ${{ github.event_name != 'pull_request' }}
+          # One matrix job owns this shared cache tag; the other runners still
+          # exercise the build and push path without racing to replace it.
+          cache: ${{ matrix.runner == 'shion1305-amd' }}
+          # On main, the demo moves `latest` so a `docker pull
+          # harbor.shion1305.com/shion1305/demo` gets the most recent
+          # smoke-test image. Branch dispatches must not move it.
+          # Production callers should NOT pass extra-tags
           # unless they have a deliberate reason — the action defaults
           # extra-tags to empty for that reason.
-          extra-tags: latest
+          extra-tags: ${{ github.ref == 'refs/heads/main' && 'latest' || '' }}
