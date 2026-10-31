@@ -31,10 +31,6 @@ kind: ClusterPolicy
 metadata:
   name: harbor-pull-injection
   annotations:
-    # Kyverno treats generate-rule match/exclude fields as immutable. Recreate
-    # this clone policy once to exclude namespaces now served directly by ESO;
-    # remove this sync option after the replacement is healthy.
-    argocd.argoproj.io/sync-options: Force=true,Replace=true
     policies.kyverno.io/title: Inject harbor-pull imagePullSecret
     policies.kyverno.io/category: Image Pull Credentials
     policies.kyverno.io/subject: Pod, Secret
