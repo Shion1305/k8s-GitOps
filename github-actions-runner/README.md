@@ -149,7 +149,7 @@ permissions:
 
 jobs:
   test:
-    # Run untrusted fork PRs on a GitHub-hosted runner instead.
+    # Skip fork PRs; add a separate GitHub-hosted job for them if needed.
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     strategy:
       fail-fast: false
