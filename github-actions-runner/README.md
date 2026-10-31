@@ -178,16 +178,26 @@ shared across repositories. GitHub's default cache limit is 10 GB per
 repository, and entries unused for seven days expire.
 
 For a Rust project under a monorepo subdirectory, set the action's workspace
-and the Cargo step's working directory together:
+and the Cargo step's working directory together. If `rust-toolchain.toml` is
+inside that subdirectory, set `RUSTUP_TOOLCHAIN` to the same version at job
+level. The cache action queries `rustc` from the repository root, where a
+subdirectory's toolchain file does not apply on a fresh self-hosted runner:
 
 ```yaml
-- uses: actions-rust-lang/setup-rust-toolchain@v2
-  with:
-    rust-src-dir: services/api
-    cache-workspaces: services/api -> target
-    cache-bin: 'false'
-- run: cargo test --locked
-  working-directory: services/api
+jobs:
+  test:
+    runs-on: shion1305-arm
+    env:
+      RUSTUP_TOOLCHAIN: '1.92.0' # Match services/api/rust-toolchain.toml.
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions-rust-lang/setup-rust-toolchain@v2
+        with:
+          rust-src-dir: services/api
+          cache-workspaces: services/api -> target
+          cache-bin: 'false'
+      - run: cargo test --locked
+        working-directory: services/api
 ```
 
 `cache-workspaces` also accepts multiple newline-separated

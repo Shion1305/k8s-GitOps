@@ -11,6 +11,9 @@ jobs:
     name: Rust smoke (${{ matrix.arch }})
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 30
+    env:
+      # Match rust-smoke/rust-toolchain.toml so rust-cache can query rustc at repo root.
+      RUSTUP_TOOLCHAIN: '1.92.0'
     strategy:
       fail-fast: false
       matrix:
@@ -37,6 +40,9 @@ jobs:
           cache-key: runner-smoke-${{ matrix.arch }}
           cache-bin: 'false'
           cache-on-failure: 'false'
+
+      - name: Verify Rust from repository root
+        run: rustc --version
 
       - name: Fetch Cargo dependencies
         working-directory: github-actions-runner/rust-smoke
