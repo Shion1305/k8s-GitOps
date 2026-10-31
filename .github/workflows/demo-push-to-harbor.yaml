@@ -40,7 +40,9 @@ jobs:
   build-push:
     strategy:
       matrix:
-        runner: [ubuntu-latest, shion1305-amd, shion1305-arm]
+        # PR code stays on a GitHub-hosted runner. Self-hosted legs run only
+        # for trusted main pushes and manual dispatches.
+        runner: ${{ fromJSON(github.event_name == 'pull_request' && '["ubuntu-latest"]' || '["ubuntu-latest","shion1305-amd","shion1305-arm"]') }}
     runs-on: ${{ matrix.runner }}
     permissions:
       contents: read
