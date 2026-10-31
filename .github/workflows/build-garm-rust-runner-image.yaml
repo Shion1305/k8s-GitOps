@@ -16,7 +16,7 @@ on:
 jobs:
   dockerfile-check:
     if: github.event_name == 'pull_request'
-    runs-on: ubuntu-24.04-arm
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
     steps:
@@ -26,15 +26,15 @@ jobs:
       # its push credentials; check Dockerfile syntax against the public parent.
       - name: Check Dockerfile
         run: |
-          docker buildx build --check --platform linux/arm64 \
+          docker buildx build --check --platform linux/amd64 \
             --build-arg GARM_IMAGE=ghcr.io/actions/actions-runner:2.338.1 \
             --file github-actions-runner/runner-image-rust/Dockerfile \
             github-actions-runner/runner-image-rust
 
   build-push:
     if: github.event_name != 'pull_request'
-    # Native ARM avoids emulated rustup component installation in the image.
-    runs-on: ubuntu-24.04-arm
+    # Build natively for the amd64 host shion-ubuntu-2605.
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
       id-token: write
@@ -45,7 +45,7 @@ jobs:
         with:
           image: harbor.shion1305.com/shion1305/garm-runner-rust
           context: ./github-actions-runner/runner-image-rust
-          platforms: linux/arm64
+          platforms: linux/amd64
           push: 'true'
       - name: Show immutable image reference
         env:
