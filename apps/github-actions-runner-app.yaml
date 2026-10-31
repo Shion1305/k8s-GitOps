@@ -14,6 +14,15 @@ spec:
   destination:
     server: https://kubernetes.default.svc
     namespace: github-actions-runner
+  # garm-init bootstraps the persisted GARM database once. A completed Job's
+  # pod template is immutable, so future image updates must not rerun it.
+  ignoreDifferences:
+    - group: batch
+      kind: Job
+      name: garm-init
+      namespace: github-actions-runner
+      jsonPointers:
+        - /spec/template
   syncPolicy:
     automated:
       prune: true
@@ -21,3 +30,4 @@ spec:
     syncOptions:
       - CreateNamespace=true
       - ServerSideApply=true
+      - RespectIgnoreDifferences=true
