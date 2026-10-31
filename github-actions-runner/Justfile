@@ -134,7 +134,7 @@ pool-add-arm target:
     --os-arch arm64 \
     --tags {{arm_tags}}
 
-# Add a Rust pool pinned to shion-ubuntu-2605. Its tag cannot match generic jobs.
+# Add one digest-pinned 2605 pool with shared and legacy Rust labels.
 pool-add-ubuntu-2605-rust target:
   #!/usr/bin/env bash
   set -euo pipefail
@@ -169,38 +169,7 @@ pool-add-ubuntu-2605-rust target:
     --min-idle-runners 0 \
     --os-type linux \
     --os-arch amd64 \
-    --tags shion1305-ubuntu-2605-rust
-
-# Add a dedicated trusted ISUCON CI or deployment pool on the 2605-only provider.
-pool-add-isucon-2605 role:
-  #!/usr/bin/env bash
-  set -euo pipefail
-  role='{{role}}'
-  case "$role" in
-    ci) max_runners=3; min_idle_runners=1 ;;
-    deploy) max_runners=1; min_idle_runners=1 ;;
-    *) echo "usage: just pool-add-isucon-2605 <ci|deploy>" >&2; exit 2 ;;
-  esac
-  image="${GARM_RUST_2605_RUNNER_IMAGE:-}"
-  if [[ ! "$image" =~ ^harbor\.shion1305\.com/shion1305/garm-runner-rust@sha256:[0-9a-f]{64}$ ]]; then
-    echo "GARM_RUST_2605_RUNNER_IMAGE must be a digest-pinned garm-runner-rust image" >&2
-    exit 2
-  fi
-  if ! kubectl wait --for=condition=Ready node/shion-ubuntu-2605 --timeout=1s >/dev/null 2>&1; then
-    echo "shion-ubuntu-2605 is not Ready; no pool was added" >&2
-    exit 2
-  fi
-  kubectl exec -n {{namespace}} {{deployment}} -- /opt/garm/bin/garm-cli pool add \
-    --repo Shion1305/isucon2026-problem \
-    --enabled \
-    --provider-name kubernetes_amd64_rust_2605 \
-    --flavor ci \
-    --image "$image" \
-    --max-runners "$max_runners" \
-    --min-idle-runners "$min_idle_runners" \
-    --os-type linux \
-    --os-arch amd64 \
-    --tags "shion1305-ubuntu-2605-$role"
+    --tags shion1305-ubuntu-2605,shion1305-ubuntu-2605-rust
 
 # Register one repository and add both amd64/arm64 pools.
 bootstrap-repo target: (repo-add target) (pool-add-amd target) (pool-add-arm target)

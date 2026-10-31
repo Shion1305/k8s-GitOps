@@ -55,7 +55,7 @@ data:
           kubernetes.io/hostname: shion-ubuntu-2605
         containers:
           - name: runner
-            # The Rust pool requires an image@sha256 reference, so a cached
+            # The 2605 pool requires an image@sha256 reference, so a cached
             # copy of that exact image is safe to reuse on each ephemeral Pod.
             imagePullPolicy: IfNotPresent
     flavors:
@@ -65,12 +65,6 @@ data:
           memory: 2Gi
         limits:
           memory: 16Gi
-      ci:
-        requests:
-          cpu: 100m
-          memory: 512Mi
-        limits:
-          memory: 4Gi
   garm-provider-k8s-arm64.yaml: |
     kubeConfigPath: ""
     runnerNamespace: "github-actions-runner-pods"
