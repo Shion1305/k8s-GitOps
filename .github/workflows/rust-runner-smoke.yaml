@@ -35,6 +35,7 @@ jobs:
       - name: Install Rust and restore Cargo cache
         uses: actions-rust-lang/setup-rust-toolchain@v2
         with:
+          toolchain: ${{ env.RUSTUP_TOOLCHAIN }}
           rust-src-dir: github-actions-runner/rust-smoke
           cache-workspaces: github-actions-runner/rust-smoke -> target
           cache-key: runner-smoke-${{ matrix.arch }}

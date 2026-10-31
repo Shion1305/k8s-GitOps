@@ -180,8 +180,10 @@ repository, and entries unused for seven days expire.
 For a Rust project under a monorepo subdirectory, set the action's workspace
 and the Cargo step's working directory together. If `rust-toolchain.toml` is
 inside that subdirectory, set `RUSTUP_TOOLCHAIN` to the same version at job
-level. The cache action queries `rustc` from the repository root, where a
-subdirectory's toolchain file does not apply on a fresh self-hosted runner:
+level and pass it to the setup action. The cache action queries `rustc` from
+the repository root, where a subdirectory's toolchain file does not apply on
+a fresh self-hosted runner. Passing `toolchain` makes the action install Rust
+with its minimal profile, rather than auto-installing rustup's default profile:
 
 ```yaml
 jobs:
@@ -193,6 +195,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions-rust-lang/setup-rust-toolchain@v2
         with:
+          toolchain: ${{ env.RUSTUP_TOOLCHAIN }}
           rust-src-dir: services/api
           cache-workspaces: services/api -> target
           cache-bin: 'false'
@@ -201,8 +204,9 @@ jobs:
 ```
 
 `cache-workspaces` also accepts multiple newline-separated
-`workspace -> target` entries. `rust-src-dir` selects where the action looks
-for `rust-toolchain.toml`; keep the lockfile in that Cargo workspace.
+`workspace -> target` entries. `rust-src-dir` selects the Rust source directory
+for version reporting; keep the lockfile in that Cargo workspace. Keep the job
+toolchain version in sync with its `rust-toolchain.toml`.
 
 The manual [Rust runner smoke workflow](../.github/workflows/rust-runner-smoke.yaml)
 builds a small locked Rust crate on both architectures. Run it twice after
