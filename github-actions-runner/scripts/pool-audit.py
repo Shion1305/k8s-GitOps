@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Flag GARM pools whose sizing drifted above the safe defaults.
+"""Flag GARM pools whose sizing drifted above the approved ceilings.
 
 Reads `garm-cli pool list --format json` on stdin. Exits non-zero if any pool
-exceeds MAX_OK / IDLE_OK, so it can be used as a check.
+exceeds its default or narrowly approved ceiling, so it can be used as a check.
 
 Pools are configured imperatively via garm-cli, so nothing in Git prevents
 drift. Oversized pools are not merely wasteful: every idle runner is a fresh
@@ -13,7 +13,27 @@ kubelet pulls images one at a time per node by default. See "Pool Sizing" in
 
 import json
 import os
+import re
 import sys
+
+
+RUST_2605_IMAGE = re.compile(
+    r"harbor\.shion1305\.com/shion1305/garm-runner-rust@sha256:[0-9a-f]{64}"
+)
+
+
+def is_approved_isucon_rust_pool(pool: dict) -> bool:
+    return (
+        pool.get("repo_name") == "Shion1305/isucon2026-problem"
+        and pool.get("provider_name") == "kubernetes_amd64_rust_2605"
+        and pool.get("os_type") == "linux"
+        and pool.get("os_arch") == "amd64"
+        and RUST_2605_IMAGE.fullmatch(pool.get("image", "")) is not None
+        and any(
+            tag.get("name") == "shion1305-ubuntu-2605-rust"
+            for tag in pool.get("tags", [])
+        )
+    )
 
 
 def main() -> int:
@@ -27,12 +47,15 @@ def main() -> int:
         # garm omits min_idle_runners from its JSON when the value is 0.
         max_runners = pool.get("max_runners", 0)
         min_idle = pool.get("min_idle_runners", 0)
+        rust_isucon = is_approved_isucon_rust_pool(pool)
+        pool_max_ok = 3 if rust_isucon else max_ok
+        pool_idle_ok = 3 if rust_isucon else idle_ok
 
         over = []
-        if max_runners > max_ok:
-            over.append(f"max_runners={max_runners} > {max_ok}")
-        if min_idle > idle_ok:
-            over.append(f"min_idle_runners={min_idle} > {idle_ok}")
+        if max_runners > pool_max_ok:
+            over.append(f"max_runners={max_runners} > {pool_max_ok}")
+        if min_idle > pool_idle_ok:
+            over.append(f"min_idle_runners={min_idle} > {pool_idle_ok}")
 
         if over:
             drifted.append((pool, over))
@@ -46,7 +69,8 @@ def main() -> int:
 
     if not drifted:
         print(f"OK: {len(pools)} pool(s) within limits "
-              f"(max_runners<={max_ok}, min_idle_runners<={idle_ok})")
+              f"(default max_runners<={max_ok}, min_idle_runners<={idle_ok}; "
+              "approved ISUCON Rust pool <=3/3)")
         return 0
 
     print(f"\n{len(drifted)} of {len(pools)} pool(s) over limits. Fix with:")

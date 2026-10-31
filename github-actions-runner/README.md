@@ -265,6 +265,41 @@ with the generic pools. A repository that requests a different Rust version
 can still install it through `rustup`, but the preinstalled version saves setup
 time only when it matches that repository's `rust-toolchain.toml`.
 
+The private `Shion1305/isucon2026-problem` pool is deliberately sized to
+`max-runners=3` and `min-idle-runners=3` after repository onboarding. Its fork
+PR workflow execution is disabled. These three ready Pods are pinned to 2605;
+each requests 500m CPU and 2 GiB memory, with a 16 GiB memory limit. This
+reserves 1.5 CPU and 6 GiB memory while idle and caps the three runners at
+48 GiB in total. The public `k8s-GitOps` smoke pool remains at `min-idle=0`.
+The three-job overlap has not been benchmarked, so watch node CPU and I/O
+pressure as normal CI traffic begins.
+
+After confirming the private repository still has fork PR workflows disabled,
+apply this sizing only to its dedicated Rust pool:
+
+```bash
+just pool-list # Find the ISUCON 2605 Rust pool ID.
+just cli pool update <isucon-pool-id> --enabled --max-runners 3 --min-idle-runners 3
+just pool-audit
+```
+
+On 2026-10-31, prewarmed 2605 runners ran the same ISUCON Rust checks with
+Rust 1.99.1. These are single-job measurements, not concurrent throughput:
+
+| Cargo cache choice | First job | Repeat job | Cache transfer |
+| --- | ---: | ---: | --- |
+| No Cargo cache | 46 s | Not measured | None |
+| Registry-only cache | 54 s | 69 s | 43.7 MB; repeat restore 21 s |
+| Registry plus build output | 160 s | 233 s | 561 MB; repeat restore 212 s |
+
+Installing the already-present toolchain took about 1-2 seconds. An on-demand
+runner added about 50 seconds of provisioning before the job; a prewarmed
+runner started the job after roughly 2-3 seconds. For this repository, the
+measured full rebuild was quicker than transferring the Cargo cache, so its
+permanent Rust CI uses the preinstalled toolchain without the cache action.
+Other repositories can use the generic cached workflow above when dependency
+compilation costs more than the transfer.
+
 Select `shion1305-ubuntu-2605-rust` in the manual smoke workflow after the
 new image and pool are ready. It verifies the preinstalled compiler before
 calling the setup action. Compare toolchain setup, image pull and Pod startup,
@@ -285,15 +320,19 @@ build.
 
 Pools are configured **imperatively** through `garm-cli`, so nothing in this
 repository prevents their sizing from drifting. `just pool-audit` reports pools
-that exceed the safe ceilings (`max_runners <= 8`, `min_idle_runners <= 1`) and
-exits non-zero, which makes it usable as a check.
+that exceed the general ceilings (`max_runners <= 8`, `min_idle_runners <= 1`)
+and exits non-zero. It allows at most 3/3 only for the private ISUCON pool on
+the dedicated 2605 Rust provider, with the exact runner label and a digest
+pinned Rust image.
 
-Keep `min_idle_runners` at 0, or at most 1 for a repository with continuous CI
-traffic. **Idle runners are not free.** Every idle runner is a *fresh pod* whose
-image must be pulled and unpacked before the runner can register, and:
+Outside that scoped pool, keep `min_idle_runners` at 0, or at most 1 for a
+repository with continuous CI traffic. **Idle runners are not free.** Every
+idle runner is a *fresh pod* whose image must be pulled and unpacked before
+the runner can register, and:
 
-- `imagePullPolicy: Always` (set in `configmap.yaml`) means each cold start goes
-  back to Harbor rather than reusing a cached layer.
+- The generic providers use `imagePullPolicy: Always`, so each cold start goes
+  back to Harbor. The dedicated 2605 provider uses `IfNotPresent` with an
+  immutable image digest, so replacement Pods can reuse the local image.
 - kubelet pulls images **one at a time per node** (`serializeImagePulls` defaults
   to true), so N idle runners become N serialized pulls on whichever node the
   scheduler picked.
