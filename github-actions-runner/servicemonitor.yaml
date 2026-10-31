@@ -27,5 +27,6 @@ spec:
       # Pin a stable job label so dashboard queries can use job="garm" instead
       # of the ServiceMonitor-derived default.
       relabelings:
-        - targetLabel: job
+        - action: replace
+          targetLabel: job
           replacement: garm
