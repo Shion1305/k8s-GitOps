@@ -202,12 +202,14 @@ the example above.
 
 Rust code compiled **inside a container build** uses a separate cache path.
 The [Harbor build action](../.github/actions/harbor-build-push/action.yml)
-imports `${image}:buildcache` and exports it on default-branch pushes. That
-persists BuildKit image layers across ephemeral builders. Place dependency
-compilation in a Dockerfile layer before copying frequently changed source so
-the registry cache can reuse it. Cargo files written only to a Dockerfile
-`RUN --mount=type=cache` mount are not included in the exported registry
-cache; the host-side Rust Actions cache is not available inside that build.
+imports `${image}:buildcache` when `push: true` and exports it on default-branch
+pushes. PR builds configured with `push: false` do not currently import it.
+The registry cache persists BuildKit image layers across ephemeral builders.
+Place dependency compilation in a Dockerfile layer before copying frequently
+changed source so the registry cache can reuse it. Cargo files written only
+to a Dockerfile `RUN --mount=type=cache` mount are not included in the exported
+registry cache; the host-side Rust Actions cache is not available inside that
+build.
 
 ## Pool Sizing
 
