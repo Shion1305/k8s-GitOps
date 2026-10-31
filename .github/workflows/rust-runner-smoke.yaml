@@ -1,0 +1,49 @@
+name: Rust runner smoke
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  rust-smoke:
+    name: Rust smoke (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: shion1305-amd
+            arch: amd64
+            machine: x86_64
+          - runner: shion1305-arm
+            arch: arm64
+            machine: aarch64
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Verify runner architecture
+        env:
+          EXPECTED_MACHINE: ${{ matrix.machine }}
+        run: test "$(uname -m)" = "$EXPECTED_MACHINE"
+
+      - name: Install Rust and restore Cargo cache
+        uses: actions-rust-lang/setup-rust-toolchain@v2
+        with:
+          rust-src-dir: github-actions-runner/rust-smoke
+          cache-workspaces: github-actions-runner/rust-smoke -> target
+          cache-key: runner-smoke-${{ matrix.arch }}
+          cache-bin: 'false'
+          cache-on-failure: 'false'
+
+      - name: Fetch Cargo dependencies
+        working-directory: github-actions-runner/rust-smoke
+        run: cargo fetch --locked
+
+      - name: Build and test
+        working-directory: github-actions-runner/rust-smoke
+        run: |
+          cargo build --locked
+          cargo test --locked

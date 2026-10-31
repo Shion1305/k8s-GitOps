@@ -129,6 +129,86 @@ or:
 runs-on: shion1305-arm
 ```
 
+## Rust CI on GARM
+
+The shared runner image does not include Rust. Each ephemeral runner has no
+persistent Cargo home, so install the toolchain in the workflow. Copy this
+workflow into a Rust repository as `.github/workflows/rust.yaml` after adding
+that repository's GARM pools with `just bootstrap-repo`:
+
+```yaml
+name: Rust CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    # Run untrusted fork PRs on a GitHub-hosted runner instead.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [shion1305-amd, shion1305-arm]
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions-rust-lang/setup-rust-toolchain@v2
+        with:
+          cache-bin: 'false'
+          cache-on-failure: 'false'
+          build-warnings: warn
+      - run: cargo test --locked
+```
+
+Commit `Cargo.lock` so `--locked` is reproducible and the cache can follow
+dependency changes. The setup action reads `rust-toolchain.toml` at the
+repository root if present; otherwise it installs stable Rust. It also enables
+`Swatinem/rust-cache`, which saves Cargo downloads and dependency build output
+to GitHub's Actions cache. No extra `actions/cache` step or in-cluster cache
+service is needed. The first run downloads the toolchain and dependencies;
+later runs still install the toolchain on each new pod but can restore the
+Cargo cache. Caches are scoped to one repository and accessible branches, not
+shared across repositories. GitHub's default cache limit is 10 GB per
+repository, and entries unused for seven days expire.
+
+For a Rust project under a monorepo subdirectory, set the action's workspace
+and the Cargo step's working directory together:
+
+```yaml
+- uses: actions-rust-lang/setup-rust-toolchain@v2
+  with:
+    rust-src-dir: services/api
+    cache-workspaces: services/api -> target
+    cache-bin: 'false'
+- run: cargo test --locked
+  working-directory: services/api
+```
+
+`cache-workspaces` also accepts multiple newline-separated
+`workspace -> target` entries. `rust-src-dir` selects where the action looks
+for `rust-toolchain.toml`; keep the lockfile in that Cargo workspace.
+
+The manual [Rust runner smoke workflow](../.github/workflows/rust-runner-smoke.yaml)
+builds a small locked Rust crate on both architectures. Run it twice after
+runner or cache changes: compare the toolchain install, cache restore, and
+total job times in the two runs. This workflow uses the same setup action as
+the example above.
+
+Rust code compiled **inside a container build** uses a separate cache path.
+The [Harbor build action](../.github/actions/harbor-build-push/action.yml)
+imports `${image}:buildcache` and exports it on default-branch pushes. That
+persists BuildKit image layers across ephemeral builders. Place dependency
+compilation in a Dockerfile layer before copying frequently changed source so
+the registry cache can reuse it. Cargo files written only to a Dockerfile
+`RUN --mount=type=cache` mount are not included in the exported registry
+cache; the host-side Rust Actions cache is not available inside that build.
+
 ## Pool Sizing
 
 Pools are configured **imperatively** through `garm-cli`, so nothing in this
