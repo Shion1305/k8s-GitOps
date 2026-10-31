@@ -268,15 +268,15 @@ time only when it matches that repository's `rust-toolchain.toml`.
 
 The private `Shion1305/isucon2026-problem` repository uses one common 2605
 pool for Rust, controller, and deployment jobs. Every job uses the same
-immutable runner image, with `max-runners=10` and `min-idle-runners=3`.
+immutable runner image, with `max-runners=20` and `min-idle-runners=3`.
 Request `shion1305-ubuntu-2605` in new workflows; the old
 `shion1305-ubuntu-2605-rust` label remains available during migration. Fork PR
 workflow execution is disabled. The three minimum idle Pods are pinned to
 2605; each runner requests 500m CPU and 2 GiB memory, with a 16 GiB memory
-limit. Idle capacity reserves 1.5 CPU and 6 GiB memory. At ten concurrent Pods
-the requests reach 5 CPU and 20 GiB; their memory limits sum to 160 GiB,
+limit. Idle capacity reserves 1.5 CPU and 6 GiB memory. At twenty concurrent Pods
+the requests reach 10 CPU and 40 GiB; their memory limits sum to 320 GiB,
 which is not reserved physical memory and exceeds the node's allocatable
-memory. The public `k8s-GitOps` smoke pool remains at `min-idle=0`. Ten-job
+memory. The public `k8s-GitOps` smoke pool remains at `min-idle=0`. Twenty-job
 overlap has not been benchmarked, so watch node CPU, memory, and I/O pressure
 during busy periods. Long controller jobs can occupy the same pool as Rust or
 deployment jobs; there is no reserved runner slot for deploy or rollback.
@@ -290,12 +290,18 @@ includes Python 3.12, Git and SSH; workflows install `uv` with
 service containers or `docker run` need a different runner. The current Modal
 controller starts its Docker daemon inside Modal, not on the runner.
 
+The separate [2605 workspace storage app](../garm-workspaces/README.md) is
+being rolled out before changing this provider's `/runner` volume. Its SATA
+StorageClass and disposable PVC can be tested without moving active GARM
+jobs; the provider continues to use `emptyDir` until the canary passes and a
+separate Pod-template change is deployed.
+
 After confirming the private repository still has fork PR workflows disabled,
 apply this sizing only to its common 2605 pool:
 
 ```bash
 just pool-list # Find the ISUCON 2605 pool ID.
-just cli pool update <isucon-pool-id> --enabled --max-runners 10 --min-idle-runners 3 --tags shion1305-ubuntu-2605,shion1305-ubuntu-2605-rust
+just cli pool update <isucon-pool-id> --enabled --max-runners 20 --min-idle-runners 3 --tags shion1305-ubuntu-2605,shion1305-ubuntu-2605-rust
 just pool-audit
 ```
 
@@ -337,7 +343,7 @@ build.
 Pools are configured **imperatively** through `garm-cli`, so nothing in this
 repository prevents their sizing from drifting. `just pool-audit` reports pools
 that exceed the general ceilings (`max_runners <= 8`, `min_idle_runners <= 1`)
-and exits non-zero. It allows at most 10/3 only for the private ISUCON pool on
+and exits non-zero. It allows at most 20/3 only for the private ISUCON pool on
 the dedicated 2605 provider with its default flavor, exactly the shared and
 legacy Rust labels, and a digest-pinned runner image.
 

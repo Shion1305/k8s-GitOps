@@ -47,7 +47,7 @@ def main() -> int:
         max_runners = pool.get("max_runners", 0)
         min_idle = pool.get("min_idle_runners", 0)
         shared_isucon = is_approved_isucon_2605_pool(pool)
-        pool_max_ok = 10 if shared_isucon else max_ok
+        pool_max_ok = 20 if shared_isucon else max_ok
         pool_idle_ok = 3 if shared_isucon else idle_ok
 
         over = []
@@ -69,7 +69,7 @@ def main() -> int:
     if not drifted:
         print(f"OK: {len(pools)} pool(s) within limits "
               f"(default max_runners<={max_ok}, min_idle_runners<={idle_ok}; "
-              "approved ISUCON 2605 pool <=10/3)")
+              "approved ISUCON 2605 pool <=20/3)")
         return 0
 
     print(f"\n{len(drifted)} of {len(pools)} pool(s) over limits. Fix with:")

@@ -1,0 +1,13 @@
+{
+  "cmdTimeoutSeconds": 300,
+  "nodePathMap": [
+    {
+      "node": "DEFAULT_PATH_FOR_NON_LISTED_NODES",
+      "paths": []
+    },
+    {
+      "node": "shion-ubuntu-2605",
+      "paths": ["/var/lib/garm-workspaces/volumes"]
+    }
+  ]
+}

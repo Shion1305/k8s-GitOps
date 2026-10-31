@@ -1,0 +1,21 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: garm-workspaces
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/Shion1305/k8s-GitOps.git
+    targetRevision: HEAD
+    path: garm-workspaces
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: garm-workspaces
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true

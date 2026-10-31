@@ -52,6 +52,15 @@ jobs:
           K8S_VERSION: "1.31.0"
         run: ./scripts/render-validate.sh
 
+      - name: Verify 2605 workspace storage guards
+        run: |
+          python3 -m json.tool garm-workspaces/config.json >/dev/null
+          kubeconform -strict -kubernetes-version 1.31.0 \
+            garm-workspaces/helperPod.yaml \
+            garm-workspaces/examples/canary-pod.yaml
+          bash garm-workspaces/tests/helper-lifecycle.sh
+          python3 github-actions-runner/scripts/test-pool-audit.py
+
       # The kube-prometheus-stack mixin dashboards are vendored with their
       # datasource variable pinned (grafana/dashboards/json/). Fail if a chart
       # bump changed the upstream dashboards without a regeneration commit.
