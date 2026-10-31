@@ -120,7 +120,9 @@ buildctl --addr tcp://buildkitd.buildkit.svc.cluster.local:1234 \
 The daemon's local cache is an `emptyDir` and is lost on pod restart. The
 shared `harbor-build-push` action imports and exports a per-image Harbor
 registry cache on pushed builds, so its Dockerfile layers survive builder
-restarts. Other workflows using buildx directly should pass their own
+restarts. Validation builds with `push: "false"` can opt into its GitHub Actions
+cache (`gha-cache: "true"`) to persist layers without Harbor credentials.
+Other workflows using buildx directly should pass their own
 `--cache-from type=registry,...` / `--cache-to type=registry,...` options.
 BuildKit registry cache does not preserve the contents of Dockerfile
 `RUN --mount=type=cache` directories.

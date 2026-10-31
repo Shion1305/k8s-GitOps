@@ -120,6 +120,13 @@ inputs:
       <image>:buildcache. Set to "false" to opt out.
     required: false
     default: "true"
+  gha-cache:
+    description: >-
+      Use the GitHub Actions cache for validation builds with push="false".
+      This is opt-in because cache uploads consume the calling repository's
+      Actions cache quota. It never fetches Harbor credentials.
+    required: false
+    default: "false"
   sign:
     description: >-
       Whether to keyless-sign the pushed image with cosign. Off-by-default
@@ -173,6 +180,24 @@ runs:
 
     - if: runner.environment == 'github-hosted'
       uses: docker/setup-buildx-action@v4
+
+    # Manual buildx commands do not receive the Actions cache runtime by
+    # default. Limit its short-lived token to the build step instead of
+    # exporting it to every later step in the calling job.
+    - if: inputs.push == 'false' && inputs.gha-cache == 'true'
+      name: Get GitHub Actions cache runtime
+      id: gha-cache-runtime
+      uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+      with:
+        script: |
+          const token = process.env.ACTIONS_RUNTIME_TOKEN;
+          const url = process.env.ACTIONS_RESULTS_URL;
+          if (!token || !url) {
+            throw new Error('GitHub Actions cache runtime is unavailable');
+          }
+          core.setSecret(token);
+          core.setOutput('token', token);
+          core.setOutput('url', url);
 
     # cosign signs the image keyless via Fulcio + Rekor. SBOM generation
     # is intentionally NOT done in CI — Harbor v2.15's UI does not surface
@@ -273,6 +298,9 @@ runs:
         IMAGE: ${{ inputs.image }}
         PUSH: ${{ inputs.push }}
         CACHE: ${{ inputs.cache }}
+        GHA_CACHE: ${{ inputs.gha-cache }}
+        ACTIONS_RUNTIME_TOKEN: ${{ steps.gha-cache-runtime.outputs.token }}
+        ACTIONS_RESULTS_URL: ${{ steps.gha-cache-runtime.outputs.url }}
         CACHE_WRITE: ${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
       run: |
         set -euo pipefail
@@ -285,6 +313,13 @@ runs:
           if [[ "${CACHE_WRITE}" == "true" ]]; then
             cache_args+=(--cache-to "type=registry,ref=${cache_ref},mode=max,ignore-error=true")
           fi
+        fi
+        if [[ "${PUSH}" == "false" && "${GHA_CACHE}" == "true" ]]; then
+          # The Actions cache is scoped by repository/ref. Hash the build
+          # identity so different images and platforms do not overwrite it.
+          cache_scope="harbor-$(printf '%s\0' "${IMAGE}" "${CONTEXT}" "${DOCKERFILE}" "${PLATFORMS}" | sha256sum | cut -c1-32)"
+          cache_args+=(--cache-from "type=gha,version=2,scope=${cache_scope}")
+          cache_args+=(--cache-to "type=gha,version=2,scope=${cache_scope},mode=max,ignore-error=true")
         fi
         docker buildx build \
           --platform "${PLATFORMS}" \
