@@ -280,7 +280,8 @@ runs:
         if [[ "${PUSH}" == "true" && "${CACHE}" == "true" ]]; then
           cache_ref="${IMAGE}:buildcache"
           cache_args+=(--cache-from "type=registry,ref=${cache_ref}")
-          # PR builds may read the trusted cache, but cannot replace it.
+          # Cache import requires push=true and Harbor auth. PR validation with
+          # push=false does not use this private cache; push=true also publishes.
           if [[ "${CACHE_WRITE}" == "true" ]]; then
             cache_args+=(--cache-to "type=registry,ref=${cache_ref},mode=max,ignore-error=true")
           fi

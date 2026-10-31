@@ -111,13 +111,14 @@ booleans are conveyed as the literal strings `"true"` / `"false"`.
 
 ## Build cache
 
-Pushed builds reuse BuildKit layers stored at `<image>:buildcache` in the same
-private Harbor project. The action obtains the existing project-scoped robot
-credentials from Vault before building, imports the cache, and exports an
-updated cache on default-branch pushes or manual dispatches. Pull request
-builds can read the cache when their caller sets `push: "true"`, but do not
-replace it. Builds with `push: "false"` do not fetch registry credentials and
-therefore do not use this private cache.
+When both `cache: "true"` and `push: "true"`, builds reuse BuildKit layers
+stored at `<image>:buildcache` in the same private Harbor project. The action
+obtains project-scoped robot credentials from Vault before building and imports
+the cache. It exports an updated cache on default-branch pushes or manual
+dispatches from the default branch. Pull request builds with `push: "false"`
+do not fetch registry credentials, so they build without this private cache.
+Do not set `push: "true"` on a pull request just to read the cache: that also
+publishes the image using push-capable robot credentials.
 
 The first build starts without a cache; BuildKit proceeds even when the cache
 tag does not exist. The cache export is best effort, so a registry cache outage
