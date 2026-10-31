@@ -1,0 +1,37 @@
+name: garm-runner-rust - build & push image
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "github-actions-runner/runner-image-rust/**"
+      - ".github/workflows/build-garm-rust-runner-image.yaml"
+  pull_request:
+    paths:
+      - "github-actions-runner/runner-image-rust/**"
+      - ".github/workflows/build-garm-rust-runner-image.yaml"
+      - ".github/actions/harbor-build-push/**"
+  workflow_dispatch:
+
+jobs:
+  build-push:
+    # Native ARM avoids emulated rustup component installation in the image.
+    runs-on: ubuntu-24.04-arm
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v7
+      - id: image
+        uses: ./.github/actions/harbor-build-push
+        with:
+          image: harbor.shion1305.com/shion1305/garm-runner-rust
+          context: ./github-actions-runner/runner-image-rust
+          platforms: linux/arm64
+          push: ${{ github.event_name != 'pull_request' }}
+      - name: Show immutable image reference
+        if: github.event_name != 'pull_request'
+        env:
+          IMAGE_REF: ${{ steps.image.outputs.ref }}
+        run: |
+          echo "Rust runner image: ${IMAGE_REF}" >> "$GITHUB_STEP_SUMMARY"

@@ -18,6 +18,7 @@ amd_provider := env_var_or_default("GARM_AMD_PROVIDER", "kubernetes_amd64")
 arm_provider := env_var_or_default("GARM_ARM_PROVIDER", "kubernetes_arm64")
 amd_tags := env_var_or_default("GARM_AMD_TAGS", "shion1305-amd")
 arm_tags := env_var_or_default("GARM_ARM_TAGS", "shion1305-arm")
+rust_arm_max_runners := env_var_or_default("GARM_RUST_ARM_MAX_RUNNERS", "2")
 flavor := env_var_or_default("GARM_FLAVOR", "default")
 api_url := env_var_or_default("GARM_API_URL", "http://127.0.0.1:9997")
 
@@ -132,6 +133,39 @@ pool-add-arm target:
     --os-type linux \
     --os-arch arm64 \
     --tags {{arm_tags}}
+
+# Add a separate arm64 pool for Rust jobs. Its tag does not match generic jobs.
+pool-add-arm-rust target:
+  #!/usr/bin/env bash
+  set -euo pipefail
+  target='{{target}}'
+  if [[ "$target" == */* ]]; then
+    target_owner="${target%%/*}"
+    target_repo="${target#*/}"
+  else
+    target_owner='{{owner}}'
+    target_repo="$target"
+  fi
+  if [[ -z "$target_owner" || -z "$target_repo" || "$target_repo" == */* ]]; then
+    echo "usage: just pool-add-arm-rust <repo|owner/repo>" >&2
+    exit 2
+  fi
+  image="${GARM_RUST_ARM_RUNNER_IMAGE:-}"
+  if [[ ! "$image" =~ @sha256:[0-9a-f]{64}$ ]]; then
+    echo "GARM_RUST_ARM_RUNNER_IMAGE must be an immutable image@sha256:... reference" >&2
+    exit 2
+  fi
+  kubectl exec -n {{namespace}} {{deployment}} -- /opt/garm/bin/garm-cli pool add \
+    --repo "$target_owner/$target_repo" \
+    --enabled \
+    --provider-name {{arm_provider}} \
+    --flavor {{flavor}} \
+    --image "$image" \
+    --max-runners {{rust_arm_max_runners}} \
+    --min-idle-runners 0 \
+    --os-type linux \
+    --os-arch arm64 \
+    --tags shion1305-arm-rust
 
 # Register one repository and add both amd64/arm64 pools.
 bootstrap-repo target: (repo-add target) (pool-add-amd target) (pool-add-arm target)

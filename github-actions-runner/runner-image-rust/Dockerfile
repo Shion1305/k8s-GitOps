@@ -1,0 +1,31 @@
+# syntax=docker/dockerfile:1.26
+
+# Keep both sources pinned to multi-platform OCI indexes. BuildKit selects the
+# toolchain matching each output platform without running rustup under QEMU.
+ARG RUST_IMAGE=rust:1.99.1-slim-bookworm@sha256:24707e70a4f1e23d9a7b25202ec43126d28a52294b96aad5c670df1fd1f1d400
+ARG GARM_IMAGE=harbor.shion1305.com/shion1305/garm-runner@sha256:37f0e39f886c789cffee185fb709807bb67b964e9d671e810be8a29cb7f0e564
+
+FROM ${RUST_IMAGE} AS rust-toolchain
+# The official slim image has the minimal profile. ISUCON CI also runs fmt and
+# clippy, so install these once in the image instead of on every ephemeral Pod.
+RUN rustup component add rustfmt clippy \
+    && rm -rf "$RUSTUP_HOME/downloads" "$RUSTUP_HOME/tmp"
+
+FROM ${GARM_IMAGE}
+
+# /home/runner is copied into the ephemeral /runner volume by entrypoint.sh.
+# Keep Rust outside that tree so each new Pod shares the read-only image layer.
+COPY --from=rust-toolchain --chown=runner:docker /usr/local/cargo /usr/local/cargo
+COPY --from=rust-toolchain --chown=runner:docker /usr/local/rustup /usr/local/rustup
+
+ENV CARGO_HOME=/usr/local/cargo \
+    RUSTUP_HOME=/usr/local/rustup \
+    PATH=/usr/local/cargo/bin:$PATH
+
+# Run only short compatibility checks under QEMU; the toolchain was installed
+# by the official Rust image build, not by this multi-platform image build.
+RUN rustup toolchain list \
+    && rustc --version \
+    && cargo --version \
+    && cargo fmt --version \
+    && cargo clippy --version
