@@ -7,8 +7,9 @@
 #      image referencing `harbor.shion1305.com/*` or `harbor.i.shion1305.com/*`.
 #   3. `generate-harbor-pull-secret` clones `harbor-pull-source/harbor-pull`
 #      into the Pod's namespace; synchronize=true so credential rotations
-#      propagate. `github-actions-runner-pods` is excluded because ESO
-#      delivers the Secret there directly, independent of ephemeral Pods.
+#      propagate. Current Harbor consumer namespaces are excluded because
+#      ESO delivers and rotates the Secret there directly, independent of
+#      ephemeral Pods.
 #   4. `add-harbor-pull-imagepullsecret` mutates the Pod to append `harbor-pull`
 #      to spec.imagePullSecrets.
 #
@@ -31,8 +32,8 @@ metadata:
   name: harbor-pull-injection
   annotations:
     # Kyverno treats generate-rule match/exclude fields as immutable. Recreate
-    # this clone policy once to add the runner exclusion; remove this sync
-    # option after the replacement is healthy.
+    # this clone policy once to exclude namespaces now served directly by ESO;
+    # remove this sync option after the replacement is healthy.
     argocd.argoproj.io/sync-options: Force=true,Replace=true
     policies.kyverno.io/title: Inject harbor-pull imagePullSecret
     policies.kyverno.io/category: Image Pull Credentials
@@ -87,7 +88,12 @@ spec:
         any:
           - resources:
               namespaces:
+                - atc
+                - clearnet-website-monitoring
+                - gh-leaked-tokens
                 - github-actions-runner-pods
+                - nc-press-chotatsu
+                - tokuchan-dev
       preconditions:
         any:
           - key: harbor.shion1305.com
