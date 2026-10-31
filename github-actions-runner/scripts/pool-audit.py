@@ -22,7 +22,7 @@ RUST_2605_IMAGE = re.compile(
 )
 
 
-def is_approved_isucon_rust_pool(pool: dict) -> bool:
+def is_approved_isucon_2605_pool(pool: dict) -> bool:
     return (
         pool.get("repo_name") == "Shion1305/isucon2026-problem"
         and pool.get("provider_name") == "kubernetes_amd64_rust_2605"
@@ -30,8 +30,8 @@ def is_approved_isucon_rust_pool(pool: dict) -> bool:
         and pool.get("os_type") == "linux"
         and pool.get("os_arch") == "amd64"
         and RUST_2605_IMAGE.fullmatch(pool.get("image", "")) is not None
-        and [tag.get("name") for tag in pool.get("tags", [])]
-        == ["shion1305-ubuntu-2605-rust"]
+        and sorted(tag.get("name") for tag in pool.get("tags", []))
+        == ["shion1305-ubuntu-2605", "shion1305-ubuntu-2605-rust"]
     )
 
 
@@ -46,9 +46,9 @@ def main() -> int:
         # garm omits min_idle_runners from its JSON when the value is 0.
         max_runners = pool.get("max_runners", 0)
         min_idle = pool.get("min_idle_runners", 0)
-        rust_isucon = is_approved_isucon_rust_pool(pool)
-        pool_max_ok = 10 if rust_isucon else max_ok
-        pool_idle_ok = 3 if rust_isucon else idle_ok
+        shared_isucon = is_approved_isucon_2605_pool(pool)
+        pool_max_ok = 10 if shared_isucon else max_ok
+        pool_idle_ok = 3 if shared_isucon else idle_ok
 
         over = []
         if max_runners > pool_max_ok:
@@ -69,7 +69,7 @@ def main() -> int:
     if not drifted:
         print(f"OK: {len(pools)} pool(s) within limits "
               f"(default max_runners<={max_ok}, min_idle_runners<={idle_ok}; "
-              "approved ISUCON Rust pool <=10/3)")
+              "approved ISUCON 2605 pool <=10/3)")
         return 0
 
     print(f"\n{len(drifted)} of {len(pools)} pool(s) over limits. Fix with:")
