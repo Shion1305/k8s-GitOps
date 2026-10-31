@@ -60,9 +60,9 @@ data:
       default:
         requests:
           cpu: 500m
-          memory: 1Gi
+          memory: 2Gi
         limits:
-          memory: 4Gi
+          memory: 16Gi
   garm-provider-k8s-arm64.yaml: |
     kubeConfigPath: ""
     runnerNamespace: "github-actions-runner-pods"
