@@ -25,4 +25,4 @@ jobs:
           image: harbor.shion1305.com/shion1305/garm-runner
           context: ./github-actions-runner/runner-image
           push: ${{ github.event_name != 'pull_request' }}
-          extra-tags: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && '2.335.1-ubuntu24.04,latest' || '' }}
+          extra-tags: ${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main' && '2.338.1-ubuntu24.04,latest' || '' }}

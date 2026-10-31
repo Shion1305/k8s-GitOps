@@ -6,7 +6,7 @@ deployment := env_var_or_default("GARM_DEPLOYMENT", "deploy/garm-server")
 owner := env_var_or_default("GARM_OWNER", "Shion1305")
 profile := env_var_or_default("GARM_PROFILE_NAME", "shion1305-k8s")
 credentials := env_var_or_default("GARM_CREDENTIALS_NAME", "shion1305-github-app")
-runner_image := env_var_or_default("GARM_RUNNER_IMAGE", "harbor.shion1305.com/shion1305/garm-runner:2.335.1-ubuntu24.04")
+runner_image := env_var_or_default("GARM_RUNNER_IMAGE", "harbor.shion1305.com/shion1305/garm-runner:2.338.1-ubuntu24.04")
 max_runners := env_var_or_default("GARM_MAX_RUNNERS", "6")
 min_idle_runners := env_var_or_default("GARM_MIN_IDLE_RUNNERS", "0")
 # Ceilings enforced by `just pool-audit`. Deliberately looser than the creation
