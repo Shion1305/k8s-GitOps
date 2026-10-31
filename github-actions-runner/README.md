@@ -439,8 +439,8 @@ Recovery, in order:
 **2026-07-29 incident.** The `crypto-auto-trading` amd64 pool had drifted to
 `min_idle_runners: 8` / `max_runners: 20` on the ~1.2 GB
 `crypto-auto-trading-ci:latest` image. All of those pods landed on
-`shion-ubuntu-2605`, whose write-saturated root SSD (see below) sustains only
-~25 MB/s and left the node I/O-stalled ~75% of the time; pulls there averaged
+`shion-ubuntu-2605`, where observed writes were ~25 MB/s and I/O pressure
+showed the node stalled ~75% of the time; pulls there averaged
 ~50 s versus ~1.5 s on `shion-ubuntu-2505`, a 33x gap on identical images.
 Runners could not register inside the 20-minute bootstrap
 timeout, so GARM reaped and recreated them, which fed the queue further.
@@ -448,38 +448,49 @@ Collateral damage reached unrelated workloads — an `atc-executor` pod spent
 12m46s waiting on its image. Fixes: pool resized to 6/1, stuck runners deleted,
 and `topologySpreadConstraints` added to `configmap.yaml`.
 
+### GARM server storage locality
+
+The GARM server stores its SQLite database on the `garm-data` Longhorn SSD PVC.
+On 2026-10-31, the server was on `shion-ubuntu-2605` while the volume's sole
+replica was on `shion-ubuntu-2505`. The deployment pins only the GARM server to
+`shion-ubuntu-2505`, beside that existing replica; the PVC, replica count, and
+`Recreate` strategy are unchanged. Runner pods remain on their provider-selected
+nodes and keep their local `emptyDir` workspaces. This removes the current
+cross-node database write path, not the runner or containerd writes on 2605.
+Replica placement can change after a failure, so verify locality after rollout.
+The 2505 pin also makes GARM unavailable while that node is unavailable.
+
 ### Node-level follow-ups
 
 These are **not** applied by this repository because they need node-level
 changes, but they are what actually caps runner throughput.
 
-**`shion-ubuntu-2605`'s root SSD is write-saturated, not worn out.** Everything
+**`shion-ubuntu-2605` has shown high write latency and NVMe timeouts; the cause
+is not established.** Everything
 — `/`, `/var/lib/containerd`, `/var/lib/kubelet`, and therefore every runner's
 `emptyDir` workspace — lives on a single 2 TB `SPCC M.2 PCIe SSD`
-(`/dev/nvme0n1p2`). Its SMART data:
+(`/dev/nvme0n1p2`). SMART data recorded during the July incident:
 
 | Metric | Value | Reading |
 | --- | --- | --- |
-| Percentage Used | 0% | not worn out |
-| Media/Data Integrity Errors | 0 | not failing |
-| Data Units Written | 39.6 TB over 1,177 power-on hours | ~34 GB/h sustained |
-| Controller Busy Time | 1,178 h of 1,177 h powered on | **never idle** |
+| Percentage Used | 0% | Low reported endurance use; does not rule out a fault |
+| Media/Data Integrity Errors | 0 | No errors counted here; does not rule out a fault |
+| Data Units Written | 39.6 TB over 1,177 power-on hours | ~34 GB/h average over that interval |
+| Controller Busy Time | 1,178 h of 1,177 h powered on | Counter near uptime; does not prove constant 100% utilization |
 
-Controller busy time equalling power-on time is the finding. A DRAM-less
-consumer drive that never gets idle time cannot run garbage collection, so its
-fast-write cache stays exhausted and it degrades to its slowest write path.
-That shows up as ~25 MB/s of sustained writes and NVMe command timeouts in
-`dmesg`:
+The July incident showed roughly 25 MB/s writes and high I/O pressure. NVMe
+write command timeouts were also recorded in `dmesg`:
 
 ```text
 nvme nvme0: I/O tag 30 (d01e) opcode 0x1 (I/O Cmd) QID 1 timeout, aborting req_op:WRITE(1) size:262144
 ```
 
-A 30-second write timeout on an NVMe device stalls containerd, which is why pod
-teardown (`stop_podsandbox`) and pod startup fail together. Replacing the drive
-without reducing the write volume would only postpone this. Worth pursuing:
-give CI workspaces a separate volume rather than the node root disk, and check
-what else on this node writes continuously.
+A 30-second write timeout can stall containerd and delay pod teardown or
+startup. The measurements do not distinguish sustained workload writes,
+controller or firmware behavior, filesystem effects, and device faults. Check
+per-process writes, containerd snapshot activity, NVMe latency, and device
+health before choosing a fix. A separate local device for CI workspaces is an
+option if measurements show workspace writes are the bottleneck.
 
 **kubelet serializes image pulls.** `serializeImagePulls` defaults to true, so
 one slow pull blocks every other pod's start on that node — including pods that
