@@ -1,3 +1,3 @@
 FROM alpine:3.24
-RUN date -u +%s > /msg
+RUN echo "hello from harbor smoke test" > /msg
 CMD ["cat", "/msg"]
