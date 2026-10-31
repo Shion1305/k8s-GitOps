@@ -22,8 +22,7 @@ ENV CARGO_HOME=/usr/local/cargo \
     RUSTUP_HOME=/usr/local/rustup \
     PATH=/usr/local/cargo/bin:$PATH
 
-# Run only short compatibility checks under QEMU; the toolchain was installed
-# by the official Rust image build, not by this multi-platform image build.
+# Check the copied toolchain in the final Ubuntu image without reinstalling it.
 RUN rustup toolchain list \
     && rustc --version \
     && cargo --version \
