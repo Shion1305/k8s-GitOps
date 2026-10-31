@@ -239,7 +239,7 @@ just pool-add-arm-rust k8s-GitOps
 ```
 
 This recipe requires a digest-pinned image, sets `min-idle-runners` to 0 and
-`max-runners` to 2 by default, and gives the pool only the custom
+`max-runners` to 1 initially, and gives the pool only the custom
 `shion1305-arm-rust` tag. Keep the existing `shion1305-arm` pool for other
 jobs. The pools share the Pi's CPU and disk, so review their combined runner
 limits before adding more Rust repositories. A Rust workflow selects the new

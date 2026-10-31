@@ -14,7 +14,25 @@ on:
   workflow_dispatch:
 
 jobs:
+  dockerfile-check:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04-arm
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v4
+      # Harbor requires auth for the pinned GARM base. PR code never receives
+      # its push credentials; check Dockerfile syntax against the public parent.
+      - name: Check Dockerfile
+        run: |
+          docker buildx build --check --platform linux/arm64 \
+            --build-arg GARM_IMAGE=ghcr.io/actions/actions-runner:2.338.1 \
+            --file github-actions-runner/runner-image-rust/Dockerfile \
+            github-actions-runner/runner-image-rust
+
   build-push:
+    if: github.event_name != 'pull_request'
     # Native ARM avoids emulated rustup component installation in the image.
     runs-on: ubuntu-24.04-arm
     permissions:
@@ -28,9 +46,8 @@ jobs:
           image: harbor.shion1305.com/shion1305/garm-runner-rust
           context: ./github-actions-runner/runner-image-rust
           platforms: linux/arm64
-          push: ${{ github.event_name != 'pull_request' }}
+          push: 'true'
       - name: Show immutable image reference
-        if: github.event_name != 'pull_request'
         env:
           IMAGE_REF: ${{ steps.image.outputs.ref }}
         run: |

@@ -18,7 +18,7 @@ amd_provider := env_var_or_default("GARM_AMD_PROVIDER", "kubernetes_amd64")
 arm_provider := env_var_or_default("GARM_ARM_PROVIDER", "kubernetes_arm64")
 amd_tags := env_var_or_default("GARM_AMD_TAGS", "shion1305-amd")
 arm_tags := env_var_or_default("GARM_ARM_TAGS", "shion1305-arm")
-rust_arm_max_runners := env_var_or_default("GARM_RUST_ARM_MAX_RUNNERS", "2")
+rust_arm_max_runners := env_var_or_default("GARM_RUST_ARM_MAX_RUNNERS", "1")
 flavor := env_var_or_default("GARM_FLAVOR", "default")
 api_url := env_var_or_default("GARM_API_URL", "http://127.0.0.1:9997")
 
