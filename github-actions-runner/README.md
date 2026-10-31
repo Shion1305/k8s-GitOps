@@ -274,6 +274,36 @@ reserves 1.5 CPU and 6 GiB memory while idle and caps the three runners at
 The three-job overlap has not been benchmarked, so watch node CPU and I/O
 pressure as normal CI traffic begins.
 
+For trusted, non-Rust ISUCON controller jobs, use a separate repository pool
+with the `shion1305-ubuntu-2605-ci` label and `max-runners=3`,
+`min-idle-runners=1`. Use another pool with the
+`shion1305-ubuntu-2605-deploy` label and `max-runners=1`,
+`min-idle-runners=1` for deploy and rollback, so long Modal jobs cannot fill
+every deployment slot. Both pools use the same immutable runner image and
+2605-only provider, but its `ci` flavor requests 100m CPU and 512 MiB memory
+and limits memory to 4 GiB per runner. The labels keep these jobs out of the
+three Rust pool slots. All pools share the node, so their concurrent performance
+has not been measured. Keep fork PR workflow execution disabled on this private
+repository, and run token-bearing jobs only from trusted workflows.
+
+After the provider ConfigMap has synced, create the ISUCON CI and deployment
+pools. Verify that their new Pods have no Kubernetes ServiceAccount token
+mounted before routing token-bearing jobs:
+
+```bash
+cd github-actions-runner
+just pool-add-isucon-2605 ci
+just pool-add-isucon-2605 deploy
+just pool-audit
+```
+
+The `ci` flavor inherits the hard 2605 hostname and amd64 selectors. New Pods
+from this provider disable ServiceAccount token mounting. The image includes
+Python 3.12, Git and SSH; workflows install `uv` with `astral-sh/setup-uv`.
+It has no local Docker daemon, so jobs using Docker service containers or
+`docker run` need a different runner. The current Modal controller starts its
+Docker daemon inside Modal, not on the runner.
+
 After confirming the private repository still has fork PR workflows disabled,
 apply this sizing only to its dedicated Rust pool:
 
