@@ -102,6 +102,14 @@ nodeExporter:
 # Kube State Metrics
 kubeStateMetrics:
   enabled: true
+# Pin these lightweight controllers to the arm64 worker to leave capacity
+# for build runners on the amd64 worker.
+prometheusOperator:
+  nodeSelector:
+    kubernetes.io/hostname: shion-raspi-5-poe
+kube-state-metrics:
+  nodeSelector:
+    kubernetes.io/hostname: shion-raspi-5-poe
 # Subchart configuration for prometheus-node-exporter
 prometheus-node-exporter:
   podLabels:
