@@ -4,7 +4,8 @@ This app deploys a dedicated Rancher local-path provisioner (v0.0.37) and the
 nondefault `garm-2605-workspace` StorageClass. It can provision only on
 `shion-ubuntu-2605`, under `/var/lib/garm-workspaces/volumes` on that node's
 SATA SSD. Other nodes have an explicit empty fallback path list. The
-provisioner and helper Pods are also pinned to 2605. The controller has only
+helper Pods are pinned to 2605; the controller runs on 2505 so it can start
+even while 2605 is under image or disk pressure. The controller has only
 the Kubernetes permissions needed to manage its helper Pods and PVs; the
 short-lived helper Pods do not mount ServiceAccount tokens.
 
