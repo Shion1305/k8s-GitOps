@@ -265,14 +265,16 @@ with the generic pools. A repository that requests a different Rust version
 can still install it through `rustup`, but the preinstalled version saves setup
 time only when it matches that repository's `rust-toolchain.toml`.
 
-The private `Shion1305/isucon2026-problem` pool is deliberately sized to
-`max-runners=3` and `min-idle-runners=3` after repository onboarding. Its fork
-PR workflow execution is disabled. These three ready Pods are pinned to 2605;
-each requests 500m CPU and 2 GiB memory, with a 16 GiB memory limit. This
-reserves 1.5 CPU and 6 GiB memory while idle and caps the three runners at
-48 GiB in total. The public `k8s-GitOps` smoke pool remains at `min-idle=0`.
-The three-job overlap has not been benchmarked, so watch node CPU and I/O
-pressure as normal CI traffic begins.
+The private `Shion1305/isucon2026-problem` Rust pool is deliberately sized to
+`max-runners=10` and `min-idle-runners=3`. Its fork PR workflow execution is
+disabled. The three minimum idle Pods are pinned to 2605; each runner requests
+500m CPU and 2 GiB memory, with a 16 GiB memory limit. Idle capacity reserves
+1.5 CPU and 6 GiB memory. At ten concurrent Pods the requests reach 5 CPU and
+20 GiB;
+their memory limits sum to 160 GiB, which is not reserved physical memory and
+exceeds the node's allocatable memory. The public `k8s-GitOps` smoke pool
+remains at `min-idle=0`. Ten-job overlap has not been benchmarked, so watch
+node CPU, memory, and I/O pressure during busy periods.
 
 For trusted, non-Rust ISUCON controller jobs, use a separate repository pool
 with the `shion1305-ubuntu-2605-ci` label and `max-runners=3`,
@@ -309,7 +311,7 @@ apply this sizing only to its dedicated Rust pool:
 
 ```bash
 just pool-list # Find the ISUCON 2605 Rust pool ID.
-just cli pool update <isucon-pool-id> --enabled --max-runners 3 --min-idle-runners 3
+just cli pool update <isucon-pool-id> --enabled --max-runners 10 --min-idle-runners 3
 just pool-audit
 ```
 
@@ -351,9 +353,9 @@ build.
 Pools are configured **imperatively** through `garm-cli`, so nothing in this
 repository prevents their sizing from drifting. `just pool-audit` reports pools
 that exceed the general ceilings (`max_runners <= 8`, `min_idle_runners <= 1`)
-and exits non-zero. It allows at most 3/3 only for the private ISUCON pool on
-the dedicated 2605 Rust provider, with the exact runner label and a digest
-pinned Rust image.
+and exits non-zero. It allows at most 10/3 only for the private ISUCON pool on
+the dedicated 2605 Rust provider with its default flavor, the exact runner
+label, and a digest-pinned Rust image.
 
 Outside that scoped pool, keep `min_idle_runners` at 0, or at most 1 for a
 repository with continuous CI traffic. **Idle runners are not free.** Every
