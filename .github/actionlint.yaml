@@ -1,0 +1,4 @@
+self-hosted-runner:
+  labels:
+    - shion1305-amd
+    - shion1305-arm
