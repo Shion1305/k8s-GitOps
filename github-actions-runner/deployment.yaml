@@ -99,6 +99,15 @@ spec:
                 environment_variables = ["KUBERNETES_"]
 
               [[provider]]
+              name = "kubernetes_amd64_rust_2605"
+              description = "Kubernetes provider for Rust amd64 runners on shion-ubuntu-2605"
+              provider_type = "external"
+                [provider.external]
+                config_file = "/opt/garm/provider-config/garm-provider-k8s-rust-amd64-2605.yaml"
+                provider_executable = "/opt/garm/bin/garm-provider-k8s"
+                environment_variables = ["KUBERNETES_"]
+
+              [[provider]]
               name = "kubernetes_arm64"
               description = "Kubernetes provider for arm64 runner pods"
               provider_type = "external"
