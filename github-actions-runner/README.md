@@ -57,14 +57,14 @@ kubectl exec -n github-actions-runner deploy/garm-server -- /opt/garm/bin/garm-c
 
 ## Runner Image
 
-Use this fixed multi-arch image for both amd64 and arm64 pools:
+Use this multi-arch image for both amd64 and arm64 pools:
 
 ```text
-harbor.shion1305.com/shion1305/garm-runner:2.335.1-ubuntu24.04
+harbor.shion1305.com/shion1305/garm-runner:2.338.1-ubuntu24.04
 ```
 
 The image is built from GitHub's official self-hosted runner image
-`ghcr.io/actions/actions-runner:2.335.1`, which currently provides Ubuntu
+`ghcr.io/actions/actions-runner:2.338.1`, which currently provides Ubuntu
 24.04 based amd64 and arm64 variants. It adds the GARM-compatible entrypoint
 plus common build tools such as Git LFS, Python, Node.js/npm, build-essential,
 cmake, zip/unzip, zstd, rsync, and OpenSSH client.
@@ -73,7 +73,7 @@ Build and publish it with the `garm-runner - build & push image` GitHub Actions
 workflow. On `main`, that workflow publishes:
 
 - `harbor.shion1305.com/shion1305/garm-runner:<commit-sha>`
-- `harbor.shion1305.com/shion1305/garm-runner:2.335.1-ubuntu24.04`
+- `harbor.shion1305.com/shion1305/garm-runner:2.338.1-ubuntu24.04`
 - `harbor.shion1305.com/shion1305/garm-runner:latest`
 
 This is close to the GitHub official self-hosted runner environment, but it is
