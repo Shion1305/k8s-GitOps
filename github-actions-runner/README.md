@@ -37,6 +37,11 @@ needs these permissions:
 ## Initial Login
 
 The `garm-init` Job creates the first admin user and writes the controller URLs.
+It runs once against GARM's persistent database. Argo CD ignores later changes
+to its completed Pod template, since Kubernetes cannot update a Job template
+and recreating the Job would rerun initialization. On a fresh installation,
+Argo CD still creates the Job normally.
+
 After it succeeds, open:
 
 ```text
@@ -130,6 +135,13 @@ runs-on: shion1305-arm
 ```
 
 ## Rust CI on GARM
+
+For a private repository using these repository-scoped GARM runners, keep
+GitHub's **Run workflows from fork pull requests** setting disabled. A fork can
+change a `pull_request` workflow to request a self-hosted runner label, so the
+job's `if:` expression and `runs-on` value are not access controls. If fork PR
+workflows must run, use GitHub-hosted runners for them or an organization runner
+group restricted to selected trusted workflows.
 
 Use `shion1305-ubuntu-2605-rust` for Rust jobs intended for
 `shion-ubuntu-2605`. Create that repository's dedicated pool as described
