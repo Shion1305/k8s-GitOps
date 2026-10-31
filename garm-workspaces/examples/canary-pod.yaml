@@ -1,0 +1,48 @@
+# Apply manually only after the 2605 SATA mount and garm-workspaces app are ready.
+# This file is intentionally excluded from kustomization.yaml.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: garm-workspace-canary
+  namespace: github-actions-runner-pods
+spec:
+  restartPolicy: Never
+  automountServiceAccountToken: false
+  nodeSelector:
+    kubernetes.io/arch: amd64
+    kubernetes.io/hostname: shion-ubuntu-2605
+  securityContext:
+    runAsUser: 1001
+    runAsGroup: 1001
+  containers:
+    - name: canary
+      image: docker.io/library/busybox:1.37.0@sha256:a7dbc319b1438115a207e11930dc4bb3e643dcb3ec0bdd694bb36cd8fad289ec
+      command:
+        - sh
+        - -ec
+        - |
+          stat -c 'workspace device=%d owner=%u:%g mode=%a' /runner
+          df -P /runner
+          dd if=/dev/zero of=/runner/canary.bin bs=1M count=64 conv=fsync
+          sha256sum /runner/canary.bin
+          sleep 600
+      resources:
+        requests:
+          cpu: 10m
+          memory: 16Mi
+        limits:
+          memory: 64Mi
+      volumeMounts:
+        - name: runner
+          mountPath: /runner
+  volumes:
+    - name: runner
+      ephemeral:
+        volumeClaimTemplate:
+          spec:
+            accessModes:
+              - ReadWriteOnce
+            storageClassName: garm-2605-workspace
+            resources:
+              requests:
+                storage: 16Gi

@@ -1,0 +1,12 @@
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: garm-2605-workspace
+  annotations:
+    defaultVolumeType: local
+provisioner: shion1305.com/garm-workspaces
+parameters:
+  nodePath: /var/lib/garm-workspaces/volumes
+volumeBindingMode: WaitForFirstConsumer
+reclaimPolicy: Delete
+allowVolumeExpansion: false
