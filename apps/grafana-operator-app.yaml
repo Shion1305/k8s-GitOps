@@ -11,6 +11,9 @@ spec:
       targetRevision: 5.25.0
       helm:
         releaseName: grafana-operator
+        values: |
+          nodeSelector:
+            kubernetes.io/hostname: shion-raspi-5-poe
   destination:
     server: https://kubernetes.default.svc
     namespace: grafana

@@ -2,6 +2,8 @@
 # Exposes Cloudflare metrics for Prometheus monitoring
 # Deployment configuration
 replicaCount: 1
+nodeSelector:
+  kubernetes.io/hostname: shion-raspi-5-poe
 image:
   repository: lablabs/cloudflare_exporter
   tag: "latest" # Specify working version
