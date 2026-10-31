@@ -131,10 +131,12 @@ runs-on: shion1305-arm
 
 ## Rust CI on GARM
 
-The shared runner image does not include Rust. Each ephemeral runner has no
-persistent Cargo home, so install the toolchain in the workflow. Copy this
-workflow into a Rust repository as `.github/workflows/rust.yaml` after adding
-that repository's GARM pools with `just bootstrap-repo`:
+Use `shion1305-ubuntu-2605-rust` for Rust jobs intended for
+`shion-ubuntu-2605`. Create that repository's dedicated pool as described
+below after the node is Ready. Each ephemeral runner has no persistent Cargo
+home, so keep the setup action in the workflow to select Rust and restore the
+Cargo cache. Copy this workflow into the Rust repository as
+`.github/workflows/rust.yaml`:
 
 ```yaml
 name: Rust CI
@@ -151,15 +153,14 @@ jobs:
   test:
     # Skip fork PRs; add a separate GitHub-hosted job for them if needed.
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
-    strategy:
-      fail-fast: false
-      matrix:
-        runner: [shion1305-amd, shion1305-arm]
-    runs-on: ${{ matrix.runner }}
+    runs-on: shion1305-ubuntu-2605-rust
+    env:
+      RUSTUP_TOOLCHAIN: '1.99.1' # Match the repository's rust-toolchain.toml.
     steps:
       - uses: actions/checkout@v7
       - uses: actions-rust-lang/setup-rust-toolchain@v2
         with:
+          toolchain: ${{ env.RUSTUP_TOOLCHAIN }}
           cache-bin: 'false'
           cache-on-failure: 'false'
           build-warnings: warn
@@ -167,15 +168,17 @@ jobs:
 ```
 
 Commit `Cargo.lock` so `--locked` is reproducible and the cache can follow
-dependency changes. The setup action reads `rust-toolchain.toml` at the
-repository root if present; otherwise it installs stable Rust. It also enables
-`Swatinem/rust-cache`, which saves Cargo downloads and dependency build output
-to GitHub's Actions cache. No extra `actions/cache` step or in-cluster cache
-service is needed. The first run downloads the toolchain and dependencies;
-later runs still install the toolchain on each new pod but can restore the
-Cargo cache. Caches are scoped to one repository and accessible branches, not
-shared across repositories. GitHub's default cache limit is 10 GB per
-repository, and entries unused for seven days expire.
+dependency changes. Match `RUSTUP_TOOLCHAIN` and `rust-toolchain.toml` to the
+image's preinstalled 1.99.1 version to avoid a fresh toolchain install. The
+setup action also enables `Swatinem/rust-cache`, which saves Cargo downloads
+and dependency build output to GitHub's Actions cache. No extra `actions/cache`
+step or in-cluster cache service is needed. The first run downloads
+dependencies; later runs can restore the Cargo cache. Caches are scoped to one
+repository and accessible branches, not shared across repositories. GitHub's
+default cache limit is 10 GB per repository, and entries unused for seven days
+expire. The shared `shion1305-amd` and `shion1305-arm` images still have no
+preinstalled Rust; choose them only when you intend to test those generic
+runners.
 
 For a Rust project under a monorepo subdirectory, set the action's workspace
 and the Cargo step's working directory together. If `rust-toolchain.toml` is
@@ -188,9 +191,9 @@ with its minimal profile, rather than auto-installing rustup's default profile:
 ```yaml
 jobs:
   test:
-    runs-on: shion1305-arm
+    runs-on: shion1305-ubuntu-2605-rust
     env:
-      RUSTUP_TOOLCHAIN: '1.92.0' # Match services/api/rust-toolchain.toml.
+      RUSTUP_TOOLCHAIN: '1.99.1' # Match services/api/rust-toolchain.toml.
     steps:
       - uses: actions/checkout@v7
       - uses: actions-rust-lang/setup-rust-toolchain@v2
@@ -209,21 +212,21 @@ for version reporting; keep the lockfile in that Cargo workspace. Keep the job
 toolchain version in sync with its `rust-toolchain.toml`.
 
 The manual [Rust runner smoke workflow](../.github/workflows/rust-runner-smoke.yaml)
-builds a small locked Rust crate on both architectures. Run it twice after
-runner or cache changes: compare the toolchain install, cache restore, and
-total job times in the two runs. This workflow uses the same setup action as
-the example above.
+builds a small locked crate on the one GARM pool selected at dispatch. Its
+default is the dedicated 2605 pool; the generic amd64 or arm64 pool runs only
+when explicitly selected. Run it twice after runner or cache changes and
+compare toolchain setup, cache restore, and total job times.
 
-### Dedicated Rust arm64 pool
+### Dedicated Rust amd64 pool on shion-ubuntu-2605
 
-For Rust jobs on the Raspberry Pi, use a separate runner image with Rust 1.99.1
-already installed. Its [Dockerfile](runner-image-rust/Dockerfile) copies the
+The dedicated image has Rust 1.99.1 already installed. Its
+[Dockerfile](runner-image-rust/Dockerfile) copies the
 minimal toolchain from a digest-pinned official Rust image into a digest-pinned
 GARM runner image. The toolchain stays under `/usr/local`: the GARM entrypoint
 copies `/home/runner` into a fresh `/runner` volume at every start, so putting
 the toolchain there would repeat the large copy on every ephemeral Pod.
 `rustfmt` and `clippy` are added to the image because the ISUCON Rust CI uses
-both. The image workflow builds arm64 natively on a GitHub-hosted ARM runner.
+both. The image workflow builds amd64 on a GitHub-hosted runner.
 
 Publish with the
 [`garm-runner-rust - build & push image`](../.github/workflows/build-garm-rust-runner-image.yaml)
@@ -231,28 +234,29 @@ workflow. Its run summary prints the immutable
 `harbor.shion1305.com/shion1305/garm-runner-rust@sha256:...` reference. Update
 the GARM base digest in the Rust Dockerfile when publishing a new generic
 runner base. Put the published Rust image reference in the local
-`GARM_RUST_ARM_RUNNER_IMAGE` setting, then create one Rust pool per repository:
+`GARM_RUST_2605_RUNNER_IMAGE` setting. Once `shion-ubuntu-2605` is Ready,
+register each repository and create its Rust pool:
 
 ```bash
 cd github-actions-runner
-just pool-add-arm-rust k8s-GitOps
+just repo-add k8s-GitOps # Omit if the repository is already registered.
+just pool-add-ubuntu-2605-rust k8s-GitOps
 ```
 
-This recipe requires a digest-pinned image, sets `min-idle-runners` to 0 and
-`max-runners` to 1 initially, and gives the pool only the custom
-`shion1305-arm-rust` tag. Keep the existing `shion1305-arm` pool for other
-jobs. The pools share the Pi's CPU and disk, so review their combined runner
-limits before adding more Rust repositories. A Rust workflow selects the new
-pool with `runs-on: shion1305-arm-rust`. A repository that requests a different
-Rust version can still install it through `rustup`, but the preinstalled
-version saves setup time only when it matches that repository's
-`rust-toolchain.toml`.
+The recipe requires the dedicated Rust image at an immutable digest, verifies
+that the node is Ready, sets `min-idle-runners` to 0 and `max-runners` to 1
+initially, and gives the pool only the `shion1305-ubuntu-2605-rust` label.
+Its GitOps-managed GARM provider has hard amd64 and hostname selectors for
+`shion-ubuntu-2605`; jobs wait if that node is unavailable and never move to
+`shion-ubuntu-2505`. GARM pools themselves are created through `garm-cli`, as
+with the generic pools. A repository that requests a different Rust version
+can still install it through `rustup`, but the preinstalled version saves setup
+time only when it matches that repository's `rust-toolchain.toml`.
 
-The manual Rust smoke workflow offers an `arm_runner` choice. Select
-`shion1305-arm-rust` after the new image and pool are ready. It verifies the
-preinstalled compiler before calling the setup action. Compare the action's
-setup duration, image pull and Pod startup time, cache restore, and node disk
-usage with a run on the generic `shion1305-arm` pool.
+Select `shion1305-ubuntu-2605-rust` in the manual smoke workflow after the
+new image and pool are ready. It verifies the preinstalled compiler before
+calling the setup action. Compare toolchain setup, image pull and Pod startup,
+cache restore, and node disk usage with a deliberately selected generic pool.
 
 Rust code compiled **inside a container build** uses a separate cache path.
 The [Harbor build action](../.github/actions/harbor-build-push/action.yml)
