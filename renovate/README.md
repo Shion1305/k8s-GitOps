@@ -61,7 +61,8 @@ stringData:
 
 **Helm (values.yaml)**:
 - CronJob enabled with wrapper script command override
-- Resources: 2 CPU / 2Gi memory limit
+- Resources: 2 CPU / 4Gi memory limit
+- pnpm projects are handled by the `npm` manager; Helm chart dependencies use `helmv3`
 - PR Limits: 10 concurrent, 2 per hour
 - Onboarding: Enabled
 
