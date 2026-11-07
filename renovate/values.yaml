@@ -54,7 +54,7 @@ renovate:
         "docker-compose",
         "dockerfile",
         "github-actions",
-        "helm",
+        "helmv3",
         "helm-values",
         "helmfile",
         "kubernetes",
@@ -62,8 +62,6 @@ renovate:
         "custom.regex",
         "gomod",
         "npm",
-        "pnpm",
-        "pnpm-lock",
         "cargo",
         "pip_requirements",
         "pip_setup",
@@ -92,7 +90,7 @@ renovate:
 resources:
   limits:
     cpu: 2000m
-    memory: 2Gi
+    memory: 4Gi
   requests:
     cpu: 200m
     memory: 512Mi

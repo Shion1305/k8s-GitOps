@@ -3,11 +3,15 @@ on:
   pull_request:
     paths:
       - "renovate.json"
+      - "renovate/values.yaml"
+      - ".github/workflows/validate-renovate.yaml"
   push:
     branches:
       - main
     paths:
       - "renovate.json"
+      - "renovate/values.yaml"
+      - ".github/workflows/validate-renovate.yaml"
 jobs:
   validate:
     runs-on: ubuntu-latest
@@ -16,6 +20,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
+      - uses: aquaproj/aqua-installer@v4.1.0
+        with:
+          aqua_version: v2.59.1
+
       - name: Validate Renovate configuration
         run: |
           npx --yes --package renovate -- renovate-config-validator --strict
+          yq -r '.renovate.config' renovate/values.yaml > "$RUNNER_TEMP/renovate-global.json"
+          npx --yes --package renovate -- renovate-config-validator --strict "$RUNNER_TEMP/renovate-global.json"
