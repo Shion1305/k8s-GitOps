@@ -57,6 +57,9 @@ jobs:
           # One matrix job owns this shared cache tag; the other runners still
           # exercise the build and push path without racing to replace it.
           cache: ${{ matrix.runner == 'shion1305-amd' }}
+          # Validation builds use the per-repository GitHub Actions cache;
+          # they never fetch Harbor robot credentials.
+          gha-cache: ${{ github.event_name == 'pull_request' }}
           # On main, the demo moves `latest` so a `docker pull
           # harbor.shion1305.com/shion1305/demo` gets the most recent
           # smoke-test image. Branch dispatches must not move it.

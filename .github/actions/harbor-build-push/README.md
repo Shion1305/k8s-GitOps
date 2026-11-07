@@ -102,6 +102,7 @@ That's it. The action handles everything else.
 | `platforms`  | `linux/amd64,linux/arm64` | Comma-separated `buildx` target platforms. |
 | `push`       | `"true"`                 | Whether to publish the built image. Set to `"false"` for validation-only builds; no Harbor credentials are fetched in that case. For a workflow that handles PRs and pushes, use `${{ github.event_name != 'pull_request' }}`. |
 | `cache`      | `"true"`                 | Import `<image>:buildcache` from Harbor when `push` is true. Refresh it only on the default branch. Set to `"false"` to opt out. |
+| `gha-cache`  | `"false"`                | Opt in to GitHub Actions cache v2 for `push: "false"` builds. Imports and exports intermediate BuildKit layers without Harbor credentials. Uses the calling repository's cache quota. |
 | `sign`       | `"true"`                | Whether to keyless-sign with cosign (Fulcio + Rekor). Defaulted ON because mixing signed and unsigned images is a supply-chain footgun. Pass the string `"false"` to disable. |
 | `tag`        | `${{ github.sha }}`     | Primary tag pushed. Defaults to the calling repo's commit SHA so every build is uniquely addressable. |
 | `extra-tags` | `""`                    | Comma-separated additional tags applied to the same digest (e.g. `latest,v1.2.3`). Empty by default — opt in explicitly if you want a moving `latest`. |
@@ -110,6 +111,8 @@ All inputs are strings. Composite actions don't have typed inputs, so
 booleans are conveyed as the literal strings `"true"` / `"false"`.
 
 ## Build cache
+
+### Harbor registry cache for pushed builds
 
 When both `cache: "true"` and `push: "true"`, builds reuse BuildKit layers
 stored at `<image>:buildcache` in the same private Harbor project. The action
@@ -132,6 +135,47 @@ compilation stage, even when the shared BuildKit pod restarts. It does not
 persist the contents of Dockerfile `RUN --mount=type=cache` directories; those
 remain local to the builder. Native `cargo` jobs should use an Actions cache or
 a compiler cache separately.
+
+### GitHub Actions cache for validation builds
+
+For repeated validation builds, opt in to the GitHub Actions cache instead:
+
+```yaml
+name: validate image
+
+on:
+  pull_request:
+
+jobs:
+  validate-image:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+      - uses: Shion1305/k8s-GitOps/.github/actions/harbor-build-push@main
+        with:
+          image: harbor.shion1305.com/shion1305/<your-app>
+          push: "false"
+          gha-cache: "true"
+```
+
+The GitHub cache stores `mode=max` BuildKit layers under a scope derived from
+the image, context, Dockerfile and target platforms. It works with the GARM
+remote builder too, and can restore a PR build after its BuildKit pod restarts.
+The cache is scoped by GitHub repository and branch/PR. The first build of a
+new PR is normally cold; reruns and later commits to that PR can reuse its
+cache. This action writes GitHub cache only for validation builds, so its
+default-branch Harbor cache does not warm new PRs. A fork PR can read a
+base branch's GitHub cache if one exists, so do not put credentials in image
+layers. Run untrusted PRs on GitHub-hosted runners, not GARM. Cache transfers
+consume GitHub's repository quota and can add time to the first build, which is why this
+input defaults to off. Check for `importing cache manifest from gha` and
+`exporting cache to GitHub Actions Cache` in the build log to confirm use.
+Like the Harbor cache, it does not preserve Dockerfile `RUN --mount=type=cache`
+contents. [Docker's cache backend guide](https://docs.docker.com/build/cache/backends/gha/)
+and [GitHub's cache access rules](https://docs.github.com/en/actions/reference/workflows-and-actions/dependency-caching#restrictions-for-accessing-a-cache)
+describe the service limits and branch visibility.
 
 ## Outputs
 
