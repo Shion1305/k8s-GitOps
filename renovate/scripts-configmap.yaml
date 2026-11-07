@@ -14,12 +14,12 @@ data:
 
   run-renovate-core.sh: |
     #!/bin/bash
-    set -e
+    set -euo pipefail
 
     echo "Starting Renovate for all GitHub App installations..."
 
     # Check required environment variables
-    if [ -z "$RENOVATE_APP_ID" ] || [ -z "$RENOVATE_APP_PRIVATE_KEY" ]; then
+    if [ -z "${RENOVATE_APP_ID:-}" ] || [ -z "${RENOVATE_APP_PRIVATE_KEY:-}" ]; then
       echo "ERROR: RENOVATE_APP_ID and RENOVATE_APP_PRIVATE_KEY must be set"
       exit 1
     fi
@@ -30,19 +30,21 @@ data:
       local private_key="$2"
 
       # Current time
-      local now=$(date +%s)
+      local now header_b64 payload_b64 signature
+      now=$(date +%s)
+      local iat=$((now - 60))  # Allow for clock drift
       local exp=$((now + 600))  # 10 minutes from now
 
       # JWT header
       local header='{"alg":"RS256","typ":"JWT"}'
-      local header_b64=$(echo -n "$header" | base64 | tr -d '=' | tr '/+' '_-' | tr -d '\n')
+      header_b64=$(echo -n "$header" | base64 | tr -d '=' | tr '/+' '_-' | tr -d '\n')
 
       # JWT payload
-      local payload="{\"iat\":$now,\"exp\":$exp,\"iss\":\"$app_id\"}"
-      local payload_b64=$(echo -n "$payload" | base64 | tr -d '=' | tr '/+' '_-' | tr -d '\n')
+      local payload="{\"iat\":$iat,\"exp\":$exp,\"iss\":\"$app_id\"}"
+      payload_b64=$(echo -n "$payload" | base64 | tr -d '=' | tr '/+' '_-' | tr -d '\n')
 
       # Create signature
-      local signature=$(echo -n "${header_b64}.${payload_b64}" | \
+      signature=$(echo -n "${header_b64}.${payload_b64}" | \
         openssl dgst -sha256 -sign <(echo "$private_key") | \
         base64 | tr -d '=' | tr '/+' '_-' | tr -d '\n')
 
@@ -53,12 +55,10 @@ data:
     JWT=$(generate_jwt "$RENOVATE_APP_ID" "$RENOVATE_APP_PRIVATE_KEY")
 
     echo "Fetching list of installations..."
-    INSTALLATIONS=$(curl -s -H "Authorization: Bearer $JWT" \
+    if ! INSTALLATIONS=$(curl -fsS -H "Authorization: Bearer $JWT" \
       -H "Accept: application/vnd.github+json" \
-      https://api.github.com/app/installations | jq -r '.[].id')
-
-    if [ -z "$INSTALLATIONS" ]; then
-      echo "ERROR: No installations found for this GitHub App"
+      https://api.github.com/app/installations | jq -er '.[].id'); then
+      echo "ERROR: Could not discover installations for this GitHub App"
       exit 1
     fi
 
@@ -67,6 +67,7 @@ data:
 
     # Process each installation
     CURRENT=0
+    EXIT_STATUS=0
     for INSTALLATION_ID in $INSTALLATIONS; do
       CURRENT=$((CURRENT + 1))
       echo ""
@@ -75,17 +76,21 @@ data:
       echo "========================================="
 
       # Generate installation access token
+      # A previous Renovate run can outlive the App JWT's 10-minute lifetime.
+      JWT=$(generate_jwt "$RENOVATE_APP_ID" "$RENOVATE_APP_PRIVATE_KEY")
       echo "Generating access token for installation $INSTALLATION_ID..."
-      TOKEN_RESPONSE=$(curl -s -X POST \
+      if ! TOKEN_RESPONSE=$(curl -fsS -X POST \
         -H "Authorization: Bearer $JWT" \
         -H "Accept: application/vnd.github+json" \
-        "https://api.github.com/app/installations/$INSTALLATION_ID/access_tokens")
-
-      TOKEN=$(echo "$TOKEN_RESPONSE" | jq -r '.token')
-
-      if [ "$TOKEN" == "null" ] || [ -z "$TOKEN" ]; then
+        "https://api.github.com/app/installations/$INSTALLATION_ID/access_tokens"); then
         echo "ERROR: Failed to generate token for installation $INSTALLATION_ID"
-        echo "Response: $TOKEN_RESPONSE"
+        EXIT_STATUS=1
+        continue
+      fi
+
+      if ! TOKEN=$(echo "$TOKEN_RESPONSE" | jq -er '.token | select(type == "string" and length > 0)'); then
+        echo "ERROR: No token returned for installation $INSTALLATION_ID"
+        EXIT_STATUS=1
         continue
       fi
 
@@ -99,13 +104,19 @@ data:
         echo "✓ Renovate completed successfully for installation $INSTALLATION_ID"
       else
         echo "✗ Renovate failed for installation $INSTALLATION_ID"
+        EXIT_STATUS=1
       fi
 
       # Unset token for security
-      unset RENOVATE_TOKEN
+      unset RENOVATE_TOKEN TOKEN TOKEN_RESPONSE
     done
 
     echo ""
     echo "========================================="
-    echo "All installations processed!"
+    if [ "$EXIT_STATUS" -eq 0 ]; then
+      echo "All installations processed successfully!"
+    else
+      echo "ERROR: One or more installations failed"
+    fi
     echo "========================================="
+    exit "$EXIT_STATUS"

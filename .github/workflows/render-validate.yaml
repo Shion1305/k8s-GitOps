@@ -52,6 +52,9 @@ jobs:
           K8S_VERSION: "1.31.0"
         run: ./scripts/render-validate.sh
 
+      - name: Verify Renovate installation authentication
+        run: python3 renovate/tests/test-wrapper.py
+
       - name: Verify 2605 workspace storage guards
         run: |
           python3 -m json.tool garm-workspaces/config.json >/dev/null
