@@ -2,7 +2,7 @@
 
 # Keep both sources pinned to multi-platform OCI indexes. BuildKit selects the
 # toolchain matching each output platform without running rustup under QEMU.
-ARG RUST_IMAGE=rust:1.99.1-slim-bookworm@sha256:24707e70a4f1e23d9a7b25202ec43126d28a52294b96aad5c670df1fd1f1d400
+ARG RUST_IMAGE=rust:1.99.1-slim-bookworm@sha256:f2c004e3d2d8b547e8cf7ffbc29205385f4e71d23e53e4e383065db5e9f822cd
 ARG GARM_IMAGE=harbor.shion1305.com/shion1305/garm-runner@sha256:bb53496e68ce90d3cb481a199d26ccc83006d8f29e025fe771e5a885d9cdb8cd
 
 FROM ${RUST_IMAGE} AS rust-toolchain
