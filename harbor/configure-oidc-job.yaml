@@ -89,7 +89,7 @@ spec:
         - name: configure-oidc
           # Digest-pinned to defeat tag-mutation supply-chain attacks. Update
           # both tag and digest together. (alpine/curl 8.17.0 amd64+arm64.)
-          image: alpine/curl:8.22.0@sha256:f05779b04a6f3c6f228c67118786f5c80d4c4922dd79b0b24c92dc10a74f594f
+          image: alpine/curl:8.23.0@sha256:423fe846edd6e4d3181e3092f2c322c85861871d0dc1e774346e1d02684e5e4c
           imagePullPolicy: IfNotPresent
           securityContext:
             allowPrivilegeEscalation: false
