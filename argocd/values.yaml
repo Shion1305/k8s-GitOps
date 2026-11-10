@@ -171,8 +171,8 @@ configs:
     # No privileges are granted to other GitHub-authenticated users.
     policy.default: role:authenticated
     policy.csv: |
-      # Dex subject for GitHub user ID 20254962 (Shion1305).
-      g, CggyMDI1NDk2MhIGZ2l0aHVi, role:admin
+      # Argo CD 3.x Dex RBAC uses federated_claims.user_id.
+      g, 20254962, role:admin
   # Reference to existing secrets
   secret:
     createSecret: false # We'll keep existing argocd-secret
