@@ -1,0 +1,25 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: clinic-slot-monitor
+spec:
+  groups:
+    - name: clinic-slot-monitor
+      rules:
+        - alert: ClinicMonitorCheckOverdue
+          expr: |
+            (
+              time() - (
+                kube_cronjob_status_last_successful_time{namespace="clinic-slot-monitor", cronjob="clinic-slot-monitor"}
+                or on (namespace, cronjob)
+                kube_cronjob_created{namespace="clinic-slot-monitor", cronjob="clinic-slot-monitor"}
+              ) > 10800
+            )
+            and on (namespace, cronjob)
+            (kube_cronjob_spec_suspend{namespace="clinic-slot-monitor", cronjob="clinic-slot-monitor"} == 0)
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: Clinic monitor has not completed a recent check
+            description: The enabled hourly clinic monitor has had no successful check for over three hours. Check Job status, image access, shared secret synchronization, and outbound connectivity.

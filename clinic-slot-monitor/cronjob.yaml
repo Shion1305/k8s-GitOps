@@ -1,0 +1,65 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: clinic-slot-monitor
+spec:
+  schedule: "0 * * * *"
+  timeZone: Asia/Tokyo
+  suspend: false
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 600
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      activeDeadlineSeconds: 600
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: clinic-slot-monitor
+        spec:
+          restartPolicy: Never
+          automountServiceAccountToken: false
+          imagePullSecrets:
+            - name: harbor-pull
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65532
+            runAsGroup: 65532
+            fsGroup: 65532
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: monitor
+              image: harbor.i.shion1305.com/shion1305/clinic-slot-monitor@sha256:dc500468e6fdd918c7eb8282ca4e78f1abb63d34ea4ad97c6edde106b75c1e54
+              args:
+                - --months=4
+                - --pagerduty-region=us
+              env:
+                - name: PAGERDUTY_ROUTING_KEY_FILE
+                  value: /secrets/pagerduty/routing-key
+              resources:
+                requests:
+                  cpu: 10m
+                  memory: 32Mi
+                limits:
+                  cpu: 250m
+                  memory: 128Mi
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: [ALL]
+              volumeMounts:
+                - name: pagerduty
+                  mountPath: /secrets/pagerduty
+                  readOnly: true
+          volumes:
+            - name: pagerduty
+              secret:
+                secretName: pagerduty-events
+                defaultMode: 0440
+                items:
+                  - key: routing-key
+                    path: routing-key

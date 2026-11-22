@@ -5,3 +5,5 @@ resources:
   - rbac-credential-exposure-db.yaml
   - github-app-clustersecretstore.yaml
   - github-app-clusterexternalsecret.yaml
+  - pagerduty-clustersecretstore.yaml
+  - pagerduty-clusterexternalsecret.yaml

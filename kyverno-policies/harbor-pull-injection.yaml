@@ -86,6 +86,7 @@ spec:
               namespaces:
                 - atc
                 - clearnet-website-monitoring
+                - clinic-slot-monitor
                 - gh-leaked-tokens
                 - github-actions-runner-pods
                 - nc-press-chotatsu
