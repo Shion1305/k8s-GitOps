@@ -1,0 +1,21 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: clinic-slot-monitor
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/Shion1305/k8s-GitOps.git
+    targetRevision: HEAD
+    path: clinic-slot-monitor
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: clinic-slot-monitor
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false
+      - ServerSideApply=true

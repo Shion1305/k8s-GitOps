@@ -237,6 +237,15 @@ path "harbor/metadata/robot-puller" {
 EOF
 echo "✓ Created policy: eso-harbor-pull"
 
+# Shared PagerDuty Events key. Only the ESO operator can assume this role;
+# ClusterSecretStore conditions and namespace labels control distribution.
+vault policy write eso-pagerduty - <<EOF
+path "system/data/pagerduty" {
+  capabilities = ["read"]
+}
+EOF
+echo "✓ Created policy: eso-pagerduty"
+
 echo ""
 echo "=== Creating namespace-scoped Kubernetes auth roles ==="
 
@@ -386,6 +395,13 @@ vault write auth/kubernetes/role/eso-harbor-pull \
   ttl=1h
 echo "✓ Created role: eso-harbor-pull"
 
+vault write auth/kubernetes/role/eso-pagerduty \
+  bound_service_account_names=external-secrets \
+  bound_service_account_namespaces=external-secrets \
+  policies=eso-pagerduty \
+  ttl=1h
+echo "✓ Created role: eso-pagerduty"
+
 echo ""
 echo "=== Configuring GitHub Actions OIDC (JWT auth) for CI pushes ==="
 
@@ -529,6 +545,7 @@ echo "  eso-gh-leaked-tokens → SA eso/gh-leaked-tokens → gh-leaked-tokens/da
 echo "  eso-github-app  → SA external-secrets/external-secrets → github-app-shared/data/*"
 echo "  eso-cloudflare-grafana → SA eso/monitoring     → cloudflare-grafana/data/*"
 echo "  eso-harbor-pull → SA external-secrets/external-secrets → harbor/data/robot-puller"
+echo "  eso-pagerduty   → SA external-secrets/external-secrets → system/data/pagerduty"
 echo ""
 echo "GitHub Actions JWT roles:"
 echo "  harbor-robot-pusher          → repository_owner ∈ {Shion1305, Shion1305Dev} → harbor/data/robot-pusher"

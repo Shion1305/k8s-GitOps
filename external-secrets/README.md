@@ -64,6 +64,17 @@ Unlike pattern 1, the Vault role binds to the ESO operator's own SA (`external-s
 
 Used today: the `github-app-shared` mount holds shared GitHub OAuth credentials that are distributed as the `grafana-github-oauth-secret` Secret into the `grafana` and `monitoring` namespaces (both labeled `secrets-sync/enabled=true`).
 
+The shared PagerDuty Events integration follows the same pattern. The
+`vault-pagerduty` ClusterSecretStore reads only `system/pagerduty`, using Vault
+role `eso-pagerduty` bound to the ESO operator ServiceAccount. The
+`pagerduty-events` ClusterExternalSecret distributes its `routing-key` field as
+`Secret/pagerduty-events` to namespaces labeled
+`secrets.shion1305.com/pagerduty: enabled`. Store conditions enforce the same
+namespace selection. The `clinic-slot-monitor` namespace opts in; other
+applications can opt in through their namespace manifests. Rotate the shared
+key once in Vault; refresh runs every five minutes. Do not create application
+copies of the key in Vault or put the value in manifests.
+
 #### Onboarding a new consumer namespace
 
 ```bash
