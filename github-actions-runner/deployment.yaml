@@ -22,7 +22,7 @@ spec:
         kubernetes.io/hostname: shion-ubuntu-2505
       initContainers:
         - name: download-garm
-          image: curlimages/curl:8.22.0
+          image: curlimages/curl:8.23.0
           imagePullPolicy: IfNotPresent
           securityContext:
             runAsUser: 0
