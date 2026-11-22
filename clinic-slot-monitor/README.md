@@ -1,10 +1,14 @@
 # Clinic slot monitor
 
 A one-shot clinic availability check managed by Argo CD. The CronJob runs at
-minute zero of each hour in `Asia/Tokyo`, checks four months, and exits. A 1 GiB
-`longhorn-ssd` claim keeps notification deduplication state across Jobs. The claim
-is excluded from Argo CD pruning. Deleting its namespace still removes the
-claim, so preserve or recover the state before recreating the namespace.
+minute zero of each hour in `Asia/Tokyo`, checks four months, and exits. It is
+stateless: no PVC, database, lock file, or writable application volume is needed.
+
+Each run sends the currently available appointments using a stable PagerDuty
+deduplication key per appointment. PagerDuty groups matching events while an
+alert remains open. After it is resolved, a later check can create a new alert
+if the appointment is still available. Reopened appointments reuse the same key;
+the monitor does not retain notification or availability history.
 
 The initial deployment is **suspended**. Merging the manifests creates the
 configuration but does not schedule checks or send notifications.
@@ -29,9 +33,11 @@ The Vault policy and Kubernetes auth role are recorded in
 
 ## Image and activation
 
-The image is pinned to the digest produced by application commit
-`5c04235c536b3491fa750f744657c0daee50fd71`. Harbor pull credentials are delivered
-directly to this namespace through the existing shared Harbor secret mechanism.
+The image reference is a placeholder pending an approved stateless application
+build. Replace it with that build's published immutable digest before merging
+this deployment change. The earlier stateful image is incompatible with this
+configuration. Harbor pull credentials are delivered directly to this namespace
+through the existing shared Harbor secret mechanism.
 
 The internal image hostname controls this workload's route to Harbor; it does
 not restrict the same artifact through other Harbor endpoints. The existing
@@ -42,16 +48,16 @@ registry visibility or gateway access rules.
 
 Before activation:
 
-1. Confirm the image is protected on every exposed registry endpoint and the
-   pinned image can be pulled by cluster nodes. Update the reference if the
-   approved registry destination changes.
+1. Confirm the image is protected on every exposed registry endpoint. After the
+   stateless application change is approved and its image is published, replace
+   the image placeholder with its digest and confirm cluster nodes can pull it.
 2. Confirm `vault-pagerduty` is ready, the namespace's `pagerduty-events` and
-   `harbor-pull` secrets are synchronized, and the state PVC is bound. Confirm
+   `harbor-pull` secrets are synchronized. Confirm
    the PagerDuty integration region; the current flag uses the US Events API.
 3. Run one manual Job from the suspended CronJob with `--dry-run` added. Check
-   image pulling and calendar access; this mode does not send events or write
-   state. Keep its output within private operational systems.
-4. Run one normal manual Job to check mounted-secret access and state writes.
+   image pulling and calendar access; this mode does not send events.
+   Keep its output within private operational systems.
+4. Run one normal manual Job to check mounted-secret access and normal execution.
    Only actual availability may generate an event; do not send synthetic test
    incidents. A run without availability does not validate PagerDuty acceptance.
 5. Change `spec.suspend` to `false` through a reviewed change and confirm the

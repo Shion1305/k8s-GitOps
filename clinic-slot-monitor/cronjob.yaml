@@ -33,10 +33,10 @@ spec:
               type: RuntimeDefault
           containers:
             - name: monitor
-              image: harbor.i.shion1305.com/shion1305/clinic-slot-monitor@sha256:b824b99c68889f507ceb32b394217a9e381facf400154408f86d59ab31edad99
+              # Replace with the approved stateless build's image@sha256 digest.
+              image: harbor.i.shion1305.com/shion1305/clinic-slot-monitor:REPLACE_WITH_STATELESS_BUILD
               args:
                 - --months=4
-                - --state-file=/data/state.json
                 - --pagerduty-region=us
               env:
                 - name: PAGERDUTY_ROUTING_KEY_FILE
@@ -54,15 +54,10 @@ spec:
                 capabilities:
                   drop: [ALL]
               volumeMounts:
-                - name: state
-                  mountPath: /data
                 - name: pagerduty
                   mountPath: /secrets/pagerduty
                   readOnly: true
           volumes:
-            - name: state
-              persistentVolumeClaim:
-                claimName: clinic-slot-monitor-state
             - name: pagerduty
               secret:
                 secretName: pagerduty-events

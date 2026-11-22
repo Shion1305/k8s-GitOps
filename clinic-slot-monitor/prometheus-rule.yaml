@@ -22,4 +22,4 @@ spec:
             severity: warning
           annotations:
             summary: Clinic monitor has not completed a recent check
-            description: The enabled hourly clinic monitor has had no successful check for over three hours. Check Job status, image access, shared secret synchronization, and storage.
+            description: The enabled hourly clinic monitor has had no successful check for over three hours. Check Job status, image access, shared secret synchronization, and outbound connectivity.
