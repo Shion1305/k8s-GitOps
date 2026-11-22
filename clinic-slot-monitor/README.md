@@ -10,8 +10,9 @@ alert remains open. After it is resolved, a later check can create a new alert
 if the appointment is still available. Reopened appointments reuse the same key;
 the monitor does not retain notification or availability history.
 
-The initial deployment is **suspended**. Merging the manifests creates the
-configuration but does not schedule checks or send notifications.
+The schedule is **enabled** (`suspend: false`). After this change is merged and
+Argo CD syncs it, Jobs run hourly and may notify PagerDuty for real availability.
+Verify the shared key and registry access before merging.
 
 ## Shared PagerDuty key
 
@@ -33,36 +34,37 @@ The Vault policy and Kubernetes auth role are recorded in
 
 ## Image and activation
 
-The image reference is a placeholder pending an approved stateless application
-build. Replace it with that build's published immutable digest before merging
-this deployment change. The earlier stateful image is incompatible with this
-configuration. Harbor pull credentials are delivered directly to this namespace
-through the existing shared Harbor secret mechanism.
+The stateless image is pinned to the published digest from application commit
+`0f189df25e2a273b0cd5b87bbfe09020f74905ef`. Harbor pull credentials are delivered
+directly to this namespace through the existing shared Harbor secret mechanism.
 
 The internal image hostname controls this workload's route to Harbor; it does
 not restrict the same artifact through other Harbor endpoints. The existing
 public Registry v2 route also supports pulls, so a public Harbor project cannot
 be assumed private based on the hostname used here. Registry access must be
-resolved separately before enabling the schedule. This change does not modify
+resolved separately before merging the enabled schedule. This change does not modify
 registry visibility or gateway access rules.
 
-Before activation:
+Before merging:
 
-1. Confirm the image is protected on every exposed registry endpoint. After the
-   stateless application change is approved and its image is published, replace
-   the image placeholder with its digest and confirm cluster nodes can pull it.
-2. Confirm `vault-pagerduty` is ready, the namespace's `pagerduty-events` and
-   `harbor-pull` secrets are synchronized. Confirm
-   the PagerDuty integration region; the current flag uses the US Events API.
-3. Run one manual Job from the suspended CronJob with `--dry-run` added. Check
-   image pulling and calendar access; this mode does not send events.
-   Keep its output within private operational systems.
-4. Run one normal manual Job to check mounted-secret access and normal execution.
-   Only actual availability may generate an event; do not send synthetic test
-   incidents. A run without availability does not validate PagerDuty acceptance.
-5. Change `spec.suspend` to `false` through a reviewed change and confirm the
-   next hourly Job succeeds. To stop checks, suspend through Git again; Argo CD
-   will reconcile imperative changes back to Git.
+1. Confirm the image is protected on every exposed registry endpoint and that
+   the pinned stateless image can be pulled by cluster nodes.
+2. Verify that `system/pagerduty` contains the intended Events API v2 integration
+   key in the `routing-key` field. Confirm the account region; the current flag
+   uses the US Events API. The application never sends a synthetic test event.
+
+After merge and Argo CD synchronization:
+
+1. Confirm `vault-pagerduty` is ready and the namespace's `pagerduty-events` and
+   `harbor-pull` secrets are synchronized. An hourly Job cannot start its monitor
+   container until its required secret is available.
+2. Confirm the first scheduled Job succeeds. If needed, run a separate manual
+   Job with `--dry-run` added to verify calendar access without sending events.
+   Keep its output within private operational systems. A run with no available
+   appointments does not verify PagerDuty's acceptance of the key.
+3. To stop checks, change `spec.suspend` to `true` through Git; Argo CD will
+   reconcile imperative changes back to Git. Suspension prevents future Jobs;
+   it does not stop one that is already running.
 
 The cluster's existing failed-Job alert covers failures. A separate rule warns
 when an enabled monitor has no successful check for more than three hours,

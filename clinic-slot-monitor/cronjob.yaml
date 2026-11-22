@@ -5,8 +5,7 @@ metadata:
 spec:
   schedule: "0 * * * *"
   timeZone: Asia/Tokyo
-  # Enable through a reviewed change after the README's activation checks.
-  suspend: true
+  suspend: false
   concurrencyPolicy: Forbid
   startingDeadlineSeconds: 600
   successfulJobsHistoryLimit: 1
@@ -33,8 +32,7 @@ spec:
               type: RuntimeDefault
           containers:
             - name: monitor
-              # Replace with the approved stateless build's image@sha256 digest.
-              image: harbor.i.shion1305.com/shion1305/clinic-slot-monitor:REPLACE_WITH_STATELESS_BUILD
+              image: harbor.i.shion1305.com/shion1305/clinic-slot-monitor@sha256:dc500468e6fdd918c7eb8282ca4e78f1abb63d34ea4ad97c6edde106b75c1e54
               args:
                 - --months=4
                 - --pagerduty-region=us
