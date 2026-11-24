@@ -1,0 +1,62 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: calendar-sync
+spec:
+  schedule: "17 * * * *"
+  timeZone: Asia/Tokyo
+  # Enable through a reviewed PR after OAuth authorization and the dry run.
+  suspend: true
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 600
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      activeDeadlineSeconds: 600
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: calendar-sync
+        spec:
+          restartPolicy: Never
+          automountServiceAccountToken: false
+          imagePullSecrets:
+            - name: harbor-pull
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65532
+            runAsGroup: 65532
+            fsGroup: 65532
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: sync
+              image: harbor.i.shion1305.com/shion1305/calendar-sync@sha256:7638a8dfd95dabdaa06bf6f215d1e87de2e7d13ecb78214c156164dd5296ab4a
+              args:
+                - --config=/secrets/config.yaml
+                - --credentials=/secrets/credentials.json
+                - --token=/secrets/token.json
+                - --timeout=8m
+              resources:
+                requests:
+                  cpu: 10m
+                  memory: 64Mi
+                limits:
+                  cpu: 250m
+                  memory: 256Mi
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: [ALL]
+              volumeMounts:
+                - name: google
+                  mountPath: /secrets
+                  readOnly: true
+          volumes:
+            - name: google
+              secret:
+                secretName: calendar-sync-google
+                defaultMode: 0440
