@@ -6,10 +6,7 @@ and preserves copies after events disappear from the source feed. Restored
 `connpass_event_id` / `connpass_sync_key` markers and legacy sync properties
 are recognized; archival descriptions and `connpass_import_batch` survive.
 
-## Activation status
-
-The CronJob is initially **suspended**. Activate it after provisioning the
-Google credentials in Vault and verifying a read-only sync from the cluster.
+## Deployment
 
 Application code: https://github.com/Shion1305/calendar-sync/pull/3
 
@@ -17,11 +14,10 @@ The CronJob pulls `harbor.i.shion1305.com/shion1305/calendar-sync:latest`
 from Harbor each time a Pod starts. The application's default branch publishes
 the tag after testing and signing the multi-architecture image.
 
-To activate:
+### Provision or renew credentials
 
-1. Confirm the application's Test and publish workflow published `latest`.
-   Merging the deployment PR creates the suspended CronJob through the root
-   Argo CD application.
+1. To pause scheduled writes during credential maintenance, set
+   `spec.suspend` to `true` in Git and wait for Argo CD to sync.
 2. In the application checkout, run `go run . --authorize` using the local
    `config.yaml` and `credentials.json`. Complete the Google authorization,
    then inspect `go run . --dry-run`. Neither command writes calendar events.
@@ -36,12 +32,12 @@ To activate:
    `calendar-sync/google`, and grants only read access to that entry via Vault
    role `eso-calendar-sync`, bound to ServiceAccount `calendar-sync/eso`.
    Re-running the script rotates the stored files; it never prints them.
-4. After merge/sync, verify `SecretStore/vault`, `ExternalSecret/calendar-sync-google`,
+4. Verify `SecretStore/vault`, `ExternalSecret/calendar-sync-google`,
    and the namespace's `harbor-pull` Secret are ready. The shared Harbor ESO
    delivery includes this namespace, avoiding a first-Pod credential race.
 5. Run a one-off Job with `--dry-run` appended to its container arguments and
    check the planned counts/IDs. Keep calendar information in private systems.
-6. Change `spec.suspend` to `false` in a reviewed PR to start hourly writes.
+6. If you paused the schedule, restore `spec.suspend` to `false` through Git.
    The first normal run adopts current source matches; past restores absent
    from the current feed remain untouched and are never deleted.
 
