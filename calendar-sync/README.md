@@ -13,15 +13,15 @@ Google credentials in Vault and verifying a read-only sync from the cluster.
 
 Application code: https://github.com/Shion1305/calendar-sync/pull/3
 
-Published source commit: `eccc837b0c8748ccc30230f525aef01b6f6d0cee`.
-Pinned image digest: `sha256:7f550a939974b8c4626728a22e72f3289520c807728a813b29921dff3295639c`.
-[Successful signed publication](https://github.com/Shion1305/calendar-sync/actions/runs/45716355782).
+The CronJob pulls `harbor.i.shion1305.com/shion1305/calendar-sync:latest`
+from Harbor each time a Pod starts. The application's default branch publishes
+the tag after testing and signing the multi-architecture image.
 
 To activate:
 
-1. Review the application PR, then the deployment PR. Review the image's source
-   commit and pinned digest below. Merging deploys the suspended CronJob through
-   the root Argo CD application.
+1. Confirm the application's Test and publish workflow published `latest`.
+   Merging the deployment PR creates the suspended CronJob through the root
+   Argo CD application.
 2. In the application checkout, run `go run . --authorize` using the local
    `config.yaml` and `credentials.json`. Complete the Google authorization,
    then inspect `go run . --dry-run`. Neither command writes calendar events.
@@ -59,6 +59,6 @@ Access tokens refresh in memory. If Google revokes the refresh token, repeat
 local authorization and upload it; ESO refreshes within five minutes, and the
 next Job reads the replacement files.
 
-The image supports amd64 and arm64. CI publishes commit-SHA tags and keyless
-signatures through the shared Harbor action; this deployment uses an immutable
-digest. New images require a reviewed digest change in this repository.
+The image supports amd64 and arm64. The application's Test and publish workflow
+records the signed digest for each published build. Completed Pods report the
+image they used in their container status.
