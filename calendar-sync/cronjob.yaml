@@ -5,8 +5,7 @@ metadata:
 spec:
   schedule: "17 * * * *"
   timeZone: Asia/Tokyo
-  # Enable through a reviewed PR after OAuth authorization and the dry run.
-  suspend: true
+  suspend: false
   concurrencyPolicy: Forbid
   startingDeadlineSeconds: 600
   successfulJobsHistoryLimit: 1
