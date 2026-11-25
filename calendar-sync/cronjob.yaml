@@ -33,7 +33,7 @@ spec:
               type: RuntimeDefault
           containers:
             - name: sync
-              image: harbor.i.shion1305.com/shion1305/calendar-sync@sha256:7638a8dfd95dabdaa06bf6f215d1e87de2e7d13ecb78214c156164dd5296ab4a
+              image: harbor.i.shion1305.com/shion1305/calendar-sync@sha256:7f550a939974b8c4626728a22e72f3289520c807728a813b29921dff3295639c
               args:
                 - --config=/secrets/config.yaml
                 - --credentials=/secrets/credentials.json

@@ -8,16 +8,14 @@ are recognized; archival descriptions and `connpass_import_batch` survive.
 
 ## Activation status
 
-The CronJob is initially **suspended**. The existing local Google refresh token
-was rejected with `invalid_grant`, and the operator's cached Vault token also
-failed authentication. No revoked token is uploaded, and no live calendar
-changes or workload deployment are performed before PR review/merge.
+The CronJob is initially **suspended**. Activate it after provisioning the
+Google credentials in Vault and verifying a read-only sync from the cluster.
 
 Application code: https://github.com/Shion1305/calendar-sync/pull/3
 
-Published source commit: `87822f0d3b5304793094fc4e3ca07bb7db3113ca`.
-Pinned image digest: `sha256:7638a8dfd95dabdaa06bf6f215d1e87de2e7d13ecb78214c156164dd5296ab4a`.
-[Successful signed publication](https://github.com/Shion1305/calendar-sync/actions/runs/45310516503).
+Published source commit: `eccc837b0c8748ccc30230f525aef01b6f6d0cee`.
+Pinned image digest: `sha256:7f550a939974b8c4626728a22e72f3289520c807728a813b29921dff3295639c`.
+[Successful signed publication](https://github.com/Shion1305/calendar-sync/actions/runs/45716355782).
 
 To activate:
 
