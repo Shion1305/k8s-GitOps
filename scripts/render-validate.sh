@@ -603,6 +603,7 @@ validate_app() {
 
 main() {
   local app_file
+  bash "${ROOT}/scripts/validate-harbor-pull-ownership.sh" || exit 1
   validate_argocd_diff_safety || exit 1
   validate_argocd_submodule_safety || exit 1
   validate_whisper_cache_safety || exit 1
